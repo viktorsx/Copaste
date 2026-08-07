@@ -2,6 +2,12 @@
 
 A copy & paste tool for props in **Cities: Skylines II** — select groups of props, copy them, and stamp them anywhere with preserved layout, rotation, and height.
 
+## About this mod
+
+Copaste started as a personal tool: we wanted a group copy/paste and blueprint workflow for prop detailing that no existing tool offered, so we built one for our own city. It grew feature by feature — undo, blueprints, a proper UI — until it felt useful enough to share, so here it is.
+
+It was built by studying the source code of the excellent open-source mods credited below. Their MIT and Apache-2.0 licenses explicitly permit exactly this kind of learning and reuse — that openness is what makes the CS2 modding scene great, and this mod is published under the same spirit (MIT). Copaste is not a replacement for Move It or ctrlC; it is a different, prop-focused workflow that can happily live alongside them.
+
 ## Features
 
 - **Click & marquee selection** — click individual props, or drag a camera-aligned box on the ground to select whole groups at once (live highlight while dragging)
@@ -53,17 +59,22 @@ To keep the game responsive, selection is capped at **1000 props** and selection
 
 ## Building from source
 
-The project compiles against the game's own assemblies — no official toolchain required (see `Copaste.csproj`, `<GamePath>` property):
+The project uses the [official CS2 modding toolchain](https://cs2.paradoxwikis.com/Modding_Toolchain) (install it via the game's launcher first — it sets up the `CSII_TOOLPATH` environment and `Mod.props`/`Mod.targets`):
 
 ```powershell
-MSBuild.exe Copaste.csproj -nologo -restore:false
+$env:DOTNET_ROLL_FORWARD = 'LatestMajor'   # ModPostProcessor targets the .NET 6 runtime
+dotnet build Copaste.csproj -c Release
 ```
 
-The build auto-deploys `Copaste.dll`, `Copaste.mjs`, and `copaste.svg` to the game's local `Mods\Copaste` folder. Note: the code deliberately avoids `SystemAPI`, Burst jobs, and other source-generated Unity.Entities features, since it is built without IL post-processing.
+The build runs the game's IL post-processor, produces Burst native libraries for Windows/Linux/macOS, and auto-deploys everything (DLL + UI files) to the game's local `Mods\Copaste` folder.
+
+Two quirks worth knowing if you hack on this:
+- `EntityManager.CreateEntity(archetype)` does not compile under the toolchain's `net48` profile (missing span types — the official project template has the same issue); use the `CreateEntity(archetype, count, allocator)` overload instead.
+- The hand-written UI module (`ui/Copaste.mjs`) uses the game's runtime globals (`window.React`, `window["cs2/api"]`) instead of imports — ES imports silently break UI modules.
 
 ## Credits & thanks
 
-This mod stands on the shoulders of the CS2 modding community. Sincere thanks to:
+This mod stands on the shoulders of the CS2 modding community — it was written from scratch, but the patterns and APIs were learned from open-source mods whose licenses (MIT, Apache-2.0) explicitly welcome that. Sincere thanks to:
 
 - **[yenyang](https://github.com/yenyang)** — the selection, highlighting, and raycasting patterns were learned from the MIT-licensed sources of *Better Bulldozer*, *Anarchy*, *Tree Controller*, and *Move It*; Anarchy's `PreventOverride` component is integrated at runtime when present
 - **[algernon](https://github.com/algernon-A)** — the object placement approach (the game's definition pipeline) was learned from the Apache-2.0 sources of *Line Tool*
