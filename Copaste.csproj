@@ -1,0 +1,107 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<Title>Copaste</Title>
+		<Description>Copy &amp; paste tool for props — select, copy, paste, move, rotate and blueprint groups of props.</Description>
+		<Authors>Viktor</Authors>
+		<Version>1.0.0</Version>
+		<Copyright>Copyright © 2026 Viktor</Copyright>
+		<OutputType>Library</OutputType>
+		<LangVersion>9.0</LangVersion>
+		<PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
+	</PropertyGroup>
+
+	<!-- Imports moraju posle PropertyGroup bloka -->
+	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.props" />
+	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.targets" />
+
+	<ItemGroup>
+		<Reference Include="Game">
+			<HintPath>$(ManagedPath)\Game.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Core">
+			<HintPath>$(ManagedPath)\Colossal.Core.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Collections">
+			<HintPath>$(ManagedPath)\Colossal.Collections.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Mathematics">
+			<HintPath>$(ManagedPath)\Colossal.Mathematics.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Logging">
+			<HintPath>$(ManagedPath)\Colossal.Logging.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Localization">
+			<HintPath>$(ManagedPath)\Colossal.Localization.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.IO.AssetDatabase">
+			<HintPath>$(ManagedPath)\Colossal.IO.AssetDatabase.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.AssetPipeline">
+			<HintPath>$(ManagedPath)\Colossal.AssetPipeline.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Mono.Cecil">
+			<HintPath>$(ManagedPath)\Colossal.Mono.Cecil.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI">
+			<HintPath>$(ManagedPath)\Colossal.UI.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI.Binding">
+			<HintPath>$(ManagedPath)\Colossal.UI.Binding.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="System.Memory">
+			<HintPath>$(ManagedPath)\System.Memory.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="System.Runtime.CompilerServices.Unsafe">
+			<HintPath>$(ManagedPath)\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Entities">
+			<HintPath>$(ManagedPath)\Unity.Entities.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Collections">
+			<HintPath>$(ManagedPath)\Unity.Collections.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Burst">
+			<HintPath>$(ManagedPath)\Unity.Burst.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Mathematics">
+			<HintPath>$(ManagedPath)\Unity.Mathematics.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.InputSystem">
+			<HintPath>$(ManagedPath)\Unity.InputSystem.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="UnityEngine.CoreModule">
+			<HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="UnityEngine.AudioModule">
+			<HintPath>$(ManagedPath)\UnityEngine.AudioModule.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+	<!-- UI fajlovi (mjs/css/svg) idu uz DLL u deploy folder -->
+	<Target Name="CopasteDeployUI" AfterTargets="DeployWIP">
+		<ItemGroup>
+			<CopasteUIFiles Include="$(MSBuildProjectDirectory)\ui\*.*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(CopasteUIFiles)" DestinationFolder="$(DeployDir)" />
+	</Target>
+</Project>

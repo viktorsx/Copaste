@@ -1,0 +1,113 @@
+namespace Copaste
+{
+    using System.Collections.Generic;
+
+    internal static class Localization
+    {
+        internal static Dictionary<string, string> BuildEnglish(CopasteSettings settings)
+        {
+            return new Dictionary<string, string>
+            {
+                { settings.GetSettingsLocaleID(), "Copaste" },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.ToggleBinding)), "Toggle Copaste tool" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.ToggleBinding)), "Activates/deactivates the Copaste selection tool." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.CopyBinding)), "Copy selection" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.CopyBinding)), "Copies the selected props to the clipboard (while the tool is active)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.PasteBinding)), "Paste" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.PasteBinding)), "Enters paste mode with a preview following the mouse (while the tool is active)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.DeleteBinding)), "Delete selection" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.DeleteBinding)), "Deletes the selected props (while the tool is active)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.RaiseBinding)), "Raise selection" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.RaiseBinding)), "Raises the selected props (or the paste preview) while held." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.LowerBinding)), "Lower selection" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.LowerBinding)), "Lowers the selected props (or the paste preview) while held." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.UndoBinding)), "Undo" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.UndoBinding)), "Undoes the last Copaste action (move, rotate, height, delete, paste)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.SelectSameBinding)), "Select same" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.SelectSameBinding)), "Toggles a type filter taken from the hovered/selected prop: while active, marquee selection only picks props of that type. Press again to clear." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.SnapGroundBinding)), "Snap to ground" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.SnapGroundBinding)), "Drops the selection back onto the terrain (resets height)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.MatchHeightBinding)), "Match height" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.MatchHeightBinding)), "Arms height picking: the next prop you click sets the height for the whole selection." },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kMatchHeightAction), "Match height" },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeUpBinding)), "Nudge away" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeUpBinding)), "Nudges the selection away from the camera." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeDownBinding)), "Nudge towards" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeDownBinding)), "Nudges the selection towards the camera." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeLeftBinding)), "Nudge left" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeLeftBinding)), "Nudges the selection to the left." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Nudge right" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Nudges the selection to the right." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Anarchy while pasting" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Ignores placement errors (overlaps, collisions) while pasting, so props can be placed anywhere — like the Anarchy mod." },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kToggleAction), "Toggle Copaste tool" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kCopyAction), "Copy selection" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kPasteAction), "Paste" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kDeleteAction), "Delete selection" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kRaiseAction), "Raise selection" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kLowerAction), "Lower selection" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kUndoAction), "Undo" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kSelectSameAction), "Select same" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kSnapGroundAction), "Snap to ground" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeUpAction), "Nudge away" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeDownAction), "Nudge towards" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeLeftAction), "Nudge left" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeRightAction), "Nudge right" },
+                { settings.GetBindingMapLocaleID(), "Copaste" },
+            };
+        }
+
+        internal static Dictionary<string, string> BuildSerbian(CopasteSettings settings)
+        {
+            return new Dictionary<string, string>
+            {
+                { settings.GetSettingsLocaleID(), "Copaste" },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.ToggleBinding)), "Uključi/isključi Copaste alat" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.ToggleBinding)), "Aktivira/deaktivira Copaste alat za selekciju." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.CopyBinding)), "Kopiraj selekciju" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.CopyBinding)), "Kopira selektovane propove u clipboard (dok je alat aktivan)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.PasteBinding)), "Nalepi" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.PasteBinding)), "Ulazi u paste mod sa preview-om koji prati miš (dok je alat aktivan)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.DeleteBinding)), "Obriši selekciju" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.DeleteBinding)), "Briše selektovane propove (dok je alat aktivan)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.RaiseBinding)), "Podigni selekciju" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.RaiseBinding)), "Podiže selektovane propove (ili paste preview) dok je taster pritisnut." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.LowerBinding)), "Spusti selekciju" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.LowerBinding)), "Spušta selektovane propove (ili paste preview) dok je taster pritisnut." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.UndoBinding)), "Poništi (Undo)" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.UndoBinding)), "Poništava poslednju Copaste akciju (pomeranje, rotaciju, visinu, brisanje, lepljenje)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.SelectSameBinding)), "Selektuj iste" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.SelectSameBinding)), "Uključuje filter tipa (uzet od propa pod mišem/selektovanog): dok je aktivan, marquee hvata samo taj tip. Ponovni pritisak gasi filter." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.SnapGroundBinding)), "Spusti na teren" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.SnapGroundBinding)), "Vraća selekciju na visinu terena (resetuje visinu)." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.MatchHeightBinding)), "Preuzmi visinu" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.MatchHeightBinding)), "Aktivira biranje visine: sledeći prop na koji klikneš zadaje visinu celoj selekciji." },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kMatchHeightAction), "Preuzmi visinu" },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeUpBinding)), "Pomak od kamere" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeUpBinding)), "Fino pomera selekciju od kamere." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeDownBinding)), "Pomak ka kameri" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeDownBinding)), "Fino pomera selekciju ka kameri." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeLeftBinding)), "Pomak levo" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeLeftBinding)), "Fino pomera selekciju ulevo." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Pomak desno" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Fino pomera selekciju udesno." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Anarchy pri lepljenju" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Ignoriše greške postavljanja (preklapanja, kolizije) pri lepljenju — kao Anarchy mod." },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kToggleAction), "Uključi/isključi Copaste alat" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kCopyAction), "Kopiraj selekciju" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kPasteAction), "Nalepi" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kDeleteAction), "Obriši selekciju" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kRaiseAction), "Podigni selekciju" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kLowerAction), "Spusti selekciju" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kUndoAction), "Poništi (Undo)" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kSelectSameAction), "Selektuj iste" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kSnapGroundAction), "Spusti na teren" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeUpAction), "Pomak od kamere" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeDownAction), "Pomak ka kameri" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeLeftAction), "Pomak levo" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeRightAction), "Pomak desno" },
+                { settings.GetBindingMapLocaleID(), "Copaste" },
+            };
+        }
+    }
+}

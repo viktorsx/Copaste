@@ -1,0 +1,28 @@
+.copasteToggle{width:40rem !important;height:40rem !important;border-radius:8rem !important;background-color:var(--accentColorNormal) !important}
+.copasteToggle img{width:26rem !important;height:26rem !important}
+.copasteToggle:hover{background-color:var(--accentColorLight) !important}
+.copasteToggleSelected{background-color:var(--accentColorLight) !important}
+
+.copastePanel{position:absolute;top:80rem;left:10rem;width:210rem;padding:8rem 10rem;border-radius:8rem;background:linear-gradient(180deg,rgba(16,32,24,0.95),rgba(10,20,15,0.95));border:1rem solid rgba(120,220,160,0.12);color:#fff;font-size:12rem;pointer-events:auto}
+.copasteTitle{font-size:14rem;font-weight:bold;margin-bottom:4rem;color:#6fd39a}
+.copasteRow{display:flex;justify-content:space-between;margin:1rem 0}
+.copasteRowLabel{opacity:0.7;margin-right:10rem}
+.copasteSection{margin-top:8rem}
+.copasteSectionTitle{font-size:10rem;text-transform:uppercase;letter-spacing:1rem;opacity:0.45;margin-bottom:3rem}
+.copasteBtns{display:flex;margin:0 -2rem}
+.copasteBtn{height:26rem;padding:0 6rem;margin:2rem;border-radius:6rem;border:1rem solid rgba(120,220,160,0.18);background:linear-gradient(180deg,#264d38,#152e1f);color:#dfeee5;font-size:11rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:1 1 0;transition:all .12s}
+.copasteBtn:hover{background:linear-gradient(180deg,#39795a,#1f4530);border-color:rgba(120,220,160,0.4)}
+.copasteBtnActive{background:linear-gradient(180deg,#4fae74,#2c7047) !important;border-color:rgba(160,255,200,0.55) !important;color:#ffffff !important}
+.copasteBtnDisabled{background:rgba(255,255,255,0.04) !important;border-color:rgba(255,255,255,0.05) !important;color:rgba(255,255,255,0.25) !important;cursor:default}
+.copasteHint{margin-top:8rem;opacity:0.5;font-size:10rem;line-height:1.4}
+.copasteBpHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:3rem}
+.copasteBpTitle{font-size:10rem;text-transform:uppercase;letter-spacing:1rem;opacity:0.45}
+.copasteBpList{max-height:112rem;overflow-y:auto}
+.copasteBpRow{display:flex;align-items:center;margin:1rem 0}
+.copasteBpLoad{flex:1;text-align:left;padding:2rem 6rem;border:none;border-radius:3rem;background-color:rgba(255,255,255,0.07);color:#fff;font-size:11rem;cursor:pointer;transition:background-color .1s}
+.copasteBpLoad:hover{background-color:rgba(80,200,130,0.35)}
+.copasteBpIcon{width:20rem;height:20rem;margin-left:2rem;border:none;border-radius:3rem;background-color:rgba(255,255,255,0.09);color:#fff;font-size:10rem;cursor:pointer;transition:background-color .1s;display:flex;align-items:center;justify-content:center}
+.copasteBpIcon:hover{background-color:rgba(80,200,130,0.45)}
+.copasteBpIconDelete:hover{background-color:rgba(230,80,80,0.7)}
+.copasteInput{flex:1;padding:2rem 4rem;border-radius:3rem;border:1rem solid #56c288;background-color:rgba(0,0,0,0.5);color:#fff;font-size:11rem}
+.copasteEmpty{opacity:0.5;font-size:11rem}

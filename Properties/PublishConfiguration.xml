@@ -1,0 +1,34 @@
+<Publish>
+  <ModId Value="" />
+  <DisplayName Value="Copaste" />
+  <ShortDescription Value="Copy &amp; paste props — select, move, rotate, blueprint and stamp groups of props" />
+  <LongDescription>## Copaste
+A copy &amp; paste tool for props — select groups of props, copy them, and stamp them anywhere with preserved layout, rotation and height.
+
+## Features
+- **Click &amp; marquee selection** — click props or drag a camera-aligned box; live highlight while dragging
+- **Copy &amp; paste with preview** — the copied group follows your mouse as a ghost; click to place, repeat to stamp
+- **Move** — drag a selected prop to move the whole selection
+- **Group rotation** — hold right mouse button and drag, or use the panel buttons
+- **Height controls** — raise/lower (PgUp/PgDn), snap to ground (End), match another prop's height (Home)
+- **Type filter** — press T to only marquee-select props of one type
+- **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps)
+- **Blueprints** — save prop groups to disk and reuse them in any city or save
+- **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable); integrates with the Anarchy mod to keep pasted props visible
+- **Toolbar button + panel** — clickable buttons for every action, with tooltips
+- All hotkeys rebindable, English and Serbian localization
+
+## Usage
+Activate with **Ctrl+Shift+C** or the toolbar button. Click or drag-select props, **Ctrl+C** to copy, **Ctrl+V** to paste, click to place. Quick right-click steps back.
+
+## Credits
+Selection/highlight patterns learned from yenyang's MIT-licensed mods (Better Bulldozer, Anarchy, Tree Controller, Move It); placement pipeline from algernon's Line Tool (Apache-2.0); UI integration patterns from Bruceyboy24804's Node Controller.
+
+Special thanks to Biffa and ConflictNerd — the author's favorite Cities: Skylines YouTubers.</LongDescription>
+  <Thumbnail Value="Properties/Thumbnail.png" />
+  <Tag Value="Code Mod" />
+  <ForumLink Value="" />
+  <ModVersion Value="1.0.0" />
+  <GameVersion Value="1.6.*" />
+  <ChangeLog>Initial release.</ChangeLog>
+</Publish>
