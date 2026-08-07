@@ -1710,7 +1710,10 @@ namespace Copaste
                 return;
             }
 
-            Entity entity = EntityManager.CreateEntity(objectData.m_Archetype);
+            // 3-arg varijanta namerno: CreateEntity(archetype) povlači span tipove koje net48 toolchain build nema.
+            NativeArray<Entity> created = EntityManager.CreateEntity(objectData.m_Archetype, 1, Allocator.Temp);
+            Entity entity = created[0];
+            created.Dispose();
             EntityManager.SetComponentData(entity, new PrefabRef(snapshot.m_Prefab));
             EntityManager.SetComponentData(entity, snapshot.m_Transform);
             if (snapshot.m_HadElevation)

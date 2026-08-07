@@ -15,6 +15,13 @@
 	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.targets" />
 
 	<ItemGroup>
+		<!-- Samo za kompajliranje (ReadOnlySpan i sl.) — u igri postoji njena verzija -->
+		<PackageReference Include="System.Memory" Version="4.5.5">
+			<ExcludeAssets>runtime</ExcludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
 		<Reference Include="Game">
 			<HintPath>$(ManagedPath)\Game.dll</HintPath>
 			<Private>false</Private>
@@ -57,14 +64,6 @@
 		</Reference>
 		<Reference Include="Colossal.UI.Binding">
 			<HintPath>$(ManagedPath)\Colossal.UI.Binding.dll</HintPath>
-			<Private>false</Private>
-		</Reference>
-		<Reference Include="System.Memory">
-			<HintPath>$(ManagedPath)\System.Memory.dll</HintPath>
-			<Private>false</Private>
-		</Reference>
-		<Reference Include="System.Runtime.CompilerServices.Unsafe">
-			<HintPath>$(ManagedPath)\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.Entities">
