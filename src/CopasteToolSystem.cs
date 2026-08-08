@@ -2017,7 +2017,9 @@ namespace Copaste
             }
 
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
-            float targetOffset = sourceTransform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, sourceTransform.m_Position);
+
+            // Apsolutno poravnanje: svi na tačno istu svetsku visinu kao uzor-prop.
+            float targetY = sourceTransform.m_Position.y;
 
             PushTransformUndo();
 
@@ -2029,10 +2031,10 @@ namespace Copaste
                     continue;
                 }
 
-                transform.m_Position.y = TerrainUtils.SampleHeight(ref heightData, transform.m_Position) + targetOffset;
+                transform.m_Position.y = targetY;
                 EntityManager.SetComponentData(entity, transform);
 
-                float elevation = targetOffset;
+                float elevation = targetY - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
                 if (EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevationData))
                 {
                     elevationData.m_Elevation = elevation;
