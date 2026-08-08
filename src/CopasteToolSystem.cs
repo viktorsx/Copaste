@@ -117,6 +117,11 @@ namespace Copaste
         private float m_RightDragAccumulator;
         private float3 m_RotationCenter;
 
+        // ALT snap rotacije: 45° koraci (PI/4).
+        private const float kRotateSnap = 0.785398163f;
+        private float m_RotateAccum;
+        private float m_RotateApplied;
+
         private bool m_MarqueeHeld;
         private bool m_MarqueeActive;
         private float3 m_MarqueeStart;
@@ -421,6 +426,8 @@ namespace Copaste
                 {
                     m_RightDragging = true;
                     m_RotationCenter = GetSelectionCenter();
+                    m_RotateAccum = 0f;
+                    m_RotateApplied = 0f;
                     if (m_Mode == Mode.Select && m_Selected.Count > 0)
                     {
                         PushTransformUndo();
@@ -429,7 +436,12 @@ namespace Copaste
 
                 if (m_RightDragging)
                 {
-                    rotationDelta = deltaX * 0.005f;
+                    // ALT: rotacija se lepi na korake od 45°.
+                    m_RotateAccum += deltaX * 0.005f;
+                    bool altHeld = Keyboard.current != null && Keyboard.current.altKey.isPressed;
+                    float target = altHeld ? math.round(m_RotateAccum / kRotateSnap) * kRotateSnap : m_RotateAccum;
+                    rotationDelta = target - m_RotateApplied;
+                    m_RotateApplied = target;
                 }
             }
 

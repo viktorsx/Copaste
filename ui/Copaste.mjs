@@ -27,6 +27,7 @@ const register = (moduleRegistry) => {
     const undoCount$ = bindValue("copaste", "undoCount", 0);
     const sameFilter$ = bindValue("copaste", "sameFilter", "");
     const heightPickArmed$ = bindValue("copaste", "heightPickArmed", false);
+    const version$ = bindValue("copaste", "version", "");
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -93,6 +94,7 @@ const register = (moduleRegistry) => {
       const heightPickArmed = useValue(heightPickArmed$);
       const [renaming, setRenaming] = React.useState(null);
       const [renameValue, setRenameValue] = React.useState("");
+      const version = useValue(version$);
 
       if (!active) {
         return null;
@@ -189,7 +191,7 @@ const register = (moduleRegistry) => {
         h(
           "div",
           { className: "copasteTitle" },
-          pasteMode ? "Copaste — Paste" : heightPickArmed ? "Copaste — Pick height" : "Copaste — Select"
+          "COPASTE" + (version ? " v" + version : "")
         ),
         h(
           "div",

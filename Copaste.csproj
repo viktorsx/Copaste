@@ -3,7 +3,7 @@
 		<Title>Copaste</Title>
 		<Description>Copy &amp; paste tool for props — select, copy, paste, move, rotate and blueprint groups of props.</Description>
 		<Authors>Viktor</Authors>
-		<Version>1.0.0</Version>
+		<Version>1.0.1</Version>
 		<Copyright>Copyright © 2026 Viktor</Copyright>
 		<OutputType>Library</OutputType>
 		<LangVersion>9.0</LangVersion>

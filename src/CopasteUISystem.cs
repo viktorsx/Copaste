@@ -24,6 +24,8 @@ namespace Copaste
             m_ToolSystem = World.GetOrCreateSystemManaged<ToolSystem>();
             m_CopasteToolSystem = World.GetOrCreateSystemManaged<CopasteToolSystem>();
 
+            string version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+            AddBinding(new ValueBinding<string>("copaste", "version", version));
             AddBinding(m_ToolActive = new ValueBinding<bool>("copaste", "toolActive", false));
             AddBinding(m_PasteMode = new ValueBinding<bool>("copaste", "pasteMode", false));
             AddBinding(m_SelectedCount = new ValueBinding<int>("copaste", "selectedCount", 0));
