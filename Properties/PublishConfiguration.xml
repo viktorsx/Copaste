@@ -14,7 +14,7 @@ A copy &amp; paste tool for props — select groups of props, copy them, and sta
 - **Type filter** — press T to only marquee-select props of one type
 - **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps)
 - **Blueprints** — save prop groups to disk and reuse them in any city or save
-- **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable); integrates with the Anarchy mod to keep pasted props visible
+- **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable). Anarchy is NOT required: if it happens to be installed, Copaste additionally protects pasted props from being hidden by the game
 - **Toolbar button + panel** — clickable buttons for every action, with tooltips
 - All hotkeys rebindable, English and Serbian localization
 
@@ -33,7 +33,7 @@ Copaste started as a personal tool and grew into this release. It stands on the 
 ### Special thanks
 A very special thank-you to **Biffa** (BiffaPlaysCitiesSkylines) and **ConflictNerd** — simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing!
 
-Source code on GitHub: viktorsx/Copaste (MIT).</LongDescription>
+Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <Thumbnail Value="Properties/Thumbnail.png" />
   <Screenshot Value="Properties/Screenshots/InAction.png" />
   <Screenshot Value="Properties/Screenshots/Panel.png" />
@@ -42,4 +42,5 @@ Source code on GitHub: viktorsx/Copaste (MIT).</LongDescription>
   <ModVersion Value="1.0.0" />
   <GameVersion Value="1.6.*" />
   <ChangeLog>Initial release.</ChangeLog>
+  <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>
