@@ -445,6 +445,27 @@ namespace Copaste
             }
         }
 
+        // Keš poluprečnika gabarita po prefabu — za marquee test preseka.
+        private readonly Dictionary<Entity, float> m_PrefabHalfSize = new Dictionary<Entity, float>();
+
+        private float GetPrefabHalfSize(Entity prefabEntity)
+        {
+            if (m_PrefabHalfSize.TryGetValue(prefabEntity, out float half))
+            {
+                return half;
+            }
+
+            half = 1f;
+            if (EntityManager.TryGetComponent(prefabEntity, out ObjectGeometryData geometryData))
+            {
+                // Pola veće horizontalne dimenzije, ograničeno da džinovski propovi ne "love" izdaleka.
+                half = math.clamp(math.max(geometryData.m_Size.x, geometryData.m_Size.z) * 0.5f, 1f, 8f);
+            }
+
+            m_PrefabHalfSize[prefabEntity] = half;
+            return half;
+        }
+
         private void UpdateMarqueeHits()
         {
             // Pravougaonik u bazi kamere: u = širina (right), v = dubina (forward).
@@ -473,7 +494,10 @@ namespace Copaste
                 float2 offset = transforms[i].m_Position.xz - m_MarqueeStart.xz;
                 float pu = math.dot(offset, m_MarqueeRight);
                 float pv = math.dot(offset, m_MarqueeForward);
-                if (pu >= uMin && pu <= uMax && pv >= vMin && pv <= vMax)
+
+                // Presek sa gabaritom propa, ne samo centrom — prop čiji je deo u okviru se selektuje.
+                float half = GetPrefabHalfSize(prefabRefs[i].m_Prefab);
+                if (pu >= uMin - half && pu <= uMax + half && pv >= vMin - half && pv <= vMax + half)
                 {
                     if (m_MarqueeHits.Count >= kMaxSelection)
                     {
