@@ -21,10 +21,19 @@ A copy &amp; paste tool for props — select groups of props, copy them, and sta
 ## Usage
 Activate with **Ctrl+Shift+C** or the toolbar button. Click or drag-select props, **Ctrl+C** to copy, **Ctrl+V** to paste, click to place. Quick right-click steps back.
 
-## Credits
-Selection/highlight patterns learned from yenyang's MIT-licensed mods (Better Bulldozer, Anarchy, Tree Controller, Move It); placement pipeline from algernon's Line Tool (Apache-2.0); UI integration patterns from Bruceyboy24804's Node Controller.
+## Credits &amp; thanks
+Copaste started as a personal tool and grew into this release. It stands on the shoulders of the CS2 modding community — written from scratch, with patterns and APIs learned from open-source mods whose MIT and Apache-2.0 licenses explicitly welcome that. Sincere thanks to:
 
-Special thanks to Biffa and ConflictNerd — the author's favorite Cities: Skylines YouTubers.</LongDescription>
+- **yenyang** — the selection, highlighting and raycasting patterns were learned from the sources of *Better Bulldozer*, *Anarchy*, *Tree Controller* and *Move It*; Anarchy's PreventOverride is integrated at runtime when present
+- **algernon** — the object placement approach (the game's definition pipeline) was learned from the sources of *Line Tool*
+- **Bruceyboy24804** — *Node Controller* served as the reference for how mod UI integrates with the game's interface
+- **Colossal Order &amp; Paradox** — for Cities: Skylines II and the official modding documentation
+- The **CS2 modding community** for keeping their mods open source — none of this would exist otherwise
+
+### Special thanks
+A very special thank-you to **Biffa** (BiffaPlaysCitiesSkylines) and **ConflictNerd** — simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing!
+
+Source code on GitHub: viktorsx/Copaste (MIT).</LongDescription>
   <Thumbnail Value="Properties/Thumbnail.png" />
   <Screenshot Value="Properties/Screenshots/InAction.png" />
   <Screenshot Value="Properties/Screenshots/Panel.png" />
