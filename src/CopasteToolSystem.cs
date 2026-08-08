@@ -822,6 +822,13 @@ namespace Copaste
 
         private void UpdateSelectMode()
         {
+            // ESC gasi alat.
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                m_ToolSystem.activeTool = m_DefaultToolSystem;
+                return;
+            }
+
             UpdateRightButton(out float rotationDelta, out bool rightClick);
 
             // Rotacija selekcije desnim prevlačenjem.
@@ -1045,6 +1052,15 @@ namespace Copaste
 
         private void UpdatePasteMode()
         {
+            // ESC izlazi iz paste moda nazad u selekciju.
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                m_Mode = Mode.Select;
+                m_PasteDirty = false;
+                m_ToolSystem.ignoreErrors = false;
+                return;
+            }
+
             UpdateRightButton(out float rotationDelta, out bool rightClick);
 
             // Rotacija cele grupe u preview-u desnim prevlačenjem.
