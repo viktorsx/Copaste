@@ -22,6 +22,9 @@ A copy &amp; paste tool for props — select groups of props, copy them, and sta
 ## Usage
 Activate with **Ctrl+Shift+C** or the toolbar button. Click or drag-select props, **Ctrl+C** to copy, **Ctrl+V** to paste, click to place. Quick right-click steps back.
 
+## Transparency
+AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. The thumbnail illustration is AI-generated. Full source code is public on GitHub (link below) — judge it freely. Bug reports are read and fixed by a human.
+
 ## Credits &amp; thanks
 Copaste started as a personal tool and grew into this release. It stands on the shoulders of the CS2 modding community — written from scratch, with patterns and APIs learned from open-source mods whose MIT and Apache-2.0 licenses explicitly welcome that. Sincere thanks to:
 

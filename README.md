@@ -72,6 +72,10 @@ Two quirks worth knowing if you hack on this:
 - `EntityManager.CreateEntity(archetype)` does not compile under the toolchain's `net48` profile (missing span types — the official project template has the same issue); use the `CreateEntity(archetype, count, allocator)` overload instead.
 - The hand-written UI module (`ui/Copaste.mjs`) uses the game's runtime globals (`window.React`, `window["cs2/api"]`) instead of imports — ES imports silently break UI modules.
 
+## Transparency
+
+AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. The thumbnail illustration is AI-generated. Bug reports are read and fixed by a human.
+
 ## Credits & thanks
 
 This mod stands on the shoulders of the CS2 modding community — it was written from scratch, but the patterns and APIs were learned from open-source mods whose licenses (MIT, Apache-2.0) explicitly welcome that. Sincere thanks to:
