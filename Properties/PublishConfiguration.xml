@@ -6,13 +6,14 @@
 A copy &amp; paste tool for props — select groups of props, copy them, and stamp them anywhere with preserved layout, rotation and height.
 
 ## Features
-- **Click &amp; marquee selection** — click props or drag a camera-aligned box; live highlight while dragging
+- **Click &amp; marquee selection** — click props or drag a camera-aligned box; live highlight while dragging. Works on props, decals AND trees
 - **Copy &amp; paste with preview** — the copied group follows your mouse as a ghost; click to place, repeat to stamp
 - **Move** — drag a selected prop to move the whole selection
 - **Group rotation** — hold right mouse button and drag, or use the panel buttons
 - **Height controls** — raise/lower (PgUp/PgDn), snap to ground (End), match another prop's height (Home)
-- **Type filter** — press T to only marquee-select props of one type
-- **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps)
+- **Delete** — press Delete to remove the whole selection at once. Combined with marquee + type filter it's great for bulk cleanup: box-select an area, press T on a tree to keep only that tree type, hit Delete — a whole overgrown forest gone in three clicks (and Ctrl+Z brings it back, ages preserved)
+- **Type filter** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too)
+- **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps); deleted trees come back with their original growth stage
 - **Blueprints** — save prop groups to disk and reuse them in any city or save
 - **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable). Anarchy is NOT required: if it happens to be installed, Copaste additionally protects pasted props from being hidden by the game
 - **Toolbar button + panel** — clickable buttons for every action, with tooltips
