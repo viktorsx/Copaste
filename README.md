@@ -10,17 +10,17 @@ It was built by studying the source code of the excellent open-source mods credi
 
 ## Features
 
-- **Click & marquee selection** — click individual props, or drag a camera-aligned box on the ground to select whole groups at once (live highlight while dragging)
+- **Click & marquee selection** — click individual props, or drag a camera-aligned box on the ground to select whole groups at once (live highlight while dragging). Works on props, decals **and trees**
 - **Copy & paste with preview** — the copied group follows your mouse as a ghost preview; click to place, as many times as you like
 - **Layout preserved** — relative positions, rotations, and heights above terrain are kept exactly as in the original group
 - **Group rotation** — hold right mouse button and drag to rotate a selection (or the paste preview) around its center
 - **Move** — drag a selected prop to move the whole selection, layout and heights preserved
-- **Delete** — remove the whole selection with one key
+- **Delete** — remove the whole selection with one key. Combined with marquee + type filter it makes bulk cleanup trivial: box-select an area, press **T** on a tree to keep only that tree type, hit **Delete** — a whole overgrown forest gone in three clicks (Ctrl+Z brings it back, growth stages preserved)
 - **Paste onto roads & paths** — the group lifts to the surface you point at
 - **Anarchy-style pasting** — placement errors (overlapping items etc.) are ignored while pasting (toggleable in options); pasted props are protected from being hidden by the game when the [Anarchy](https://mods.paradoxplaza.com/mods/74604/Windows) mod is installed
-- **Undo** — Ctrl+Z reverts the last action (move, rotate, height change, delete, paste), up to 32 steps back
+- **Undo** — Ctrl+Z reverts the last action (move, rotate, height change, delete, paste), up to 32 steps back; deleted trees come back with their original growth stage
 - **Blueprints** — save the copied group to disk and reuse it in any city or save; managed from the in-game panel
-- **Select same** — one key selects every free-standing prop of the same type as the hovered one
+- **Type filter ("Same")** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too)
 - **Nudge & snap** — fine-position the selection with Ctrl+arrows, drop it back to terrain with End
 - **Toolbar button + status panel** — a top-left toolbar button toggles the tool; a small panel shows the current mode, selection and clipboard counts, shortcut hints, and your blueprints
 - **Rebindable hotkeys** — all shortcuts can be changed in Options → Copaste
