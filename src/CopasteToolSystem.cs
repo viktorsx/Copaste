@@ -609,6 +609,13 @@ namespace Copaste
                 return;
             }
 
+            // Dok je filter aktivan, klik na prop prebacuje filter na njegov tip.
+            if (m_SameFilterPrefab != Entity.Null &&
+                EntityManager.TryGetComponent(entity, out PrefabRef clickedPrefab))
+            {
+                m_SameFilterPrefab = clickedPrefab.m_Prefab;
+            }
+
             if (shiftHeld)
             {
                 if (m_Selected.Remove(entity))

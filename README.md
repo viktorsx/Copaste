@@ -42,7 +42,7 @@ It was built by studying the source code of the excellent open-source mods credi
 | Raise / lower selection or paste preview | **Page Up / Page Down** (hold for continuous) |
 | Delete selection | **Delete** |
 | Undo last action | **Ctrl+Z** (works in paste mode too — removes the last stamp) |
-| Type filter ("Same") | **T** — toggles a filter taken from the hovered/selected prop: while active, marquee only picks that prop type; press again to clear |
+| Type filter ("Same") | **T** — toggles a filter taken from the hovered/selected prop: while active, marquee only picks that prop type; clicking any prop switches the filter to its type; press again to clear |
 | Match height | **Home** — arms height picking: the next prop you click sets the height for the whole selection |
 | Nudge selection | **Ctrl + arrow keys** (camera-relative, hold for continuous) |
 | Snap selection to ground | **End** (in paste mode: resets the height offset) |

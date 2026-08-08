@@ -12,7 +12,7 @@ A copy &amp; paste tool for props — select groups of props, copy them, and sta
 - **Group rotation** — hold right mouse button and drag, or use the panel buttons
 - **Height controls** — raise/lower (PgUp/PgDn), snap to ground (End), match another prop's height (Home)
 - **Delete** — press Delete to remove the whole selection at once. Combined with marquee + type filter it's great for bulk cleanup: box-select an area, press T on a tree to keep only that tree type, hit Delete — a whole overgrown forest gone in three clicks (and Ctrl+Z brings it back, ages preserved)
-- **Type filter** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too)
+- **Type filter** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too). While the filter is active, clicking any prop switches the filter to that prop's type
 - **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps); deleted trees come back with their original growth stage
 - **Blueprints** — save prop groups to disk and reuse them in any city or save
 - **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable). Anarchy is NOT required: if it happens to be installed, Copaste additionally protects pasted props from being hidden by the game
@@ -48,6 +48,7 @@ Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <ModVersion Value="1.0.1" />
   <GameVersion Value="1.6.*" />
   <ChangeLog>- Marquee selection now uses each prop's footprint instead of its center point, so props visually inside the box no longer get skipped when the edge passes through them
-- New thumbnail</ChangeLog>
+- While the type filter is active, clicking a prop now switches the filter to that prop's type
+- New thumbnail and screenshots</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>
