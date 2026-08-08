@@ -176,10 +176,11 @@ namespace Copaste
         {
             base.InitializeRaycast();
 
-            if (m_Mode == Mode.Paste || m_MoveDragging)
+            if (m_Mode == Mode.Paste || m_MoveDragging || m_MarqueeHeld)
             {
                 // Net je uključen da bi se grupa mogla nalepiti na površinu puta/staze, ne samo na teren.
-                // Isti mask važi i tokom pomeranja — da raycast ne pogađa propove koje upravo vučemo.
+                // Isti mask važi tokom pomeranja i marquee razvlačenja — da raycast ne pogađa
+                // propove koje vučemo, niti "iskače" na zgrade preko kojih kursor prelazi.
                 m_ToolRaycastSystem.typeMask = TypeMask.Terrain | TypeMask.Net;
                 m_ToolRaycastSystem.netLayerMask = Game.Net.Layer.Road | Game.Net.Layer.Pathway | Game.Net.Layer.PublicTransportRoad;
                 m_ToolRaycastSystem.collisionMask = CollisionMask.OnGround | CollisionMask.Overground;
@@ -894,8 +895,10 @@ namespace Copaste
                     m_LeftPressShift = shiftHeld;
                     m_MoveStart = hit.m_HitPosition;
                 }
-                else if (raycastValid && !m_LeftHeldOnProp)
+                else if (raycastValid && !m_LeftHeldOnProp &&
+                    (raycastEntity == Entity.Null || !EntityManager.HasComponent<Game.Objects.Object>(raycastEntity)))
                 {
+                    // Marquee počinje samo na tlu — klik na zgradu ne sme da "usidri" ugao na njen krov.
                     m_MarqueeHeld = true;
                     m_MarqueeActive = false;
                     m_MarqueeStart = hit.m_HitPosition;

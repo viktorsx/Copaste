@@ -45,7 +45,7 @@ Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <Screenshot Value="Properties/Screenshots/Panel.png" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
-  <ModVersion Value="1.0.1" />
+  <ModVersion Value="1.0.2" />
   <GameVersion Value="1.6.*" />
   <ChangeLog>- Marquee selection now uses each prop's footprint instead of its center point, so props visually inside the box no longer get skipped when the edge passes through them
 - While the type filter is active, clicking a prop now switches the filter to that prop's type

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.2] - 2026-08-08
+
+- Fixed marquee corner jumping onto buildings while dragging (the box now follows the terrain under the cursor)
+- Marquee can no longer be started by clicking on a building
+
 ## [1.0.1] - 2026-08-08
 
 - Marquee selection now uses each prop's footprint instead of its center point, so props visually inside the box no longer get skipped when the edge passes through them
