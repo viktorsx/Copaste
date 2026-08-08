@@ -74,7 +74,7 @@ Two quirks worth knowing if you hack on this:
 
 ## Transparency
 
-AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. The thumbnail illustration is AI-generated. Bug reports are read and fixed by a human.
+AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. Bug reports are read and fixed by a human.
 
 ## Credits & thanks
 
