@@ -1,5 +1,5 @@
 <Publish>
-  <ModId Value="" />
+  <ModId Value="154371" />
   <DisplayName Value="Copaste" />
   <ShortDescription Value="Copy &amp; paste props — select, move, rotate, blueprint and stamp groups of props" />
   <LongDescription>## Copaste
@@ -26,6 +26,8 @@ Selection/highlight patterns learned from yenyang's MIT-licensed mods (Better Bu
 
 Special thanks to Biffa and ConflictNerd — the author's favorite Cities: Skylines YouTubers.</LongDescription>
   <Thumbnail Value="Properties/Thumbnail.png" />
+  <Screenshot Value="Properties/Screenshots/InAction.png" />
+  <Screenshot Value="Properties/Screenshots/Panel.png" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
   <ModVersion Value="1.0.0" />
