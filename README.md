@@ -84,7 +84,7 @@ This mod stands on the shoulders of the CS2 modding community — it was written
 
 ### Special thanks
 
-A very special thank-you to **[Biffa](https://www.youtube.com/@BiffaPlaysCitiesSkylines)** and **[ConflictNerd](https://www.youtube.com/@ConflictNerd)** — simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing! 🍵
+A very special thank-you to **[Biffa (Biffa Plays Indie Games)](https://www.youtube.com/@BiffaPlaysCitiesSkylines)** and **[ConflictNerd](https://www.youtube.com/@ConflictNerd)** — simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing! 🍵
 
 ## License
 
