@@ -138,6 +138,10 @@ namespace Copaste
             public float3 m_Position;
             public bool m_HadTree;
             public Game.Objects.Tree m_Tree;
+
+            // Stvarni entitet koji je paste stvorio — razrešava se u RunPostPasteFix,
+            // da undo briše baš njega, a ne bilo koji istovetan prop na istom mestu.
+            public Entity m_Resolved;
         }
 
         private struct MoveItem
@@ -155,7 +159,7 @@ namespace Copaste
         private readonly List<MoveItem> m_MoveItems = new List<MoveItem>();
 
         private readonly List<PastedRecord> m_LastPreview = new List<PastedRecord>();
-        private readonly List<PastedRecord> m_PostPasteFix = new List<PastedRecord>();
+        private List<PastedRecord> m_PostPasteFix;
         private int m_PostPasteFixFrames;
         private ComponentType m_PreventOverrideType;
         private bool m_HasPreventOverride;
@@ -383,7 +387,7 @@ namespace Copaste
             m_RightDragging = false;
             m_SameFilterPrefab = Entity.Null;
             m_HeightPickArmed = false;
-            m_PostPasteFix.Clear();
+            m_PostPasteFix = null;
             m_PostPasteFixFrames = 0;
             m_HoverEntity = Entity.Null;
             if (m_ToolSystem != null)
@@ -1064,6 +1068,7 @@ namespace Copaste
                 m_Mode = Mode.Paste;
                 m_PasteDirty = true;
                 m_PasteHeightBoost = 0f;
+                m_LastPreview.Clear();
             }
 
             DrawSelectOverlays();
@@ -1139,16 +1144,21 @@ namespace Copaste
             // Klik: potvrdi — prošlofrejmovski preview postaje trajan.
             if (ClickedThisFrame())
             {
+                // Bez preview-a nema šta da se potvrdi (npr. klik u prvom frejmu paste moda).
+                if (m_LastPreview.Count == 0)
+                {
+                    return;
+                }
+
                 applyMode = ApplyMode.Apply;
                 m_PasteDirty = true;
 
-                // Zapamti šta je nalepljeno: naknadno se skida Overridden / dodaje PreventOverride
-                // (uz Anarchy opciju) i vraća starost drveća — zato uvek.
-                m_PostPasteFix.Clear();
-                m_PostPasteFix.AddRange(m_LastPreview);
+                // Ista lista ide i u post-paste popravke i u undo zapis: popravke usput
+                // razrešavaju TAČNE entitete koje je paste stvorio, pa undo briše samo njih.
+                m_PostPasteFix = new List<PastedRecord>(m_LastPreview);
                 m_PostPasteFixFrames = 10;
 
-                PushUndo(new UndoRecord { m_Kind = UndoKind.Paste, m_Pasted = new List<PastedRecord>(m_LastPreview) });
+                PushUndo(new UndoRecord { m_Kind = UndoKind.Paste, m_Pasted = m_PostPasteFix });
                 if (!m_SoundQuery.IsEmptyIgnoreFilter)
                 {
                     m_AudioManager.PlayUISound(m_SoundQuery.GetSingleton<ToolUXSoundSettingsData>().m_PlacePropSound);
@@ -1369,6 +1379,7 @@ namespace Copaste
                 EntityManager.HasComponent<PrefabRef>(entity) &&
                 !EntityManager.HasComponent<Game.Buildings.Building>(entity) &&
                 !EntityManager.HasComponent<Game.Buildings.Extension>(entity) &&
+                !EntityManager.HasComponent<Game.Vehicles.Vehicle>(entity) &&
                 !EntityManager.HasComponent<Game.Objects.Moving>(entity) &&
                 !EntityManager.HasComponent<Temp>(entity) &&
                 !EntityManager.HasComponent<Deleted>(entity);
@@ -1463,6 +1474,7 @@ namespace Copaste
                 m_Mode = Mode.Paste;
                 m_PasteDirty = true;
                 m_PasteHeightBoost = 0f;
+                m_LastPreview.Clear();
             }
         }
 
@@ -1583,81 +1595,122 @@ namespace Copaste
 
         // Nekoliko frejmova posle lepljenja: skini Overridden sa nalepljenih propova
         // i (ako je Anarchy prisutan) dodaj im PreventOverride da ostanu vidljivi.
+        // Popravke jednog nalepljenog entiteta (anti-override + starost drveta).
+        private void ApplyPastedFix(Entity entity, PastedRecord record)
+        {
+            if (!EntityManager.Exists(entity))
+            {
+                return;
+            }
+
+            if (Mod.Settings.AnarchyPaste)
+            {
+                if (EntityManager.HasComponent<Overridden>(entity))
+                {
+                    EntityManager.RemoveComponent<Overridden>(entity);
+                    EntityManager.AddComponent<BatchesUpdated>(entity);
+                }
+
+                if (m_HasPreventOverride && !EntityManager.HasComponent(entity, m_PreventOverrideType))
+                {
+                    EntityManager.AddComponent(entity, m_PreventOverrideType);
+                }
+            }
+
+            // Nalepljeno drveće preuzima starost/stanje originala.
+            if (record.m_HadTree &&
+                EntityManager.TryGetComponent(entity, out Game.Objects.Tree currentTree) &&
+                !currentTree.Equals(record.m_Tree))
+            {
+                EntityManager.SetComponentData(entity, record.m_Tree);
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+            }
+        }
+
         private void RunPostPasteFix()
         {
-            if (m_PostPasteFixFrames <= 0 || m_PostPasteFix.Count == 0)
+            if (m_PostPasteFixFrames <= 0 || m_PostPasteFix == null || m_PostPasteFix.Count == 0)
             {
                 return;
             }
 
             m_PostPasteFixFrames--;
 
-            // Granice svih nalepljenih pozicija — brzi filter pre skupog poređenja.
-            float3 boundsMin = new float3(float.MaxValue);
-            float3 boundsMax = new float3(float.MinValue);
-            foreach (PastedRecord record in m_PostPasteFix)
+            // Već razrešeni zapisi: održavaj popravke na TAČNO tom entitetu (jeftino).
+            HashSet<Entity> claimed = new HashSet<Entity>();
+            int unresolvedCount = 0;
+            for (int j = 0; j < m_PostPasteFix.Count; j++)
             {
-                boundsMin = math.min(boundsMin, record.m_Position);
-                boundsMax = math.max(boundsMax, record.m_Position);
+                PastedRecord record = m_PostPasteFix[j];
+                if (record.m_Resolved != Entity.Null)
+                {
+                    claimed.Add(record.m_Resolved);
+                    ApplyPastedFix(record.m_Resolved, record);
+                }
+                else
+                {
+                    unresolvedCount++;
+                }
             }
 
-            boundsMin -= 0.5f;
-            boundsMax += 0.5f;
-
-            NativeArray<Entity> entities = m_PropQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<Game.Objects.Transform> transforms = m_PropQuery.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
-            NativeArray<PrefabRef> prefabRefs = m_PropQuery.ToComponentDataArray<PrefabRef>(Allocator.Temp);
-
-            for (int i = 0; i < entities.Length; i++)
+            // Nerazrešeni zapisi: pronađi novonastale entitete — najviše JEDAN po zapisu,
+            // da zatečeni istovetni propovi na istom mestu ne budu uvučeni u undo.
+            if (unresolvedCount > 0)
             {
-                float3 entityPosition = transforms[i].m_Position;
-                if (math.any(entityPosition < boundsMin) || math.any(entityPosition > boundsMax))
-                {
-                    continue;
-                }
-
+                float3 boundsMin = new float3(float.MaxValue);
+                float3 boundsMax = new float3(float.MinValue);
                 foreach (PastedRecord record in m_PostPasteFix)
                 {
-                    if (prefabRefs[i].m_Prefab != record.m_Prefab ||
-                        math.distancesq(transforms[i].m_Position, record.m_Position) > 0.01f)
+                    if (record.m_Resolved == Entity.Null)
+                    {
+                        boundsMin = math.min(boundsMin, record.m_Position);
+                        boundsMax = math.max(boundsMax, record.m_Position);
+                    }
+                }
+
+                boundsMin -= 0.5f;
+                boundsMax += 0.5f;
+
+                NativeArray<Entity> entities = m_PropQuery.ToEntityArray(Allocator.Temp);
+                NativeArray<Game.Objects.Transform> transforms = m_PropQuery.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
+                NativeArray<PrefabRef> prefabRefs = m_PropQuery.ToComponentDataArray<PrefabRef>(Allocator.Temp);
+
+                for (int i = 0; i < entities.Length; i++)
+                {
+                    float3 entityPosition = transforms[i].m_Position;
+                    if (math.any(entityPosition < boundsMin) || math.any(entityPosition > boundsMax) ||
+                        claimed.Contains(entities[i]))
                     {
                         continue;
                     }
 
-                    if (Mod.Settings.AnarchyPaste)
+                    for (int j = 0; j < m_PostPasteFix.Count; j++)
                     {
-                        if (EntityManager.HasComponent<Overridden>(entities[i]))
+                        PastedRecord record = m_PostPasteFix[j];
+                        if (record.m_Resolved != Entity.Null ||
+                            prefabRefs[i].m_Prefab != record.m_Prefab ||
+                            math.distancesq(entityPosition, record.m_Position) > 0.01f)
                         {
-                            EntityManager.RemoveComponent<Overridden>(entities[i]);
-                            EntityManager.AddComponent<BatchesUpdated>(entities[i]);
+                            continue;
                         }
 
-                        if (m_HasPreventOverride && !EntityManager.HasComponent(entities[i], m_PreventOverrideType))
-                        {
-                            EntityManager.AddComponent(entities[i], m_PreventOverrideType);
-                        }
+                        record.m_Resolved = entities[i];
+                        m_PostPasteFix[j] = record;
+                        claimed.Add(entities[i]);
+                        ApplyPastedFix(entities[i], record);
+                        break;
                     }
-
-                    // Nalepljeno drveće preuzima starost/stanje originala.
-                    if (record.m_HadTree &&
-                        EntityManager.TryGetComponent(entities[i], out Game.Objects.Tree currentTree) &&
-                        !currentTree.Equals(record.m_Tree))
-                    {
-                        EntityManager.SetComponentData(entities[i], record.m_Tree);
-                        EntityManager.AddComponent<BatchesUpdated>(entities[i]);
-                    }
-
-                    break;
                 }
-            }
 
-            entities.Dispose();
-            transforms.Dispose();
-            prefabRefs.Dispose();
+                entities.Dispose();
+                transforms.Dispose();
+                prefabRefs.Dispose();
+            }
 
             if (m_PostPasteFixFrames == 0)
             {
-                m_PostPasteFix.Clear();
+                // Bez Clear — istu listu drži undo zapis (sa razrešenim entitetima).
+                m_PostPasteFix = null;
             }
         }
 
@@ -1761,6 +1814,14 @@ namespace Copaste
 
                 case UndoKind.Paste:
                     DeletePastedEntities(record.m_Pasted);
+
+                    // Ako se fixup za taj stamp još vrti, prekini ga — entiteti su upravo obrisani.
+                    if (ReferenceEquals(record.m_Pasted, m_PostPasteFix))
+                    {
+                        m_PostPasteFix = null;
+                        m_PostPasteFixFrames = 0;
+                    }
+
                     break;
             }
 
@@ -1823,12 +1884,41 @@ namespace Copaste
                 return;
             }
 
+            // Prvo razrešeni zapisi: brišemo TAČNO entitete koje je paste stvorio.
+            HashSet<Entity> deleted = new HashSet<Entity>();
+            int unresolvedCount = 0;
+            foreach (PastedRecord record in records)
+            {
+                if (record.m_Resolved != Entity.Null)
+                {
+                    if (EntityManager.Exists(record.m_Resolved) && deleted.Add(record.m_Resolved))
+                    {
+                        m_Selected.Remove(record.m_Resolved);
+                        EntityManager.AddComponent<Deleted>(record.m_Resolved);
+                    }
+                }
+                else
+                {
+                    unresolvedCount++;
+                }
+            }
+
+            if (unresolvedCount == 0)
+            {
+                return;
+            }
+
+            // Rezerva za nerazrešene (undo pre završetka razrešavanja): pozicioni match,
+            // ali najviše JEDAN obrisan entitet po zapisu — originali ostaju.
             float3 boundsMin = new float3(float.MaxValue);
             float3 boundsMax = new float3(float.MinValue);
             foreach (PastedRecord record in records)
             {
-                boundsMin = math.min(boundsMin, record.m_Position);
-                boundsMax = math.max(boundsMax, record.m_Position);
+                if (record.m_Resolved == Entity.Null)
+                {
+                    boundsMin = math.min(boundsMin, record.m_Position);
+                    boundsMax = math.max(boundsMax, record.m_Position);
+                }
             }
 
             boundsMin -= 0.5f;
@@ -1838,23 +1928,31 @@ namespace Copaste
             NativeArray<Game.Objects.Transform> transforms = m_PropQuery.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
             NativeArray<PrefabRef> prefabRefs = m_PropQuery.ToComponentDataArray<PrefabRef>(Allocator.Temp);
 
+            bool[] recordUsed = new bool[records.Count];
             for (int i = 0; i < entities.Length; i++)
             {
                 float3 position = transforms[i].m_Position;
-                if (math.any(position < boundsMin) || math.any(position > boundsMax))
+                if (math.any(position < boundsMin) || math.any(position > boundsMax) ||
+                    deleted.Contains(entities[i]))
                 {
                     continue;
                 }
 
-                foreach (PastedRecord record in records)
+                for (int j = 0; j < records.Count; j++)
                 {
-                    if (prefabRefs[i].m_Prefab == record.m_Prefab &&
-                        math.distancesq(position, record.m_Position) <= 0.01f)
+                    PastedRecord record = records[j];
+                    if (recordUsed[j] || record.m_Resolved != Entity.Null ||
+                        prefabRefs[i].m_Prefab != record.m_Prefab ||
+                        math.distancesq(position, record.m_Position) > 0.01f)
                     {
-                        m_Selected.Remove(entities[i]);
-                        EntityManager.AddComponent<Deleted>(entities[i]);
-                        break;
+                        continue;
                     }
+
+                    recordUsed[j] = true;
+                    deleted.Add(entities[i]);
+                    m_Selected.Remove(entities[i]);
+                    EntityManager.AddComponent<Deleted>(entities[i]);
+                    break;
                 }
             }
 
