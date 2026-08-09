@@ -3,6 +3,9 @@
 ## [1.0.3] - 2026-08-09
 
 - Fixed panel clicks leaking through to the map: clicking Save (or any panel button) no longer clears the selection underneath, so saving a blueprint straight from a marquee selection works now
+- Undo of a paste now removes only the props that paste created; identical pre-existing props on the same spot are no longer deleted
+- Fixed a stale-records issue where clicking immediately after entering paste mode could create a bogus undo entry
+- Parked vehicles can no longer be selected or copied
 
 ## [1.0.2] - 2026-08-08
 
