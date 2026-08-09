@@ -45,9 +45,8 @@ Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <Screenshot Value="Properties/Screenshots/Panel.png" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
-  <ModVersion Value="1.0.2" />
+  <ModVersion Value="1.0.3" />
   <GameVersion Value="1.6.*" />
-  <ChangeLog>- Fixed marquee corner jumping onto buildings while dragging (the box now follows the terrain under the cursor)
-- Marquee can no longer be started by clicking on a building</ChangeLog>
+  <ChangeLog>- Fixed panel clicks leaking through to the map: clicking Save (or any panel button) no longer clears the selection underneath, so saving a blueprint straight from a marquee selection works now</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>

@@ -392,12 +392,16 @@ namespace Copaste
             }
         }
 
+        // Da li je kursor iznad UI-ja (naš panel, meniji igre) — sirove mišje akcije se tada ignorišu.
+        private static bool MouseOverUI => InputManager.instance != null && InputManager.instance.mouseOverUI;
+
         // Klik čitamo i direktno sa miša: drugi modovi (npr. Line Tool) drže globalne
         // Shift/Ctrl+klik akcije koje preuzmu vanila Apply akciju pa ona ne okine.
+        // Ali NE kada je kursor na UI-ju — klik na dugme panela ne sme da bude i klik na mapu.
         private bool ClickedThisFrame()
         {
             return applyAction.WasPressedThisFrame() ||
-                (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame);
+                (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !MouseOverUI);
         }
 
         // Desni taster: brzi klik = cancel, držanje + prevlačenje = rotacija.
@@ -412,7 +416,7 @@ namespace Copaste
                 return;
             }
 
-            if (Mouse.current.rightButton.wasPressedThisFrame)
+            if (Mouse.current.rightButton.wasPressedThisFrame && !MouseOverUI)
             {
                 m_RightHeld = true;
                 m_RightDragging = false;

@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.3] - 2026-08-09
+
+- Fixed panel clicks leaking through to the map: clicking Save (or any panel button) no longer clears the selection underneath, so saving a blueprint straight from a marquee selection works now
+
 ## [1.0.2] - 2026-08-08
 
 - Fixed marquee corner jumping onto buildings while dragging (the box now follows the terrain under the cursor)
