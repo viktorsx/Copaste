@@ -1201,11 +1201,6 @@ namespace Copaste
             // Preview prati miš: definicije se prave iznova samo kad se pozicija promeni.
             if (m_PasteDirty || !anchor.Equals(m_LastAnchor))
             {
-                if (m_PasteDirty)
-                {
-                    Mod.Log.Info($"Paste rebuild: clipboard={m_Clipboard.Count}, anchor={anchor}");
-                }
-
                 m_LastAnchor = anchor;
                 m_PasteDirty = false;
                 CreatePasteDefinitions(anchor);
@@ -1500,7 +1495,6 @@ namespace Copaste
 
         public void TriggerPaste()
         {
-            Mod.Log.Info($"TriggerPaste: active={ToolIsActive}, mode={m_Mode}, clipboard={m_Clipboard.Count}");
             if (!ToolIsActive)
             {
                 return;
@@ -1521,7 +1515,6 @@ namespace Copaste
         // Poziva UI posle učitavanja blueprinta: preview mora iznova, sa nultim pomakom visine.
         public void RefreshPastePreview()
         {
-            Mod.Log.Info($"RefreshPastePreview: mode={m_Mode}, clipboard={m_Clipboard.Count}");
             if (m_Mode == Mode.Paste)
             {
                 m_PasteDirty = true;
@@ -2297,11 +2290,12 @@ namespace Copaste
             return names;
         }
 
-        // Snima trenutni clipboard kao blueprint (automatsko ime); vraća ime ili null.
-        // Ako je clipboard prazan a postoji selekcija — prvo je kopira.
+        // Snima blueprint (automatsko ime); vraća ime ili null.
+        // Selekcija ima prednost: čuva se ono što korisnik trenutno vidi obeleženo,
+        // a clipboard tek kad selekcije nema (npr. čuvanje učitanog blueprinta).
         public string SaveBlueprint()
         {
-            if (m_Clipboard.Count == 0 && m_Selected.Count > 0)
+            if (m_Selected.Count > 0)
             {
                 CopySelection();
             }
