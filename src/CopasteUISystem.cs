@@ -102,15 +102,14 @@ namespace Copaste
         {
             base.OnUpdate();
 
-            if (m_ToolActive.value)
-            {
-                m_PasteMode.Update(m_CopasteToolSystem.IsPasteMode);
-                m_SelectedCount.Update(m_CopasteToolSystem.SelectedCount);
-                m_ClipboardCount.Update(m_CopasteToolSystem.ClipboardCount);
-                m_UndoCount.Update(m_CopasteToolSystem.UndoCount);
-                m_SameFilter.Update(m_CopasteToolSystem.SameFilterName);
-                m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
-            }
+            // Uvek ažuriraj — gating na toolActive je ostavljao ustajale vrednosti
+            // (npr. Paste dugme "svetli" iako je alat u Select modu).
+            m_PasteMode.Update(m_CopasteToolSystem.IsPasteMode);
+            m_SelectedCount.Update(m_CopasteToolSystem.SelectedCount);
+            m_ClipboardCount.Update(m_CopasteToolSystem.ClipboardCount);
+            m_UndoCount.Update(m_CopasteToolSystem.UndoCount);
+            m_SameFilter.Update(m_CopasteToolSystem.SameFilterName);
+            m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
         }
     }
 }
