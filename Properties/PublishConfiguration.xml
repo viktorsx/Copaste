@@ -47,16 +47,23 @@ Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <ForumLink Value="" />
   <ModVersion Value="1.0.4" />
   <GameVersion Value="1.6.*" />
-  <ChangeLog>- Fixed blueprint saving: Save now stores what is currently selected (it used to silently re-save the old clipboard content instead)
-- Blueprints now save tree growth stages (older blueprint files still load fine)
-- Loading a blueprint while already pasting now correctly refreshes the preview to the new group
-- Pressing Ctrl+V in the middle of dragging a prop no longer leaves the tool in a broken move state
-- Raised props now keep their height reliably after being moved or nudged
-- Selection overflowing the 1000-prop limit no longer leaves extra props permanently highlighted
-- Copaste no longer suppresses the game's error indicators on unrelated objects while pasting, and plays nicer with Anarchy's own error toggle
-- Blueprint names are validated more strictly
-- The Save button now only appears while props are selected, preventing accidental saves of old clipboard content
-- Typing in the blueprint rename field no longer triggers tool hotkeys (T, Delete, ESC...)
-- Small performance improvements in the panel and selection overlays</ChangeLog>
+  <ChangeLog>Stability update. Everything below was hand tested in game before publishing - that's the routine for every Copaste release.
+
+Blueprints
+- Fixed the big one: Save used to quietly store the old clipboard content instead of what you actually had selected. It now saves exactly what you see selected
+- The Save button only appears while something is selected, so you can't save the wrong thing by accident
+- Blueprints now remember tree growth stages, and older blueprint files still load fine
+- Picking a different blueprint while already pasting now properly switches the preview
+- Typing a blueprint name no longer sets off tool hotkeys mid-typing
+
+Editing
+- Raised props now keep their height after being moved or nudged
+- Pressing Ctrl+V in the middle of dragging a prop no longer confuses the tool
+- Selections that hit the 1000 prop limit no longer leave stray highlighted props behind
+- Parked vehicles can no longer be selected by mistake
+
+Under the hood
+- Copaste no longer touches the game's error indicators on unrelated objects, and gets along better with Anarchy's own toggle
+- Stricter blueprint name validation and small performance work in the panel and overlays</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>
