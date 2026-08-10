@@ -32,34 +32,20 @@ const register = (moduleRegistry) => {
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
 
-    // Vanila ToolButton + vanila tema dugmeta (kao ostali modovi) — igra/teme modovi
-    // vode računa o pozadini, mi dajemo samo beli svg.
-    let ToolButton = null;
-    let toolButtonClass = "";
-    try {
-      const tb = moduleRegistry.registry.get(
-        "game-ui/game/components/tool-options/tool-button/tool-button.tsx"
-      );
-      ToolButton = tb ? tb.ToolButton : null;
-      const theme = moduleRegistry.registry.get(
-        "game-ui/game/components/tool-options/tool-button/tool-button.module.scss"
-      );
-      if (theme && theme.classes && theme.classes.button) toolButtonClass = theme.classes.button;
-    } catch (e) {
-      console.log("[Copaste] ToolButton unavailable: " + e);
-    }
+    // Vanila floating Button iz cs2/ui — isti šablon kao Traffic i Node Controller
+    // (Button + variant:"floating" + svg sa width/height 100%). Bez naših klasa:
+    // pozadinu i selected izgled diktira igra/tema mod (npr. Redesigned Top Buttons).
 
     const CopasteButton = () => {
       const active = useValue(toolActive$);
       const onToggle = () => trigger("copaste", "toggleTool");
 
       let button;
-      if (ToolButton) {
-        button = h(ToolButton, {
+      if (ui.Button) {
+        button = h(ui.Button, {
           src: "coui://copaste/copaste.svg",
-          selected: active,
+          variant: "floating",
           onSelect: onToggle,
-          className: toolButtonClass,
         });
       } else {
         button = h(
@@ -69,9 +55,9 @@ const register = (moduleRegistry) => {
             style: {
               width: "40rem",
               height: "40rem",
-              borderRadius: "10rem",
+              borderRadius: "50%",
               border: "none",
-              backgroundColor: active ? "#0e9cd8" : "#45b8e6",
+              backgroundColor: "rgba(0,0,0,0.4)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
