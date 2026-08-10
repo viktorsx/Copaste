@@ -10,6 +10,8 @@
 - Selection overflowing the 1000-prop limit no longer leaves extra props permanently highlighted
 - Copaste no longer suppresses the game's error indicators on unrelated objects while pasting, and plays nicer with Anarchy's own error toggle
 - Blueprint names are validated more strictly
+- The Save button now only appears while props are selected, preventing accidental saves of old clipboard content
+- Typing in the blueprint rename field no longer triggers tool hotkeys (T, Delete, ESC...)
 - Small performance improvements in the panel and selection overlays
 
 ## [1.0.3] - 2026-08-09
