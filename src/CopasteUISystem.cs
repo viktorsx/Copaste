@@ -62,6 +62,7 @@ namespace Copaste
                 m_CopasteToolSystem.DeleteBlueprint(name);
                 RefreshBlueprints();
             }));
+            AddBinding(new TriggerBinding<bool>("copaste", "setTyping", (typing) => m_CopasteToolSystem.SetUiTyping(typing)));
             AddBinding(new TriggerBinding<string>("copaste", "renameBlueprint", (payload) =>
             {
                 string[] parts = payload.Split('\n');

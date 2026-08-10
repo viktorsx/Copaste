@@ -347,7 +347,17 @@ namespace Copaste
             m_SameFilterPrefab = Entity.Null;
             SetSameFilterName();
             m_HeightPickArmed = false;
+            m_UiTyping = false;
             base.OnStopRunning();
+        }
+
+        // Dok korisnik kuca u UI polju (rename), sav input alata je uspavan —
+        // inače slova okidaju prečice (T = filter, Delete = brisanje, ESC = izlaz...).
+        private bool m_UiTyping;
+
+        public void SetUiTyping(bool typing)
+        {
+            m_UiTyping = typing;
         }
 
         protected override JobHandle OnUpdate(JobHandle inputDeps)
@@ -358,6 +368,11 @@ namespace Copaste
                 applyMode = ApplyMode.Clear;
 
                 RunPostPasteFix();
+
+                if (m_UiTyping)
+                {
+                    return inputDeps;
+                }
 
                 if (m_Mode == Mode.Select)
                 {

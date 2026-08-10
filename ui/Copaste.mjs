@@ -135,6 +135,12 @@ const register = (moduleRegistry) => {
           trigger("copaste", "renameBlueprint", oldName + "\n" + renameValue);
         }
         setRenaming(null);
+        trigger("copaste", "setTyping", false);
+      };
+
+      const cancelRename = () => {
+        setRenaming(null);
+        trigger("copaste", "setTyping", false);
       };
 
       const bpRow = (name) => {
@@ -148,7 +154,7 @@ const register = (moduleRegistry) => {
               onChange: (e) => setRenameValue(e.target.value),
               onKeyDown: (e) => {
                 if (e.key === "Enter") commitRename(name);
-                if (e.key === "Escape") setRenaming(null);
+                if (e.key === "Escape") cancelRename();
               },
               onBlur: () => commitRename(name),
             })
@@ -170,6 +176,7 @@ const register = (moduleRegistry) => {
               onClick: () => {
                 setRenaming(name);
                 setRenameValue(name);
+                trigger("copaste", "setTyping", true);
               },
             },
             h("img", { src: "coui://copaste/rename.svg", style: { width: "12rem", height: "12rem" } })
@@ -220,7 +227,9 @@ const register = (moduleRegistry) => {
             { className: "copasteBtns" },
             actionBtn("Copy", "Copy selection (Ctrl+C)", selected > 0 && !pasteMode, () => trigger("copaste", "actionCopy"), false),
             actionBtn("Paste", "Paste mode on/off (Ctrl+V)", clipboard > 0, () => trigger("copaste", "actionPaste"), pasteMode),
-            actionBtn("Save", "Save selection as blueprint", selected > 0 || clipboard > 0, () => trigger("copaste", "saveBlueprint"), false)
+            selected > 0
+              ? actionBtn("Save", "Save selection as blueprint", true, () => trigger("copaste", "saveBlueprint"), false)
+              : null
           )
         ),
         section(
