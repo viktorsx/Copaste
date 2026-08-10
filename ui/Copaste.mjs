@@ -32,13 +32,19 @@ const register = (moduleRegistry) => {
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
 
-    // Vanila ToolButton (isti kao Node Controller i ostali) + naše accent boje iz Copaste.css.
+    // Vanila ToolButton + vanila tema dugmeta (kao ostali modovi) — igra/teme modovi
+    // vode računa o pozadini, mi dajemo samo beli svg.
     let ToolButton = null;
+    let toolButtonClass = "";
     try {
       const tb = moduleRegistry.registry.get(
         "game-ui/game/components/tool-options/tool-button/tool-button.tsx"
       );
       ToolButton = tb ? tb.ToolButton : null;
+      const theme = moduleRegistry.registry.get(
+        "game-ui/game/components/tool-options/tool-button/tool-button.module.scss"
+      );
+      if (theme && theme.classes && theme.classes.button) toolButtonClass = theme.classes.button;
     } catch (e) {
       console.log("[Copaste] ToolButton unavailable: " + e);
     }
@@ -53,7 +59,7 @@ const register = (moduleRegistry) => {
           src: "coui://copaste/copaste.svg",
           selected: active,
           onSelect: onToggle,
-          className: "copasteToggle" + (active ? " copasteToggleSelected" : ""),
+          className: toolButtonClass,
         });
       } else {
         button = h(
