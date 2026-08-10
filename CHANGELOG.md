@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.4] - 2026-08-09
+
+- Blueprints now save tree growth stages (older blueprint files still load fine)
+- Loading a blueprint while already pasting now correctly refreshes the preview to the new group
+- Pressing Ctrl+V in the middle of dragging a prop no longer leaves the tool in a broken move state
+- Raised props now keep their height reliably after being moved or nudged
+- Selection overflowing the 1000-prop limit no longer leaves extra props permanently highlighted
+- Copaste no longer suppresses the game's error indicators on unrelated objects while pasting, and plays nicer with Anarchy's own error toggle
+- Blueprint names are validated more strictly
+- Small performance improvements in the panel and selection overlays
+
 ## [1.0.3] - 2026-08-09
 
 - Fixed panel clicks leaking through to the map: clicking Save (or any panel button) no longer clears the selection underneath, so saving a blueprint straight from a marquee selection works now

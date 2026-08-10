@@ -46,7 +46,12 @@ namespace Copaste
                 // Klik na blueprint odmah kreće u lepljenje.
                 if (m_CopasteToolSystem.LoadBlueprint(name))
                 {
-                    if (!m_CopasteToolSystem.IsPasteMode)
+                    if (m_CopasteToolSystem.IsPasteMode)
+                    {
+                        // Već lepimo: preview mora iznova za novi sadržaj clipboard-a.
+                        m_CopasteToolSystem.RefreshPastePreview();
+                    }
+                    else
                     {
                         m_CopasteToolSystem.TriggerPaste();
                     }

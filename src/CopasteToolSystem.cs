@@ -338,10 +338,15 @@ namespace Copaste
             m_MoveItems.Clear();
             m_Selected.Clear();
             m_HoverEntity = Entity.Null;
+            if (m_Mode == Mode.Paste)
+            {
+                m_ToolSystem.ignoreErrors = m_PreviousIgnoreErrors;
+            }
+
             m_Mode = Mode.Select;
             m_SameFilterPrefab = Entity.Null;
+            SetSameFilterName();
             m_HeightPickArmed = false;
-            m_ToolSystem.ignoreErrors = false;
             base.OnStopRunning();
         }
 
@@ -374,6 +379,25 @@ namespace Copaste
 
         private void ResetToolState()
         {
+            if (m_Mode == Mode.Paste && m_ToolSystem != null)
+            {
+                m_ToolSystem.ignoreErrors = m_PreviousIgnoreErrors;
+            }
+
+            // Highlight se skida i na ovoj (crash) putanji — inače ostaje zauvek.
+            foreach (Entity entity in m_MarqueeHits)
+            {
+                if (!m_Selected.Contains(entity))
+                {
+                    Unhighlight(entity);
+                }
+            }
+
+            if (m_HoverEntity != Entity.Null && !m_Selected.Contains(m_HoverEntity))
+            {
+                Unhighlight(m_HoverEntity);
+            }
+
             m_Mode = Mode.Select;
             m_PasteDirty = false;
             m_PasteHeightBoost = 0f;
@@ -386,14 +410,11 @@ namespace Copaste
             m_RightHeld = false;
             m_RightDragging = false;
             m_SameFilterPrefab = Entity.Null;
+            SetSameFilterName();
             m_HeightPickArmed = false;
             m_PostPasteFix = null;
             m_PostPasteFixFrames = 0;
             m_HoverEntity = Entity.Null;
-            if (m_ToolSystem != null)
-            {
-                m_ToolSystem.ignoreErrors = false;
-            }
         }
 
         // Da li je kursor iznad UI-ja (naš panel, meniji igre) — sirove mišje akcije se tada ignorišu.
@@ -554,11 +575,21 @@ namespace Copaste
             }
 
             HashSet<Entity> selectedSet = new HashSet<Entity>(m_Selected);
-            foreach (Entity entity in m_MarqueeHits)
+            for (int i = 0; i < m_MarqueeHits.Count; i++)
             {
+                Entity entity = m_MarqueeHits[i];
                 if (m_Selected.Count >= kMaxSelection)
                 {
+                    // Višak preko limita mora da izgubi highlight — inače svetli zauvek.
                     Mod.Log.Info($"Copaste: selection capped at {kMaxSelection}");
+                    for (int j = i; j < m_MarqueeHits.Count; j++)
+                    {
+                        if (!selectedSet.Contains(m_MarqueeHits[j]))
+                        {
+                            Unhighlight(m_MarqueeHits[j]);
+                        }
+                    }
+
                     break;
                 }
 
@@ -590,6 +621,28 @@ namespace Copaste
             return delta;
         }
 
+        // Jedinstveno održavanje Elevation komponente: postavlja/dodaje pri visini iznad
+        // terena, uklanja kad je prop praktično na tlu — da sistemi igre ne vraćaju prop.
+        private void WriteElevation(Entity entity, float elevation)
+        {
+            if (math.abs(elevation) <= 0.01f)
+            {
+                if (EntityManager.HasComponent<Game.Objects.Elevation>(entity))
+                {
+                    EntityManager.RemoveComponent<Game.Objects.Elevation>(entity);
+                }
+            }
+            else if (EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevationData))
+            {
+                elevationData.m_Elevation = elevation;
+                EntityManager.SetComponentData(entity, elevationData);
+            }
+            else
+            {
+                EntityManager.AddComponentData(entity, new Game.Objects.Elevation { m_Elevation = elevation });
+            }
+        }
+
         private void AdjustSelectionHeight(float delta)
         {
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
@@ -604,20 +657,7 @@ namespace Copaste
 
                 transform.m_Position.y += delta;
                 EntityManager.SetComponentData(entity, transform);
-
-                // Elevation komponenta se održava u skladu sa visinom iznad terena,
-                // da drugi sistemi igre ne bi vratili prop na tlo.
-                float elevation = transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
-                if (EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevationData))
-                {
-                    elevationData.m_Elevation = elevation;
-                    EntityManager.SetComponentData(entity, elevationData);
-                }
-                else if (elevation > 0.01f)
-                {
-                    EntityManager.AddComponentData(entity, new Game.Objects.Elevation { m_Elevation = elevation });
-                }
-
+                WriteElevation(entity, transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position));
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
@@ -635,6 +675,7 @@ namespace Copaste
                 EntityManager.TryGetComponent(entity, out PrefabRef clickedPrefab))
             {
                 m_SameFilterPrefab = clickedPrefab.m_Prefab;
+                SetSameFilterName();
             }
 
             if (shiftHeld)
@@ -717,6 +758,7 @@ namespace Copaste
 
                 transform.m_Position = position;
                 EntityManager.SetComponentData(item.m_Entity, transform);
+                WriteElevation(item.m_Entity, item.m_HeightOffset);
                 EntityManager.AddComponent<Updated>(item.m_Entity);
                 EntityManager.AddComponent<BatchesUpdated>(item.m_Entity);
             }
@@ -834,6 +876,13 @@ namespace Copaste
             }
 
             m_Selected.Clear();
+
+            // Hover koji nije bio u selekciji mora da izgubi highlight — inače svetli zauvek.
+            if (m_HoverEntity != Entity.Null)
+            {
+                Unhighlight(m_HoverEntity);
+            }
+
             m_HoverEntity = Entity.Null;
             if (!m_SoundQuery.IsEmptyIgnoreFilter)
             {
@@ -1058,17 +1107,7 @@ namespace Copaste
             // Paste: pređi u paste mod ako clipboard nije prazan.
             if (m_PasteAction.WasPressedThisFrame() && m_Clipboard.Count > 0)
             {
-                CancelMarquee();
-                if (m_HoverEntity != Entity.Null && !m_Selected.Contains(m_HoverEntity))
-                {
-                    Unhighlight(m_HoverEntity);
-                }
-
-                m_HoverEntity = Entity.Null;
-                m_Mode = Mode.Paste;
-                m_PasteDirty = true;
-                m_PasteHeightBoost = 0f;
-                m_LastPreview.Clear();
+                EnterPasteMode();
             }
 
             DrawSelectOverlays();
@@ -1079,9 +1118,7 @@ namespace Copaste
             // ESC izlazi iz paste moda nazad u selekciju.
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
-                m_Mode = Mode.Select;
-                m_PasteDirty = false;
-                m_ToolSystem.ignoreErrors = false;
+                ExitPasteMode();
                 return;
             }
 
@@ -1118,9 +1155,7 @@ namespace Copaste
             // Brzi desni klik: nazad u selekcioni mod (preview nestaje jer je applyMode == Clear).
             if (rightClick)
             {
-                m_Mode = Mode.Select;
-                m_PasteDirty = false;
-                m_ToolSystem.ignoreErrors = false;
+                ExitPasteMode();
                 return;
             }
 
@@ -1130,13 +1165,9 @@ namespace Copaste
             }
 
             // "Anarchy": kaži validaciji igre da ignoriše greške postavljanja (preklapanja itd.).
-            m_ToolSystem.ignoreErrors = Mod.Settings.AnarchyPaste;
-
-            if (Mod.Settings.AnarchyPaste && !m_ErrorQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.AddComponent<BatchesUpdated>(m_ErrorQuery);
-                EntityManager.RemoveComponent<Error>(m_ErrorQuery);
-            }
+            // Namerno bez skidanja Error komponenti — ignoreErrors je zvaničan i dovoljan mehanizam,
+            // a globalno skidanje je diralo i entitete koji nisu naši.
+            m_ToolSystem.ignoreErrors = Mod.Settings.AnarchyPaste || m_PreviousIgnoreErrors;
 
             float3 anchor = hit.m_HitPosition;
             DrawPasteOverlays(anchor);
@@ -1255,7 +1286,22 @@ namespace Copaste
             return 2.5f;
         }
 
+        // Keš — overlay krugovi ovo čitaju svaki frejm za svaki selektovan prop.
+        private readonly Dictionary<Entity, float> m_PrefabDiameter = new Dictionary<Entity, float>();
+
         private float GetPrefabDiameter(Entity prefabEntity)
+        {
+            if (m_PrefabDiameter.TryGetValue(prefabEntity, out float cached))
+            {
+                return cached;
+            }
+
+            float result = GetPrefabDiameterUncached(prefabEntity);
+            m_PrefabDiameter[prefabEntity] = result;
+            return result;
+        }
+
+        private float GetPrefabDiameterUncached(Entity prefabEntity)
         {
             if (EntityManager.TryGetComponent(prefabEntity, out ObjectGeometryData geometryData))
             {
@@ -1456,25 +1502,58 @@ namespace Copaste
 
             if (m_Mode == Mode.Paste)
             {
-                m_Mode = Mode.Select;
-                m_PasteDirty = false;
-                m_ToolSystem.ignoreErrors = false;
+                ExitPasteMode();
                 return;
             }
 
             if (m_Clipboard.Count > 0)
             {
-                CancelMarquee();
-                if (m_HoverEntity != Entity.Null && !m_Selected.Contains(m_HoverEntity))
-                {
-                    Unhighlight(m_HoverEntity);
-                }
+                EnterPasteMode();
+            }
+        }
 
-                m_HoverEntity = Entity.Null;
-                m_Mode = Mode.Paste;
+        // Poziva UI posle učitavanja blueprinta: preview mora iznova, sa nultim pomakom visine.
+        public void RefreshPastePreview()
+        {
+            if (m_Mode == Mode.Paste)
+            {
                 m_PasteDirty = true;
                 m_PasteHeightBoost = 0f;
                 m_LastPreview.Clear();
+            }
+        }
+
+        private bool m_PreviousIgnoreErrors;
+
+        // Jedinstven ulazak u paste mod — čisti SVA stanja selekcionog moda.
+        private void EnterPasteMode()
+        {
+            CancelMarquee();
+            if (m_HoverEntity != Entity.Null && !m_Selected.Contains(m_HoverEntity))
+            {
+                Unhighlight(m_HoverEntity);
+            }
+
+            m_HoverEntity = Entity.Null;
+            m_HeightPickArmed = false;
+            m_LeftHeldOnProp = false;
+            m_MoveDragging = false;
+            m_MoveItems.Clear();
+            m_Mode = Mode.Paste;
+            m_PasteDirty = true;
+            m_PasteHeightBoost = 0f;
+            m_LastPreview.Clear();
+            m_PreviousIgnoreErrors = m_ToolSystem.ignoreErrors;
+        }
+
+        // Jedinstven izlazak — vraća zatečeno ignoreErrors stanje (npr. Anarchy moda).
+        private void ExitPasteMode()
+        {
+            m_Mode = Mode.Select;
+            m_PasteDirty = false;
+            if (m_ToolSystem != null)
+            {
+                m_ToolSystem.ignoreErrors = m_PreviousIgnoreErrors;
             }
         }
 
@@ -1962,20 +2041,18 @@ namespace Copaste
         }
 
         private Entity m_SameFilterPrefab = Entity.Null;
+        private string m_SameFilterName = string.Empty;
 
-        public string SameFilterName
+        // Keširano ime — UI ga čita svaki frejm, a menja se samo pri izboru filtera.
+        public string SameFilterName => m_SameFilterName;
+
+        private void SetSameFilterName()
         {
-            get
-            {
-                if (m_SameFilterPrefab == Entity.Null)
-                {
-                    return string.Empty;
-                }
-
-                return m_PrefabSystem.TryGetPrefab(m_SameFilterPrefab, out PrefabBase prefabBase) && prefabBase != null
+            m_SameFilterName = m_SameFilterPrefab == Entity.Null
+                ? string.Empty
+                : m_PrefabSystem.TryGetPrefab(m_SameFilterPrefab, out PrefabBase prefabBase) && prefabBase != null
                     ? prefabBase.name
                     : "?";
-            }
         }
 
         // Filter tipa: dok je aktivan, marquee selektuje samo propove tog prefaba.
@@ -1989,6 +2066,7 @@ namespace Copaste
             if (m_SameFilterPrefab != Entity.Null)
             {
                 m_SameFilterPrefab = Entity.Null;
+                SetSameFilterName();
                 return;
             }
 
@@ -2001,6 +2079,7 @@ namespace Copaste
             }
 
             m_SameFilterPrefab = prefabRef.m_Prefab;
+            SetSameFilterName();
             if (m_Selected.Count > 0)
             {
                 FilterSelectionToSamePrefab(source);
@@ -2098,6 +2177,7 @@ namespace Copaste
 
                 transform.m_Position = position;
                 EntityManager.SetComponentData(entity, transform);
+                WriteElevation(entity, heightOffset);
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
@@ -2139,17 +2219,7 @@ namespace Copaste
                 transform.m_Position.y = targetY;
                 EntityManager.SetComponentData(entity, transform);
 
-                float elevation = targetY - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
-                if (EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevationData))
-                {
-                    elevationData.m_Elevation = elevation;
-                    EntityManager.SetComponentData(entity, elevationData);
-                }
-                else if (elevation > 0.01f)
-                {
-                    EntityManager.AddComponentData(entity, new Game.Objects.Elevation { m_Elevation = elevation });
-                }
-
+                WriteElevation(entity, targetY - TerrainUtils.SampleHeight(ref heightData, transform.m_Position));
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
@@ -2170,12 +2240,7 @@ namespace Copaste
 
                 transform.m_Position.y = TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
                 EntityManager.SetComponentData(entity, transform);
-                if (EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevation))
-                {
-                    elevation.m_Elevation = 0f;
-                    EntityManager.SetComponentData(entity, elevation);
-                }
-
+                WriteElevation(entity, 0f);
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
@@ -2183,6 +2248,24 @@ namespace Copaste
 
         private static string BlueprintDirectory =>
             System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "ModsData", "Copaste", "Blueprints");
+
+        // Granica poverenja za imena iz UI trigger-a: bez nedozvoljenih znakova i bez ".."
+        // — ime nikada ne sme da adresira fajl van Blueprints foldera.
+        private static string SanitizeBlueprintName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            foreach (char invalid in System.IO.Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(invalid.ToString(), string.Empty);
+            }
+
+            name = name.Trim();
+            return name.Length == 0 || name.Contains("..") ? null : name;
+        }
 
         public List<string> GetBlueprintNames()
         {
@@ -2270,6 +2353,9 @@ namespace Copaste
                         item.m_Rotation.value.w.ToString("R", inv),
                         item.m_HeightOffset.ToString("R", inv),
                         item.m_Diameter.ToString("R", inv),
+                        item.m_HadTree ? "1" : "0",
+                        ((int)item.m_Tree.m_State).ToString(inv),
+                        item.m_Tree.m_Growth.ToString(inv),
                     }));
                 }
 
@@ -2294,6 +2380,12 @@ namespace Copaste
         {
             try
             {
+                name = SanitizeBlueprintName(name);
+                if (name == null)
+                {
+                    return false;
+                }
+
                 string path = System.IO.Path.Combine(BlueprintDirectory, name + ".txt");
                 if (!System.IO.File.Exists(path))
                 {
@@ -2313,7 +2405,9 @@ namespace Copaste
                 for (int i = 1; i < lines.Length; i++)
                 {
                     string[] parts = lines[i].Split('|');
-                    if (parts.Length != 11)
+
+                    // 11 polja = stari format (pre čuvanja drveća), 14 = novi.
+                    if (parts.Length != 11 && parts.Length != 14)
                     {
                         continue;
                     }
@@ -2325,7 +2419,7 @@ namespace Copaste
                     }
 
                     Entity prefabEntity = m_PrefabSystem.GetEntity(prefabBase);
-                    items.Add(new ClipboardItem
+                    ClipboardItem item = new ClipboardItem
                     {
                         m_Prefab = prefabEntity,
                         m_Offset = new float3(
@@ -2339,7 +2433,19 @@ namespace Copaste
                             float.Parse(parts[8], inv)),
                         m_HeightOffset = float.Parse(parts[9], inv),
                         m_Diameter = float.Parse(parts[10], inv),
-                    });
+                    };
+
+                    if (parts.Length == 14 && parts[11] == "1")
+                    {
+                        item.m_HadTree = true;
+                        item.m_Tree = new Game.Objects.Tree
+                        {
+                            m_State = (Game.Objects.TreeState)int.Parse(parts[12], inv),
+                            m_Growth = byte.Parse(parts[13], inv),
+                        };
+                    }
+
+                    items.Add(item);
                 }
 
                 if (items.Count == 0)
@@ -2364,6 +2470,12 @@ namespace Copaste
         {
             try
             {
+                name = SanitizeBlueprintName(name);
+                if (name == null)
+                {
+                    return;
+                }
+
                 string path = System.IO.Path.Combine(BlueprintDirectory, name + ".txt");
                 if (System.IO.File.Exists(path))
                 {
@@ -2381,13 +2493,9 @@ namespace Copaste
         {
             try
             {
-                foreach (char invalid in System.IO.Path.GetInvalidFileNameChars())
-                {
-                    newName = newName.Replace(invalid.ToString(), string.Empty);
-                }
-
-                newName = newName.Trim();
-                if (newName.Length == 0 || newName == oldName)
+                oldName = SanitizeBlueprintName(oldName);
+                newName = SanitizeBlueprintName(newName);
+                if (oldName == null || newName == null || newName == oldName)
                 {
                     return;
                 }
