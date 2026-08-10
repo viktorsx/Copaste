@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5] - 2026-08-10
+
+Toolbar button facelift.
+
+- The toolbar button now uses the game's standard floating button, the same one Traffic, Node Controller and other mods use — correct icon size and the default look
+- Removed the custom blue background (both idle and active) — the button now blends in with other mod buttons, and theme mods like Redesigned Top Buttons can restyle it just like the rest
+
 ## [1.0.4] - 2026-08-10
 
 Stability update.

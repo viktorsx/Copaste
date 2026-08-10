@@ -45,25 +45,11 @@ Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <Screenshot Value="Properties/Screenshots/Panel.png" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
-  <ModVersion Value="1.0.4" />
+  <ModVersion Value="1.0.5" />
   <GameVersion Value="1.6.*" />
-  <ChangeLog>Stability update. Everything below was hand tested in game before publishing - that's the routine for every Copaste release.
+  <ChangeLog>Toolbar button facelift. Hand tested in game before publishing - that's the routine for every Copaste release.
 
-Blueprints
-- Fixed the big one: Save used to quietly store the old clipboard content instead of what you actually had selected. It now saves exactly what you see selected
-- The Save button only appears while something is selected, so you can't save the wrong thing by accident
-- Blueprints now remember tree growth stages, and older blueprint files still load fine
-- Picking a different blueprint while already pasting now properly switches the preview
-- Typing a blueprint name no longer sets off tool hotkeys mid-typing
-
-Editing
-- Raised props now keep their height after being moved or nudged
-- Pressing Ctrl+V in the middle of dragging a prop no longer confuses the tool
-- Selections that hit the 1000 prop limit no longer leave stray highlighted props behind
-- Parked vehicles can no longer be selected by mistake
-
-Under the hood
-- Copaste no longer touches the game's error indicators on unrelated objects, and gets along better with Anarchy's own toggle
-- Stricter blueprint name validation and small performance work in the panel and overlays</ChangeLog>
+- The toolbar button now uses the game's standard floating button, the same one Traffic, Node Controller and other mods use - correct icon size and the default look
+- Removed the custom blue background (both idle and active) - the button now blends in with other mod buttons, and theme mods like Redesigned Top Buttons can restyle it just like the rest</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>
