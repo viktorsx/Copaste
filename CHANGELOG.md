@@ -1,7 +1,8 @@
 # Changelog
 
-## [1.0.4] - 2026-08-09
+## [1.0.4] - 2026-08-10
 
+- Fixed blueprint saving: Save now stores what is currently selected (it used to silently re-save the old clipboard content instead)
 - Blueprints now save tree growth stages (older blueprint files still load fine)
 - Loading a blueprint while already pasting now correctly refreshes the preview to the new group
 - Pressing Ctrl+V in the middle of dragging a prop no longer leaves the tool in a broken move state
