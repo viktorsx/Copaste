@@ -57,6 +57,18 @@ Buildings and vehicles are intentionally not selectable — this is a prop tool.
 
 To keep the game responsive, selection is capped at **1000 props** and selection circles are drawn for at most 400 at a time (everything selected is still highlighted). The tool guards its own update loop, so an unexpected error disables the current action instead of crashing the game.
 
+## Developer documentation
+
+Detailed docs for every part of the code live in [`docs/`](docs/README.md) —
+architecture, the tool system, the paste pipeline and color preservation, align
+tools, undo, the blueprint file format, the cohtml UI (including Gameface
+engine gotchas), settings/input, and build/deploy.
+
+## Branches
+
+- **`main`** — matches the latest published release on Paradox Mods; releases are tagged `vX.Y.Z`
+- **`dev`** — active development; merged into `main` at release time after in-game testing
+
 ## Building from source
 
 The project uses the [official CS2 modding toolchain](https://cs2.paradoxwikis.com/Modding_Toolchain) (install it via the game's launcher first — it sets up the `CSII_TOOLPATH` environment and `Mod.props`/`Mod.targets`):
