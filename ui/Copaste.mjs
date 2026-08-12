@@ -95,20 +95,27 @@ const register = (moduleRegistry) => {
       const blueprints = blueprintsRaw ? blueprintsRaw.split("\n").filter((n) => n.length > 0) : [];
 
       // Dugme: label ili SVG ikonica, sa tooltip-om i vidljivim stanjem.
-      const actionBtn = (content, tooltip, enabled, onClick, isActive) => {
+      const actionBtn = (content, tooltip, enabled, onClick, isActive, variant) => {
         const inner =
           typeof content === "string" && content.endsWith(".svg")
-            ? h("img", { src: "coui://copaste/" + content, style: { width: "14rem", height: "14rem" } })
+            ? h("img", { src: "coui://copaste/" + content })
             : content;
+
+        const variantClass = isActive
+          ? " copasteBtnActive"
+          : !enabled
+          ? " copasteBtnDisabled"
+          : variant === "primary"
+          ? " copasteBtnPrimary"
+          : variant === "danger"
+          ? " copasteBtnDanger"
+          : "";
 
         const btn = h(
           "button",
           {
             key: tooltip,
-            className:
-              "copasteBtn" +
-              (isActive ? " copasteBtnActive" : "") +
-              (!enabled && !isActive ? " copasteBtnDisabled" : ""),
+            className: "copasteBtn" + variantClass,
             onClick: enabled ? onClick : undefined,
           },
           inner
@@ -118,9 +125,14 @@ const register = (moduleRegistry) => {
       };
 
       const section = (title, ...rows) =>
-        h("div", { key: title, className: "copasteSection" },
+        h("div", { key: title, className: "copasteCard" },
           h("div", { className: "copasteSectionTitle" }, title),
           ...rows);
+
+      const stat = (label, value, pad) =>
+        h("div", { className: "copasteStat" + (pad ? " copasteStatPad" : "") },
+          h("div", { className: "copasteStatValue" + (value > 0 ? " copasteStatValueLive" : "") }, String(value)),
+          h("div", { className: "copasteStatLabel" }, label));
 
       const commitRename = (oldName) => {
         if (renameValue && renameValue !== oldName) {
@@ -171,7 +183,7 @@ const register = (moduleRegistry) => {
                 trigger("copaste", "setTyping", true);
               },
             },
-            h("img", { src: "coui://copaste/rename.svg", style: { width: "12rem", height: "12rem" } })
+            h("img", { src: "coui://copaste/rename.svg" })
           )),
           withTooltip("Delete blueprint", h(
             "button",
@@ -179,7 +191,7 @@ const register = (moduleRegistry) => {
               className: "copasteBpIcon copasteBpIconDelete",
               onClick: () => trigger("copaste", "deleteBlueprint", name),
             },
-            h("img", { src: "coui://copaste/delete.svg", style: { width: "12rem", height: "12rem" } })
+            h("img", { src: "coui://copaste/delete.svg" })
           ))
         );
       };
@@ -189,35 +201,37 @@ const register = (moduleRegistry) => {
         { className: "copastePanel" },
         h(
           "div",
-          { className: "copasteTitle" },
-          "COPASTE" + (version ? " v" + version : "")
+          { className: "copasteHeader" },
+          h("div", { className: "copasteLogo" }, h("img", { src: "coui://copaste/copaste.svg" })),
+          h("div", { className: "copasteTitle" }, "COPASTE"),
+          version ? h("div", { className: "copasteVersion" }, "v" + version) : null
         ),
         h(
           "div",
-          { className: "copasteRow" },
-          h("div", { className: "copasteRowLabel" }, "Selected"),
-          h("div", null, String(selected))
+          { className: "copasteCard copasteCardFlush", style: { marginTop: "0" } },
+          h(
+            "div",
+            { className: "copasteStatsRow" },
+            stat("Selected", selected, false),
+            h("div", { className: "copasteStatDivider" }),
+            stat("Clipboard", clipboard, true)
+          ),
+          sameFilter
+            ? h(
+                "div",
+                { className: "copasteFilterRow" },
+                h("img", { src: "coui://copaste/filter.svg" }),
+                h("div", { className: "copasteFilterLabel" }, "Filter"),
+                h("div", { className: "copasteFilterValue" }, sameFilter)
+              )
+            : null
         ),
-        h(
-          "div",
-          { className: "copasteRow" },
-          h("div", { className: "copasteRowLabel" }, "Clipboard"),
-          h("div", null, String(clipboard))
-        ),
-        sameFilter
-          ? h(
-              "div",
-              { className: "copasteRow" },
-              h("div", { className: "copasteRowLabel" }, "Filter"),
-              h("div", null, sameFilter)
-            )
-          : null,
         section(
           "Clipboard",
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Copy", "Copy selection (Ctrl+C)", selected > 0 && !pasteMode, () => trigger("copaste", "actionCopy"), false),
+            actionBtn("Copy", "Copy selection (Ctrl+C)", selected > 0 && !pasteMode, () => trigger("copaste", "actionCopy"), false, "primary"),
             actionBtn("Paste", "Paste mode on/off (Ctrl+V)", clipboard > 0, () => trigger("copaste", "actionPaste"), pasteMode),
             selected > 0
               ? actionBtn("Save", "Save selection as blueprint", true, () => trigger("copaste", "saveBlueprint"), false)
@@ -230,7 +244,7 @@ const register = (moduleRegistry) => {
             "div",
             { className: "copasteBtns" },
             actionBtn("Undo", "Undo last action (Ctrl+Z)", undoCount > 0, () => trigger("copaste", "actionUndo"), false),
-            actionBtn("Delete", "Delete selection (Del)", selected > 0 && !pasteMode, () => trigger("copaste", "actionDelete"), false),
+            actionBtn("Delete", "Delete selection (Del)", selected > 0 && !pasteMode, () => trigger("copaste", "actionDelete"), false, "danger"),
             actionBtn("Filter", "Type filter for marquee (T)", (selected > 0 || sameFilter) && !pasteMode, () => trigger("copaste", "actionSelectSame"), !!sameFilter)
           ),
           h(
