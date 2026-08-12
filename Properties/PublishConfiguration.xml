@@ -53,6 +53,7 @@ Panel
 - Complete visual redesign: grouped cards, icons on every button, clear button states, readable counters
 - The panel can now be dragged by its header and remembers its position between sessions
 - Single click-selected props show their name in the panel (marquee selections don't)
+- Small selections (up to 15 props) get a Selected props list in the panel: hovering an entry rings that prop in the world, clicking it keeps only that prop selected - handy when a prop is hard to click directly
 - Blueprint list shows 5 entries before scrolling
 
 Editing

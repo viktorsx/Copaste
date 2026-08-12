@@ -35,6 +35,7 @@ const register = (moduleRegistry) => {
     const alignGapLive$ = bindValue("copaste", "alignGapLive", -1);
     const alignPickArmed$ = bindValue("copaste", "alignPickArmed", false);
     const alignSessionSource$ = bindValue("copaste", "alignSessionSource", 0);
+    const selectionList$ = bindValue("copaste", "selectionList", "");
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -102,6 +103,16 @@ const register = (moduleRegistry) => {
       const alignGapLive = useValue(alignGapLive$);
       const alignPickArmed = useValue(alignPickArmed$);
       const alignSessionSource = useValue(alignSessionSource$);
+      const selectionListRaw = useValue(selectionList$);
+
+      // "idx:ver:ime" po redu — hover crta prsten oko propa, klik ostavlja samo njega.
+      const selectionEntries = selectionListRaw
+        ? selectionListRaw.split("\n").map((line) => {
+            const first = line.indexOf(":");
+            const second = line.indexOf(":", first + 1);
+            return { id: line.substring(0, second), name: line.substring(second + 1) };
+          })
+        : [];
 
       // Stepper: +/− 0.5 m; ispod 0.5 se vraća na "auto"; menja i živu align sesiju.
       const stepGap = (dir) => {
@@ -307,6 +318,30 @@ const register = (moduleRegistry) => {
               )
             : null
         ),
+        selectionEntries.length > 0
+          ? h(
+              "div",
+              { className: "copasteCard" },
+              h("div", { className: "copasteSectionTitle" }, "Selected props"),
+              h(
+                "div",
+                { className: "copasteBpList" },
+                selectionEntries.map((entry, i) =>
+                  h(
+                    "button",
+                    {
+                      key: entry.id + "-" + i,
+                      className: "copasteBpLoad copasteSelRow",
+                      onClick: () => trigger("copaste", "selectOnlyProp", entry.id),
+                      onMouseEnter: () => trigger("copaste", "focusProp", entry.id),
+                      onMouseLeave: () => trigger("copaste", "focusProp", ""),
+                    },
+                    entry.name
+                  )
+                )
+              )
+            )
+          : null,
         section(
           "Clipboard",
           h(

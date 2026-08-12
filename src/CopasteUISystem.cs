@@ -21,6 +21,22 @@ namespace Copaste
         private ValueBinding<float> m_AlignGapLive;
         private ValueBinding<bool> m_AlignPickArmed;
         private ValueBinding<int> m_AlignSessionSource;
+        private ValueBinding<string> m_SelectionList;
+
+        private static bool TryParseEntityId(string payload, out int index, out int version)
+        {
+            index = 0;
+            version = 0;
+            if (string.IsNullOrEmpty(payload))
+            {
+                return false;
+            }
+
+            string[] parts = payload.Split(':');
+            return parts.Length == 2 &&
+                int.TryParse(parts[0], out index) &&
+                int.TryParse(parts[1], out version);
+        }
 
         private static float ParseGap(string payload)
         {
@@ -79,6 +95,26 @@ namespace Copaste
             AddBinding(new TriggerBinding<string>("copaste", "setAlignGapLive", (payload) => m_CopasteToolSystem.SetAlignSessionGap(ParseGap(payload))));
             AddBinding(m_AlignPickArmed = new ValueBinding<bool>("copaste", "alignPickArmed", false));
             AddBinding(m_AlignSessionSource = new ValueBinding<int>("copaste", "alignSessionSource", 0));
+            AddBinding(m_SelectionList = new ValueBinding<string>("copaste", "selectionList", string.Empty));
+
+            AddBinding(new TriggerBinding<string>("copaste", "focusProp", (payload) =>
+            {
+                if (TryParseEntityId(payload, out int index, out int version))
+                {
+                    m_CopasteToolSystem.SetListFocus(index, version);
+                }
+                else
+                {
+                    m_CopasteToolSystem.ClearListFocus();
+                }
+            }));
+            AddBinding(new TriggerBinding<string>("copaste", "selectOnlyProp", (payload) =>
+            {
+                if (TryParseEntityId(payload, out int index, out int version))
+                {
+                    m_CopasteToolSystem.SelectOnly(index, version);
+                }
+            }));
 
             AddBinding(new TriggerBinding<string>("copaste", "actionAlignCircle", (payload) =>
                 m_CopasteToolSystem.TriggerAlignCircle(ParseGap(payload))));
@@ -180,6 +216,7 @@ namespace Copaste
             m_AlignGapLive.Update(m_CopasteToolSystem.AlignSessionGap);
             m_AlignPickArmed.Update(m_CopasteToolSystem.AlignPickArmed);
             m_AlignSessionSource.Update(m_CopasteToolSystem.AlignSessionSource);
+            m_SelectionList.Update(m_CopasteToolSystem.GetSelectionList());
         }
     }
 }

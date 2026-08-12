@@ -28,6 +28,7 @@ namespace Copaste
 
         private static readonly UnityEngine.Color kHoverColor = new UnityEngine.Color(1f, 1f, 1f, 0.7f);
         private static readonly UnityEngine.Color kSelectedColor = new UnityEngine.Color(0.2f, 0.85f, 1f, 1f);
+        private static readonly UnityEngine.Color kListFocusColor = new UnityEngine.Color(0.44f, 0.93f, 0.63f, 1f);
         private static readonly UnityEngine.Color kPasteColor = new UnityEngine.Color(0.3f, 1f, 0.45f, 0.9f);
 
         private enum Mode
@@ -1496,6 +1497,16 @@ namespace Copaste
                 EntityManager.TryGetComponent(m_HoverEntity, out Game.Objects.Transform hoverTransform))
             {
                 overlayBuffer.DrawCircle(kHoverColor, default, 0.25f, 0, new float2(0f, 1f), hoverTransform.m_Position, GetDiameter(m_HoverEntity));
+            }
+
+            // Fokus iz panela: hover na red u "Selected props" listi crta zeleni prsten
+            // oko baš tog propa — da se identifikuje među istoimenim.
+            if (m_ListFocusEntity != Entity.Null &&
+                m_Selected.Contains(m_ListFocusEntity) &&
+                EntityManager.Exists(m_ListFocusEntity) &&
+                EntityManager.TryGetComponent(m_ListFocusEntity, out Game.Objects.Transform focusTransform))
+            {
+                overlayBuffer.DrawCircle(kListFocusColor, default, 0.5f, 0, new float2(0f, 1f), focusTransform.m_Position, GetDiameter(m_ListFocusEntity) + 1f);
             }
         }
 
@@ -2984,6 +2995,74 @@ namespace Copaste
 
             ApplyAlignSession();
             Mod.Log.Info($"Copaste: align row on {valid.Count} props (gap {m_AlignGap:F1} m, rotate {alsoRotate})");
+        }
+
+        // "Selected props" lista u panelu: samo za male selekcije (2-15) — tu ima
+        // smisla birati pojedinačan prop; za veće selekcije lista se ne prikazuje.
+        private const int kSelectionListMax = 15;
+        private Entity m_ListFocusEntity = Entity.Null;
+        private readonly Dictionary<Entity, string> m_PrefabNameCache = new Dictionary<Entity, string>();
+
+        public string GetSelectionList()
+        {
+            if (m_Mode != Mode.Select || m_Selected.Count < 2 || m_Selected.Count > kSelectionListMax)
+            {
+                return string.Empty;
+            }
+
+            System.Text.StringBuilder builder = new System.Text.StringBuilder();
+            foreach (Entity entity in m_Selected)
+            {
+                if (!EntityManager.Exists(entity) ||
+                    !EntityManager.TryGetComponent(entity, out PrefabRef prefabRef))
+                {
+                    continue;
+                }
+
+                if (!m_PrefabNameCache.TryGetValue(prefabRef.m_Prefab, out string name))
+                {
+                    name = m_PrefabSystem.TryGetPrefab(prefabRef.m_Prefab, out PrefabBase prefabBase) && prefabBase != null
+                        ? prefabBase.name
+                        : "?";
+                    m_PrefabNameCache[prefabRef.m_Prefab] = name;
+                }
+
+                if (builder.Length > 0)
+                {
+                    builder.Append('\n');
+                }
+
+                builder.Append(entity.Index).Append(':').Append(entity.Version).Append(':').Append(name);
+            }
+
+            return builder.ToString();
+        }
+
+        // Hover na red liste: zeleni prsten oko tog propa (Entity.Null gasi).
+        public void SetListFocus(int index, int version)
+        {
+            m_ListFocusEntity = new Entity { Index = index, Version = version };
+        }
+
+        public void ClearListFocus()
+        {
+            m_ListFocusEntity = Entity.Null;
+        }
+
+        // Klik na red liste: selekcija se svodi na SAMO taj prop.
+        public void SelectOnly(int index, int version)
+        {
+            Entity entity = new Entity { Index = index, Version = version };
+            if (!m_Selected.Contains(entity) || !EntityManager.Exists(entity))
+            {
+                return;
+            }
+
+            ClearSelection();
+            m_Selected.Add(entity);
+            Highlight(entity);
+            m_SelectionFromMarquee = false;
+            m_ListFocusEntity = Entity.Null;
         }
 
         public bool HeightPickArmed => m_HeightPickArmed;
