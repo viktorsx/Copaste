@@ -14,6 +14,9 @@ namespace Copaste
         private ValueBinding<int> m_UndoCount;
         private ValueBinding<string> m_SameFilter;
         private ValueBinding<bool> m_HeightPickArmed;
+        private ValueBinding<string> m_SelectedName;
+        private ValueBinding<int> m_PanelX;
+        private ValueBinding<int> m_PanelY;
         private ToolSystem m_ToolSystem;
         private CopasteToolSystem m_CopasteToolSystem;
 
@@ -34,6 +37,25 @@ namespace Copaste
             AddBinding(m_UndoCount = new ValueBinding<int>("copaste", "undoCount", 0));
             AddBinding(m_SameFilter = new ValueBinding<string>("copaste", "sameFilter", string.Empty));
             AddBinding(m_HeightPickArmed = new ValueBinding<bool>("copaste", "heightPickArmed", false));
+            AddBinding(m_SelectedName = new ValueBinding<string>("copaste", "selectedName", string.Empty));
+            AddBinding(m_PanelX = new ValueBinding<int>("copaste", "panelX", Mod.Settings != null ? Mod.Settings.PanelX : -1));
+            AddBinding(m_PanelY = new ValueBinding<int>("copaste", "panelY", Mod.Settings != null ? Mod.Settings.PanelY : -1));
+
+            AddBinding(new TriggerBinding<string>("copaste", "setPanelPos", (payload) =>
+            {
+                string[] parts = payload.Split(',');
+                if (parts.Length == 2 &&
+                    int.TryParse(parts[0], out int x) &&
+                    int.TryParse(parts[1], out int y) &&
+                    Mod.Settings != null)
+                {
+                    Mod.Settings.PanelX = x;
+                    Mod.Settings.PanelY = y;
+                    Mod.Settings.ApplyAndSave();
+                    m_PanelX.Update(x);
+                    m_PanelY.Update(y);
+                }
+            }));
 
             AddBinding(new TriggerBinding("copaste", "toggleTool", () => m_CopasteToolSystem.ToggleTool()));
             AddBinding(new TriggerBinding("copaste", "saveBlueprint", () =>
@@ -111,6 +133,7 @@ namespace Copaste
             m_UndoCount.Update(m_CopasteToolSystem.UndoCount);
             m_SameFilter.Update(m_CopasteToolSystem.SameFilterName);
             m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
+            m_SelectedName.Update(m_CopasteToolSystem.SelectedPropName);
         }
     }
 }

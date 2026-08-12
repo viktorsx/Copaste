@@ -584,6 +584,8 @@ namespace Copaste
 
         private void CommitMarquee(bool additive)
         {
+            m_SelectionFromMarquee = true;
+
             if (!additive)
             {
                 ClearSelection();
@@ -685,6 +687,8 @@ namespace Copaste
                 return;
             }
 
+            m_SelectionFromMarquee = false;
+
             // Dok je filter aktivan, klik na prop prebacuje filter na njegov tip.
             if (m_SameFilterPrefab != Entity.Null &&
                 EntityManager.TryGetComponent(entity, out PrefabRef clickedPrefab))
@@ -721,6 +725,7 @@ namespace Copaste
             // Prop pod mišem ulazi u selekciju ako već nije u njoj.
             if (!m_Selected.Contains(m_LeftPressEntity) && EntityManager.Exists(m_LeftPressEntity))
             {
+                m_SelectionFromMarquee = false;
                 if (!m_LeftPressShift)
                 {
                     ClearSelection();
@@ -2057,9 +2062,39 @@ namespace Copaste
 
         private Entity m_SameFilterPrefab = Entity.Null;
         private string m_SameFilterName = string.Empty;
+        private bool m_SelectionFromMarquee;
+        private Entity m_SelectedNameEntity = Entity.Null;
+        private string m_SelectedName = string.Empty;
 
         // Keširano ime — UI ga čita svaki frejm, a menja se samo pri izboru filtera.
         public string SameFilterName => m_SameFilterName;
+
+        // Ime propa za panel — samo kad je tačno jedan prop selektovan klikom (ne marquee-em).
+        public string SelectedPropName
+        {
+            get
+            {
+                if (m_Selected.Count != 1 || m_SelectionFromMarquee)
+                {
+                    return string.Empty;
+                }
+
+                Entity entity = m_Selected[0];
+                if (entity != m_SelectedNameEntity)
+                {
+                    m_SelectedNameEntity = entity;
+                    m_SelectedName =
+                        EntityManager.Exists(entity) &&
+                        EntityManager.TryGetComponent(entity, out PrefabRef prefabRef) &&
+                        m_PrefabSystem.TryGetPrefab(prefabRef.m_Prefab, out PrefabBase prefabBase) &&
+                        prefabBase != null
+                            ? prefabBase.name
+                            : string.Empty;
+                }
+
+                return m_SelectedName;
+            }
+        }
 
         private void SetSameFilterName()
         {

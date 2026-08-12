@@ -28,6 +28,9 @@ const register = (moduleRegistry) => {
     const sameFilter$ = bindValue("copaste", "sameFilter", "");
     const heightPickArmed$ = bindValue("copaste", "heightPickArmed", false);
     const version$ = bindValue("copaste", "version", "");
+    const selectedName$ = bindValue("copaste", "selectedName", "");
+    const panelX$ = bindValue("copaste", "panelX", -1);
+    const panelY$ = bindValue("copaste", "panelY", -1);
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -87,10 +90,48 @@ const register = (moduleRegistry) => {
       const [renaming, setRenaming] = React.useState(null);
       const [renameValue, setRenameValue] = React.useState("");
       const version = useValue(version$);
+      const selectedName = useValue(selectedName$);
+      const savedX = useValue(panelX$);
+      const savedY = useValue(panelY$);
+      const [dragPos, setDragPos] = React.useState(null);
+      const panelRef = React.useRef(null);
 
       if (!active) {
         return null;
       }
+
+      // Pozicija panela: sačuvana/prevučena u pikselima, inače CSS default.
+      const hasPos = dragPos !== null || (savedX >= 0 && savedY >= 0);
+      const rawX = dragPos ? dragPos.x : savedX;
+      const rawY = dragPos ? dragPos.y : savedY;
+      const winW = window.innerWidth || 1920;
+      const winH = window.innerHeight || 1080;
+      const posX = Math.max(0, Math.min(rawX, winW - 60));
+      const posY = Math.max(0, Math.min(rawY, winH - 60));
+      const panelStyle = hasPos ? { top: posY + "px", left: posX + "px" } : undefined;
+
+      const onHeaderMouseDown = (e) => {
+        const el = panelRef.current;
+        if (!el || !el.getBoundingClientRect) return;
+        const rect = el.getBoundingClientRect();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const baseX = rect.left;
+        const baseY = rect.top;
+        const onMove = (ev) => {
+          setDragPos({ x: baseX + (ev.clientX - startX), y: baseY + (ev.clientY - startY) });
+        };
+        const onUp = (ev) => {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+          const fx = Math.round(baseX + (ev.clientX - startX));
+          const fy = Math.round(baseY + (ev.clientY - startY));
+          setDragPos({ x: fx, y: fy });
+          trigger("copaste", "setPanelPos", fx + "," + fy);
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+      };
 
       const blueprints = blueprintsRaw ? blueprintsRaw.split("\n").filter((n) => n.length > 0) : [];
 
@@ -198,10 +239,10 @@ const register = (moduleRegistry) => {
 
       return h(
         "div",
-        { className: "copastePanel" },
+        { className: "copastePanel", ref: panelRef, style: panelStyle },
         h(
           "div",
-          { className: "copasteHeader" },
+          { className: "copasteHeader", onMouseDown: onHeaderMouseDown },
           h("div", { className: "copasteLogo" }, h("img", { src: "coui://copaste/copaste.svg" })),
           h("div", { className: "copasteTitle" }, "COPASTE"),
           version ? h("div", { className: "copasteVersion" }, "v" + version) : null
@@ -216,6 +257,15 @@ const register = (moduleRegistry) => {
             h("div", { className: "copasteStatDivider" }),
             stat("Clipboard", clipboard, true)
           ),
+          selectedName
+            ? h(
+                "div",
+                { className: "copasteFilterRow" },
+                h("img", { src: "coui://copaste/prop.svg" }),
+                h("div", { className: "copasteFilterLabel" }, "Prop"),
+                h("div", { className: "copasteFilterValue copastePropName" }, selectedName)
+              )
+            : null,
           sameFilter
             ? h(
                 "div",

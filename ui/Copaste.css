@@ -1,6 +1,6 @@
 .copastePanel{position:absolute;top:80rem;left:10rem;width:226rem;padding:8rem;border-radius:12rem;background:linear-gradient(180deg,rgba(30,32,46,0.85),rgba(19,20,30,0.88));border:1rem solid rgba(255,255,255,0.10);box-shadow:0 12rem 32rem rgba(0,0,0,0.5);backdrop-filter:var(--panelBlur);color:#e8e9f2;font-size:12rem;pointer-events:auto}
 
-.copasteHeader{display:flex;align-items:center;padding:2rem 2rem 6rem}
+.copasteHeader{display:flex;align-items:center;padding:2rem 2rem 6rem;cursor:move}
 .copasteLogo{width:20rem;height:20rem;border-radius:6rem;background:linear-gradient(180deg,#79dba3,#45a06c);display:flex;align-items:center;justify-content:center;box-shadow:0 2rem 6rem rgba(111,211,154,0.35)}
 .copasteLogo img{width:12rem;height:12rem}
 .copasteTitle{font-size:12rem;font-weight:bold;letter-spacing:0.8rem;color:#ffffff;margin-left:7rem}
@@ -21,6 +21,7 @@
 .copasteFilterRow img{width:10rem;height:10rem}
 .copasteFilterLabel{font-size:10rem;color:rgba(255,255,255,0.5);margin-left:5rem}
 .copasteFilterValue{font-size:10rem;font-weight:600;color:#8fe6b4;margin-left:5rem}
+.copastePropName{color:rgba(255,255,255,0.85)}
 
 .copasteBtns{display:flex;margin:0 -2rem}
 .copasteBtn{height:25rem;padding:0 6rem;margin:2rem;border-radius:6rem;font-size:11rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:1 1 0;background:linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.03));border:1rem solid rgba(255,255,255,0.13);color:#e6e9f0;transition:all .12s}
@@ -35,7 +36,7 @@
 .copasteBtnDisabled{background:rgba(255,255,255,0.03) !important;border-color:rgba(255,255,255,0.05) !important;color:rgba(255,255,255,0.22) !important;cursor:default;box-shadow:none !important;font-weight:normal !important}
 .copasteBtnDisabled img{opacity:0.25}
 
-.copasteBpList{max-height:112rem;overflow-y:auto}
+.copasteBpList{max-height:125rem;overflow-y:auto}
 .copasteBpRow{display:flex;align-items:center;margin:1.5rem 0}
 .copasteBpLoad{flex:1;height:22rem;display:flex;align-items:center;text-align:left;padding:0 7rem;border:none;border-radius:5rem;background-color:rgba(255,255,255,0.06);color:#e8e9f2;font-size:11rem;cursor:pointer;transition:background-color .12s}
 .copasteBpLoad:hover{background-color:rgba(111,211,154,0.22)}

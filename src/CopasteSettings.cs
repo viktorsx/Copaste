@@ -72,9 +72,18 @@ namespace Copaste
 
         public bool AnarchyPaste { get; set; } = true;
 
+        // Sačuvana pozicija panela u pikselima ekrana; -1 = default (CSS pozicija).
+        [SettingsUIHidden]
+        public int PanelX { get; set; } = -1;
+
+        [SettingsUIHidden]
+        public int PanelY { get; set; } = -1;
+
         public override void SetDefaults()
         {
             AnarchyPaste = true;
+            PanelX = -1;
+            PanelY = -1;
         }
     }
 }
