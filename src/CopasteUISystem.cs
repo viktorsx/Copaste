@@ -19,6 +19,7 @@ namespace Copaste
         private ValueBinding<int> m_PanelY;
         private ValueBinding<bool> m_RandomVariation;
         private ValueBinding<float> m_AlignGapLive;
+        private ValueBinding<bool> m_AlignPickArmed;
 
         private static float ParseGap(string payload)
         {
@@ -69,8 +70,10 @@ namespace Copaste
                     m_RandomVariation.Update(random);
                 }
             }));
-            // 0 = na liniju, 1 = na liniju sa jednakim razmacima.
-            AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) => m_CopasteToolSystem.TriggerAlignLine(mode == 1)));
+            // Line = biranje uzor-propa; Spaced = jednaki razmaci po liniji.
+            AddBinding(new TriggerBinding("copaste", "actionAlignPick", () => m_CopasteToolSystem.TriggerAlignPick()));
+            AddBinding(new TriggerBinding<string>("copaste", "setAlignGapLive", (payload) => m_CopasteToolSystem.SetAlignSessionGap(ParseGap(payload))));
+            AddBinding(m_AlignPickArmed = new ValueBinding<bool>("copaste", "alignPickArmed", false));
 
             // Spaced/Circle sa opcionim razmakom u metrima ("" ili neispravno = auto).
             AddBinding(new TriggerBinding<string>("copaste", "actionAlignSpaced", (payload) =>
@@ -173,6 +176,7 @@ namespace Copaste
             m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
             m_SelectedName.Update(m_CopasteToolSystem.SelectedPropName);
             m_AlignGapLive.Update(m_CopasteToolSystem.AlignSessionGap);
+            m_AlignPickArmed.Update(m_CopasteToolSystem.AlignPickArmed);
         }
     }
 }

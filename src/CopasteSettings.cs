@@ -98,11 +98,11 @@ namespace Copaste
         [SettingsUISection(kKeybindingsTab, kNudgeGroup)]
         public ProxyBinding NudgeRightBinding { get; set; }
 
-        [SettingsUIKeyboardBinding(BindingKeyboard.RightArrow, kAlignGapPlusAction, alt: true)]
+        [SettingsUIKeyboardBinding(BindingKeyboard.RightBracket, kAlignGapPlusAction)]
         [SettingsUISection(kKeybindingsTab, kAlignGroup)]
         public ProxyBinding AlignGapPlusBinding { get; set; }
 
-        [SettingsUIKeyboardBinding(BindingKeyboard.LeftArrow, kAlignGapMinusAction, alt: true)]
+        [SettingsUIKeyboardBinding(BindingKeyboard.LeftBracket, kAlignGapMinusAction)]
         [SettingsUISection(kKeybindingsTab, kAlignGroup)]
         public ProxyBinding AlignGapMinusBinding { get; set; }
 

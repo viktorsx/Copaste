@@ -5,7 +5,7 @@
 Panel redesign and quality-of-life update.
 
 ### Panel
-- Complete visual redesign: grouped cards, clear button states, readable counters
+- Complete visual redesign: grouped cards, icons on every button, clear button states, readable counters
 - The panel can now be dragged by its header and remembers its position between sessions
 - Single click-selected props show their name in the panel (marquee selections don't)
 - Blueprint list shows 5 entries before scrolling
@@ -14,7 +14,7 @@ Panel redesign and quality-of-life update.
 - Pasted props now keep the original's look by default — both the game's color variation and any custom color picked in the Customization tab. A blue bench stays blue, a recolored one keeps its custom color. The Original/Random toggle in the panel restores the old random behavior
 - The paste preview shows the real colors too, instead of shuffling them while you move
 - Undo of a delete also restores the original colors now
-- New Align tools: Line puts the selection onto a straight line between its two farthest props; Spaced additionally makes the gaps equal (optional exact gap in meters); Circle arranges the selection evenly on a circle. After Spaced or Circle, Alt+Left/Right (rebindable) fine-tunes the gap live
+- New Align tools: Line lets you pick a reference prop and lines the selection up along its facing; Spaced makes the gaps equal on a line (exact meters via the stepper); Circle arranges the selection evenly on a circle. After Spaced or Circle, [ and ] keys (rebindable) or the stepper resize the layout live
 - Move drag no longer jerks at the start — the selection follows the cursor smoothly from the first frame
 - Nudge (Ctrl+arrows) step halved for finer control
 

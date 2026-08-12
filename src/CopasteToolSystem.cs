@@ -84,6 +84,7 @@ namespace Copaste
         private ProxyAction m_SnapGroundAction;
         private ProxyAction m_MatchHeightAction;
         private bool m_HeightPickArmed;
+        private bool m_AlignPickArmed;
         private ProxyAction m_NudgeUpAction;
         private ProxyAction m_NudgeDownAction;
         private ProxyAction m_NudgeLeftAction;
@@ -325,6 +326,7 @@ namespace Copaste
             m_SnapGroundAction.shouldBeEnabled = true;
             m_MatchHeightAction.shouldBeEnabled = true;
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_NudgeUpAction.shouldBeEnabled = true;
             m_NudgeDownAction.shouldBeEnabled = true;
             m_NudgeLeftAction.shouldBeEnabled = true;
@@ -393,6 +395,7 @@ namespace Copaste
             m_SameFilterPrefab = Entity.Null;
             SetSameFilterName();
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_UiTyping = false;
             base.OnStopRunning();
         }
@@ -475,6 +478,7 @@ namespace Copaste
             m_SameFilterPrefab = Entity.Null;
             SetSameFilterName();
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_PostPasteFix = null;
             m_PostPasteFixFrames = 0;
             m_HoverEntity = Entity.Null;
@@ -1024,7 +1028,13 @@ namespace Copaste
             // Pritisak: na propu = potencijalni klik ili početak pomeranja; na praznom tlu = početak marquee-a.
             if (ClickedThisFrame())
             {
-                if (m_HeightPickArmed && hitEntity != Entity.Null)
+                if (m_AlignPickArmed && hitEntity != Entity.Null)
+                {
+                    // Klik bira uzor-prop: linija ide kroz njega, u pravcu u kom je okrenut.
+                    AlignSelectionToReference(hitEntity);
+                    m_AlignPickArmed = false;
+                }
+                else if (m_HeightPickArmed && hitEntity != Entity.Null)
                 {
                     // Klik bira uzor-prop: cela selekcija preuzima njegovu visinu iznad terena.
                     MatchSelectionHeight(hitEntity);
@@ -1124,7 +1134,11 @@ namespace Copaste
             // Brzi desni klik: prvo gasi height-pick, pa čisti selekciju, pa izlazi iz alata.
             if (rightClick)
             {
-                if (m_HeightPickArmed)
+                if (m_AlignPickArmed)
+                {
+                    m_AlignPickArmed = false;
+                }
+                else if (m_HeightPickArmed)
                 {
                     m_HeightPickArmed = false;
                 }
@@ -1761,6 +1775,7 @@ namespace Copaste
 
             m_HoverEntity = Entity.Null;
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_LeftHeldOnProp = false;
             m_MoveDragging = false;
             m_MoveOffsetsPending = false;
@@ -2554,6 +2569,85 @@ namespace Copaste
         private float m_AlignStartAngle;   // Circle: ugao prvog propa
 
         public float AlignSessionGap => m_AlignKind != AlignKind.None ? m_AlignGap : -1f;
+
+        public bool AlignPickArmed => m_AlignPickArmed;
+
+        // Line dugme: naoružaj biranje uzor-propa (kao Match H za visinu).
+        public void TriggerAlignPick()
+        {
+            if (!ToolIsActive || m_Mode != Mode.Select)
+            {
+                return;
+            }
+
+            m_AlignPickArmed = !m_AlignPickArmed && m_Selected.Count > 0;
+            if (m_AlignPickArmed)
+            {
+                m_HeightPickArmed = false;
+            }
+        }
+
+        // Živa promena razmaka aktivne sesije iz panela (stepper).
+        public void SetAlignSessionGap(float gap)
+        {
+            if (m_AlignKind == AlignKind.None || gap <= 0f)
+            {
+                return;
+            }
+
+            m_AlignGap = math.max(0.5f, gap);
+            ApplyAlignSession();
+        }
+
+        // Poravnaj selekciju na liniju kroz uzor-prop, u pravcu njegove rotacije.
+        private void AlignSelectionToReference(Entity reference)
+        {
+            if (!EntityManager.Exists(reference) ||
+                !EntityManager.TryGetComponent(reference, out Game.Objects.Transform referenceTransform) ||
+                m_Selected.Count == 0)
+            {
+                return;
+            }
+
+            float3 forward = math.mul(referenceTransform.m_Rotation, new float3(0f, 0f, 1f));
+            float2 direction = math.normalizesafe(forward.xz, new float2(0f, 1f));
+            float2 origin = referenceTransform.m_Position.xz;
+
+            EndAlignSession();
+            PushTransformUndo();
+
+            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
+            int moved = 0;
+            foreach (Entity entity in m_Selected)
+            {
+                if (!EntityManager.Exists(entity) ||
+                    !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    continue;
+                }
+
+                float projection = math.dot(transform.m_Position.xz - origin, direction);
+                float2 newXz = origin + (direction * projection);
+                if (math.distancesq(newXz, transform.m_Position.xz) < 0.000001f)
+                {
+                    continue;
+                }
+
+                float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
+                float3 position = transform.m_Position;
+                position.xz = newXz;
+                position.y = TerrainUtils.SampleHeight(ref heightData, position) + heightOffset;
+
+                transform.m_Position = position;
+                EntityManager.SetComponentData(entity, transform);
+                WriteElevation(entity, heightOffset);
+                EntityManager.AddComponent<Updated>(entity);
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+                moved++;
+            }
+
+            Mod.Log.Info($"Copaste: align to reference prop line ({moved} props moved)");
+        }
 
         private void EndAlignSession()
         {

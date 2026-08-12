@@ -33,6 +33,7 @@ const register = (moduleRegistry) => {
     const panelY$ = bindValue("copaste", "panelY", -1);
     const randomVariation$ = bindValue("copaste", "randomVariation", false);
     const alignGapLive$ = bindValue("copaste", "alignGapLive", -1);
+    const alignPickArmed$ = bindValue("copaste", "alignPickArmed", false);
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -98,6 +99,24 @@ const register = (moduleRegistry) => {
       const savedY = useValue(panelY$);
       const randomVariation = useValue(randomVariation$);
       const alignGapLive = useValue(alignGapLive$);
+      const alignPickArmed = useValue(alignPickArmed$);
+
+      // Stepper: +/− 0.5 m; ispod 0.5 se vraća na "auto"; menja i živu align sesiju.
+      const stepGap = (dir) => {
+        let value = parseFloat((alignGap || "").replace(",", "."));
+        if (isNaN(value)) {
+          value = alignGapLive > 0 ? alignGapLive + dir * 0.5 : dir > 0 ? 0.5 : 0;
+        } else {
+          value += dir * 0.5;
+        }
+        if (value < 0.5) {
+          setAlignGap("");
+          return;
+        }
+        value = Math.round(value * 10) / 10;
+        setAlignGap(String(value));
+        trigger("copaste", "setAlignGapLive", String(value));
+      };
       const [dragPos, setDragPos] = React.useState(null);
       const panelRef = React.useRef(null);
 
@@ -141,10 +160,15 @@ const register = (moduleRegistry) => {
       const blueprints = blueprintsRaw ? blueprintsRaw.split("\n").filter((n) => n.length > 0) : [];
 
       // Dugme: label ili SVG ikonica, sa tooltip-om i vidljivim stanjem.
-      const actionBtn = (content, tooltip, enabled, onClick, isActive, variant) => {
+      const actionBtn = (content, tooltip, enabled, onClick, isActive, variant, icon) => {
         const inner =
           typeof content === "string" && content.endsWith(".svg")
             ? h("img", { src: "coui://copaste/" + content })
+            : icon
+            ? [
+                h("img", { key: "i", className: "copasteBtnIcon", src: "coui://copaste/" + icon }),
+                h("span", { key: "t" }, content),
+              ]
             : content;
 
         const variantClass = isActive
@@ -286,10 +310,10 @@ const register = (moduleRegistry) => {
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Copy", "Copy selection (Ctrl+C)", selected > 0 && !pasteMode, () => trigger("copaste", "actionCopy"), false, "primary"),
-            actionBtn("Paste", "Paste mode on/off (Ctrl+V)", clipboard > 0, () => trigger("copaste", "actionPaste"), pasteMode),
+            actionBtn("Copy", "Copy selection (Ctrl+C)", selected > 0 && !pasteMode, () => trigger("copaste", "actionCopy"), false, "primary", "copy.svg"),
+            actionBtn("Paste", "Paste mode on/off (Ctrl+V)", clipboard > 0, () => trigger("copaste", "actionPaste"), pasteMode, undefined, "paste.svg"),
             selected > 0
-              ? actionBtn("Save", "Save selection as blueprint", true, () => trigger("copaste", "saveBlueprint"), false)
+              ? actionBtn("Save", "Save selection as blueprint", true, () => trigger("copaste", "saveBlueprint"), false, undefined, "save.svg")
               : null
           )
         ),
@@ -298,15 +322,15 @@ const register = (moduleRegistry) => {
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Undo", "Undo last action (Ctrl+Z)", undoCount > 0, () => trigger("copaste", "actionUndo"), false),
-            actionBtn("Delete", "Delete selection (Del)", selected > 0 && !pasteMode, () => trigger("copaste", "actionDelete"), false, "danger"),
-            actionBtn("Filter", "Type filter for marquee (T)", (selected > 0 || sameFilter) && !pasteMode, () => trigger("copaste", "actionSelectSame"), !!sameFilter)
+            actionBtn("Undo", "Undo last action (Ctrl+Z)", undoCount > 0, () => trigger("copaste", "actionUndo"), false, undefined, "undo.svg"),
+            actionBtn("Delete", "Delete selection (Del)", selected > 0 && !pasteMode, () => trigger("copaste", "actionDelete"), false, "danger", "trash.svg"),
+            actionBtn("Filter", "Type filter for marquee (T)", (selected > 0 || sameFilter) && !pasteMode, () => trigger("copaste", "actionSelectSame"), !!sameFilter, undefined, "filterw.svg")
           ),
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Ground", "Snap selection to terrain (End)", selected > 0 || pasteMode, () => trigger("copaste", "actionSnapGround"), false),
-            actionBtn("Match H", "Pick height from a prop (Home)", selected > 0 && !pasteMode, () => trigger("copaste", "actionMatchHeight"), heightPickArmed)
+            actionBtn("Ground", "Snap selection to terrain (End)", selected > 0 || pasteMode, () => trigger("copaste", "actionSnapGround"), false, undefined, "ground.svg"),
+            actionBtn("Match H", "Pick height from a prop (Home)", selected > 0 && !pasteMode, () => trigger("copaste", "actionMatchHeight"), heightPickArmed, undefined, "matchh.svg")
           )
         ),
         section(
@@ -321,37 +345,67 @@ const register = (moduleRegistry) => {
           ),
           h(
             "div",
-            { className: "copasteSectionTitle copasteSubTitle" },
-            "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m (Alt+←/→)" : "")
+            { className: "copasteSubTitleRow" },
+            h(
+              "div",
+              { className: "copasteSectionTitle copasteSubTitleFlat" },
+              "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m" : "")
+            ),
+            withTooltip(
+              "Gap in meters for Spaced and Circle (empty = auto). Adjusts a live align too — same as [ and ] keys",
+              h(
+                "div",
+                { className: "copasteStepper" },
+                h(
+                  "button",
+                  { className: "copasteStepperBtn", onClick: () => stepGap(-1) },
+                  h("img", { src: "coui://copaste/chevl.svg" })
+                ),
+                h("input", {
+                  className: "copasteStepperInput",
+                  value: alignGap,
+                  placeholder: "auto",
+                  onChange: (e) => setAlignGap(e.target.value),
+                  onFocus: () => trigger("copaste", "setTyping", true),
+                  onBlur: () => trigger("copaste", "setTyping", false),
+                }),
+                h(
+                  "button",
+                  { className: "copasteStepperBtn", onClick: () => stepGap(1) },
+                  h("img", { src: "coui://copaste/chevr.svg" })
+                )
+              )
+            )
           ),
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Line", "Line up the selection between its two farthest props", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
+            actionBtn(
+              "Line",
+              "Pick a reference prop: the selection lines up on a line through it, along its facing. RMB cancels",
+              selected > 0 && !pasteMode,
+              () => trigger("copaste", "actionAlignPick"),
+              alignPickArmed,
+              undefined,
+              "alignline.svg"
+            ),
             actionBtn(
               "Spaced",
-              "Line up with equal gaps (box = exact meters, empty = auto). Then Alt+Left/Right fine-tunes",
+              "Line up with equal gaps (stepper = exact meters, empty = auto). Then [ and ] fine-tune",
               selected > 1 && !pasteMode,
               () => trigger("copaste", "actionAlignSpaced", alignGap),
-              false
+              false,
+              undefined,
+              "alignspaced.svg"
             ),
             actionBtn(
               "Circle",
-              "Arrange evenly on a circle (box = gap in meters, empty = keep size). Then Alt+Left/Right fine-tunes",
+              "Arrange evenly on a circle (stepper = gap in meters, empty = keep size). Then [ and ] fine-tune",
               selected > 2 && !pasteMode,
               () => trigger("copaste", "actionAlignCircle", alignGap),
-              false
-            ),
-            withTooltip(
-              "Optional gap in meters for Spaced and Circle (empty = auto)",
-              h("input", {
-                className: "copasteGapInput",
-                value: alignGap,
-                placeholder: "auto",
-                onChange: (e) => setAlignGap(e.target.value),
-                onFocus: () => trigger("copaste", "setTyping", true),
-                onBlur: () => trigger("copaste", "setTyping", false),
-              })
+              false,
+              undefined,
+              "aligncircle.svg"
             )
           ),
           h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Paste look"),
@@ -392,6 +446,8 @@ const register = (moduleRegistry) => {
             ? "Click: place • RMB drag: rotate • PgUp/PgDn: height • RMB: back"
             : heightPickArmed
             ? "Click a prop to copy its height • RMB: cancel"
+            : alignPickArmed
+            ? "Click a prop: the line goes through it, along its facing • RMB: cancel"
             : "Click/box: select • Drag prop: move • RMB drag: rotate • Ctrl+arrows: nudge"
         )
       );
