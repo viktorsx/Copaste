@@ -45,6 +45,10 @@ namespace Copaste
             public float m_Diameter;
             public bool m_HadTree;
             public Game.Objects.Tree m_Tree;
+
+            // PseudoRandomSeed originala — određuje varijaciju boje/izgleda.
+            public bool m_HasSeed;
+            public ushort m_Seed;
         }
 
         public int SelectedCount => m_Selected.Count;
@@ -95,6 +99,8 @@ namespace Copaste
             public bool m_HadElevation;
             public bool m_HadTree;
             public Game.Objects.Tree m_Tree;
+            public bool m_HasSeed;
+            public ushort m_Seed;
         }
 
         private class UndoRecord
@@ -138,6 +144,8 @@ namespace Copaste
             public float3 m_Position;
             public bool m_HadTree;
             public Game.Objects.Tree m_Tree;
+            public bool m_HasSeed;
+            public ushort m_Seed;
 
             // Stvarni entitet koji je paste stvorio — razrešava se u RunPostPasteFix,
             // da undo briše baš njega, a ne bilo koji istovetan prop na istom mestu.
@@ -153,6 +161,7 @@ namespace Copaste
 
         private bool m_LeftHeldOnProp;
         private bool m_MoveDragging;
+        private bool m_MoveOffsetsPending;
         private bool m_LeftPressShift;
         private Entity m_LeftPressEntity;
         private float3 m_MoveStart;
@@ -335,6 +344,7 @@ namespace Copaste
             m_MarqueeActive = false;
             m_LeftHeldOnProp = false;
             m_MoveDragging = false;
+            m_MoveOffsetsPending = false;
             m_MoveItems.Clear();
             m_Selected.Clear();
             m_HoverEntity = Entity.Null;
@@ -421,6 +431,7 @@ namespace Copaste
             m_MarqueeHits.Clear();
             m_LeftHeldOnProp = false;
             m_MoveDragging = false;
+            m_MoveOffsetsPending = false;
             m_MoveItems.Clear();
             m_RightHeld = false;
             m_RightDragging = false;
@@ -740,6 +751,19 @@ namespace Copaste
 
             PushTransformUndo();
 
+            // Ofseti se NE računaju odavde: sidro iz ovog frejma je pogodak na
+            // površini propa, a od sledećeg frejma raycast gađa samo teren —
+            // paralaksa između ta dva pogotka je pravila vidljivo cimanje na
+            // startu prevlačenja. InitMoveOffsets čeka prvi terenski pogodak.
+            m_MoveItems.Clear();
+            m_MoveDragging = true;
+            m_MoveOffsetsPending = true;
+        }
+
+        // Popuni ofsete selekcije prema prvom TERENSKOM sidru (isti raycast kao
+        // kasniji MoveSelection pozivi — nema skoka).
+        private void InitMoveOffsets(float3 anchor)
+        {
             m_MoveItems.Clear();
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
             foreach (Entity entity in m_Selected)
@@ -758,7 +782,7 @@ namespace Copaste
                 });
             }
 
-            m_MoveDragging = true;
+            m_MoveOffsetsPending = false;
         }
 
         private void MoveSelection(float3 anchor)
@@ -968,6 +992,7 @@ namespace Copaste
                 {
                     m_LeftHeldOnProp = true;
                     m_MoveDragging = false;
+                    m_MoveOffsetsPending = false;
                     m_LeftPressEntity = hitEntity;
                     m_LeftPressShift = shiftHeld;
                     m_MoveStart = hit.m_HitPosition;
@@ -996,6 +1021,11 @@ namespace Copaste
                 {
                     BeginMoveDrag(hit.m_HitPosition);
                 }
+                else if (m_MoveDragging && m_MoveOffsetsPending)
+                {
+                    // Prvi frejm sa terenskom raycast maskom — tek sad znamo pravo sidro.
+                    InitMoveOffsets(hit.m_HitPosition);
+                }
                 else if (m_MoveDragging)
                 {
                     MoveSelection(hit.m_HitPosition);
@@ -1011,6 +1041,7 @@ namespace Copaste
 
                 m_LeftHeldOnProp = false;
                 m_MoveDragging = false;
+                m_MoveOffsetsPending = false;
                 m_MoveItems.Clear();
             }
 
@@ -1377,6 +1408,7 @@ namespace Copaste
                 // Stvarna visina propa iznad terena — čuva se da nalepljeni bude na istoj visini kao original.
                 float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref copyHeightData, transform.m_Position);
                 bool hadTree = EntityManager.TryGetComponent(entity, out Game.Objects.Tree tree);
+                bool hasSeed = EntityManager.TryGetComponent(entity, out PseudoRandomSeed seed);
 
                 m_Clipboard.Add(new ClipboardItem
                 {
@@ -1387,6 +1419,8 @@ namespace Copaste
                     m_Diameter = GetPrefabDiameter(prefabRef.m_Prefab),
                     m_HadTree = hadTree,
                     m_Tree = tree,
+                    m_HasSeed = hasSeed,
+                    m_Seed = hasSeed ? seed.m_Seed : (ushort)0,
                 });
             }
 
@@ -1401,6 +1435,10 @@ namespace Copaste
             float baseDelta = GetAnchorHeightDelta(anchor, ref heightData);
             m_LastPreview.Clear();
 
+            // "Original" izgled: nalepljeni prop preuzima seed (boju/varijaciju) originala.
+            // "Random varijacije": igra bira nasumično, kao do sada.
+            bool keepLook = Mod.Settings == null || !Mod.Settings.RandomPasteVariation;
+
             foreach (ClipboardItem item in m_Clipboard)
             {
                 float3 position = anchor + item.m_Offset;
@@ -1411,6 +1449,8 @@ namespace Copaste
                     m_Position = position,
                     m_HadTree = item.m_HadTree,
                     m_Tree = item.m_Tree,
+                    m_HasSeed = keepLook && item.m_HasSeed,
+                    m_Seed = item.m_Seed,
                 });
 
                 Entity definitionEntity = buffer.CreateEntity();
@@ -1558,6 +1598,7 @@ namespace Copaste
             m_HeightPickArmed = false;
             m_LeftHeldOnProp = false;
             m_MoveDragging = false;
+            m_MoveOffsetsPending = false;
             m_MoveItems.Clear();
             m_Mode = Mode.Paste;
             m_PasteDirty = true;
@@ -1724,6 +1765,15 @@ namespace Copaste
                 EntityManager.SetComponentData(entity, record.m_Tree);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+
+            // Varijacija boje/izgleda: preuzmi seed originala ("Original" mod).
+            if (record.m_HasSeed &&
+                EntityManager.TryGetComponent(entity, out PseudoRandomSeed currentSeed) &&
+                currentSeed.m_Seed != record.m_Seed)
+            {
+                EntityManager.SetComponentData(entity, new PseudoRandomSeed(record.m_Seed));
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+            }
         }
 
         private void RunPostPasteFix()
@@ -1836,6 +1886,7 @@ namespace Copaste
 
                 bool hadElevation = EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevation);
                 bool hadTree = EntityManager.TryGetComponent(entity, out Game.Objects.Tree tree);
+                bool hasSeed = EntityManager.TryGetComponent(entity, out PseudoRandomSeed seed);
                 snapshots.Add(new TransformSnapshot
                 {
                     m_Entity = entity,
@@ -1845,6 +1896,8 @@ namespace Copaste
                     m_Elevation = hadElevation ? elevation.m_Elevation : 0f,
                     m_HadTree = hadTree,
                     m_Tree = tree,
+                    m_HasSeed = hasSeed,
+                    m_Seed = hasSeed ? seed.m_Seed : (ushort)0,
                 });
             }
 
@@ -1956,7 +2009,11 @@ namespace Copaste
 
             if (EntityManager.HasComponent<PseudoRandomSeed>(entity))
             {
-                EntityManager.SetComponentData(entity, new PseudoRandomSeed((ushort)RandomSeed.Next().GetRandom(0).NextInt(ushort.MaxValue)));
+                // Vraćeni prop zadržava originalnu varijaciju (boju); random samo
+                // ako snapshot iz nekog razloga nema seed.
+                EntityManager.SetComponentData(entity, snapshot.m_HasSeed
+                    ? new PseudoRandomSeed(snapshot.m_Seed)
+                    : new PseudoRandomSeed((ushort)RandomSeed.Next().GetRandom(0).NextInt(ushort.MaxValue)));
             }
 
             // Drveće: vrati starost/stanje — inače undo vraća sadnicu umesto odraslog stabla.
@@ -2196,7 +2253,7 @@ namespace Copaste
             float2 forward = math.normalizesafe(cameraForward.xz, new float2(0f, 1f));
             float2 right = new float2(forward.y, -forward.x);
 
-            float speed = 2f * UnityEngine.Time.deltaTime;
+            float speed = 1f * UnityEngine.Time.deltaTime;
             float2 delta = ((right * x) + (forward * z)) * speed;
             return new float3(delta.x, 0f, delta.y);
         }
@@ -2231,6 +2288,76 @@ namespace Copaste
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+        }
+
+        // Align center: poravnaj sve selektovane propove na liniju kroz centar
+        // selekcije. Osa je relativna kameri, kao nudge i marquee:
+        // horizontal=true → horizontalna linija na ekranu (poravnanje po dubini),
+        // horizontal=false → vertikalna linija (poravnanje po širini).
+        public void TriggerAlignCenter(bool horizontal)
+        {
+            if (!ToolIsActive || m_Mode != Mode.Select || m_Selected.Count < 2)
+            {
+                return;
+            }
+
+            UnityEngine.Camera camera = UnityEngine.Camera.main;
+            float3 cameraForward = camera != null ? (float3)camera.transform.forward : new float3(0f, 0f, 1f);
+            float2 forward = math.normalizesafe(cameraForward.xz, new float2(0f, 1f));
+            float2 right = new float2(forward.y, -forward.x);
+            float2 axis = horizontal ? forward : right;
+
+            // Centar selekcije po izabranoj osi.
+            float2 centroid = float2.zero;
+            int count = 0;
+            foreach (Entity entity in m_Selected)
+            {
+                if (EntityManager.Exists(entity) && EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    centroid += transform.m_Position.xz;
+                    count++;
+                }
+            }
+
+            if (count < 2)
+            {
+                return;
+            }
+
+            centroid /= count;
+            float centroidAlongAxis = math.dot(centroid, axis);
+
+            PushTransformUndo();
+
+            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
+            foreach (Entity entity in m_Selected)
+            {
+                if (!EntityManager.Exists(entity) ||
+                    !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    continue;
+                }
+
+                float2 xz = transform.m_Position.xz;
+                float delta = centroidAlongAxis - math.dot(xz, axis);
+                if (delta == 0f)
+                {
+                    continue;
+                }
+
+                float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
+                float3 position = transform.m_Position;
+                position.xz = xz + (axis * delta);
+                position.y = TerrainUtils.SampleHeight(ref heightData, position) + heightOffset;
+
+                transform.m_Position = position;
+                EntityManager.SetComponentData(entity, transform);
+                WriteElevation(entity, heightOffset);
+                EntityManager.AddComponent<Updated>(entity);
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+            }
+
+            Mod.Log.Info($"Copaste: align center ({(horizontal ? "H" : "V")}) on {count} props");
         }
 
         public bool HeightPickArmed => m_HeightPickArmed;
@@ -2407,6 +2534,7 @@ namespace Copaste
                         item.m_HadTree ? "1" : "0",
                         ((int)item.m_Tree.m_State).ToString(inv),
                         item.m_Tree.m_Growth.ToString(inv),
+                        item.m_HasSeed ? item.m_Seed.ToString(inv) : "-1",
                     }));
                 }
 
@@ -2457,8 +2585,8 @@ namespace Copaste
                 {
                     string[] parts = lines[i].Split('|');
 
-                    // 11 polja = stari format (pre čuvanja drveća), 14 = novi.
-                    if (parts.Length != 11 && parts.Length != 14)
+                    // 11 polja = najstariji format, 14 = sa drvećem (v1.0.4), 15 = sa seed-om (v1.0.6).
+                    if (parts.Length != 11 && parts.Length != 14 && parts.Length != 15)
                     {
                         continue;
                     }
@@ -2486,7 +2614,7 @@ namespace Copaste
                         m_Diameter = float.Parse(parts[10], inv),
                     };
 
-                    if (parts.Length == 14 && parts[11] == "1")
+                    if (parts.Length >= 14 && parts[11] == "1")
                     {
                         item.m_HadTree = true;
                         item.m_Tree = new Game.Objects.Tree
@@ -2494,6 +2622,12 @@ namespace Copaste
                             m_State = (Game.Objects.TreeState)int.Parse(parts[12], inv),
                             m_Growth = byte.Parse(parts[13], inv),
                         };
+                    }
+
+                    if (parts.Length >= 15 && int.TryParse(parts[14], System.Globalization.NumberStyles.Integer, inv, out int seedValue) && seedValue >= 0)
+                    {
+                        item.m_HasSeed = true;
+                        item.m_Seed = (ushort)seedValue;
                     }
 
                     items.Add(item);

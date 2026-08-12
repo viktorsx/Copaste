@@ -36,6 +36,12 @@
 .copasteBtnDisabled{background:rgba(255,255,255,0.03) !important;border-color:rgba(255,255,255,0.05) !important;color:rgba(255,255,255,0.22) !important;cursor:default;box-shadow:none !important;font-weight:normal !important}
 .copasteBtnDisabled img{opacity:0.25}
 
+.copasteSubTitle{margin:8rem 2rem 5rem}
+.copasteToggleTrack{display:flex;background:rgba(0,0,0,0.35);border-radius:6rem;padding:2rem}
+.copasteToggleOpt{flex:1 1 0;height:20rem;display:flex;align-items:center;justify-content:center;border-radius:4rem;font-size:10rem;color:rgba(255,255,255,0.55);cursor:pointer;transition:color .12s}
+.copasteToggleOpt:hover{color:rgba(255,255,255,0.85)}
+.copasteToggleOptActive{background:linear-gradient(180deg,#79dba3,#45a06c);color:#0b2114;font-weight:bold}
+
 .copasteBpList{max-height:125rem;overflow-y:auto}
 .copasteBpRow{display:flex;align-items:center;margin:1.5rem 0}
 .copasteBpLoad{flex:1;height:22rem;display:flex;align-items:center;text-align:left;padding:0 7rem;border:none;border-radius:5rem;background-color:rgba(255,255,255,0.06);color:#e8e9f2;font-size:11rem;cursor:pointer;transition:background-color .12s}

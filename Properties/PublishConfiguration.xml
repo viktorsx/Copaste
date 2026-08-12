@@ -45,11 +45,24 @@ Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <Screenshot Value="Properties/Screenshots/Panel.png" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
-  <ModVersion Value="1.0.5" />
+  <ModVersion Value="1.0.6" />
   <GameVersion Value="1.6.*" />
-  <ChangeLog>Toolbar button facelift. Hand tested in game before publishing - that's the routine for every Copaste release.
+  <ChangeLog>Panel redesign and quality-of-life update. Hand tested in game before publishing - that's the routine for every Copaste release.
 
-- The toolbar button now uses the game's standard floating button, the same one Traffic, Node Controller and other mods use - correct icon size and the default look
-- Removed the custom blue background (both idle and active) - the button now blends in with other mod buttons, and theme mods like Redesigned Top Buttons can restyle it just like the rest</ChangeLog>
+Panel
+- Complete visual redesign: grouped cards, clear button states, readable counters
+- The panel can now be dragged by its header and remembers its position between sessions
+- Single click-selected props show their name in the panel (marquee selections don't)
+- Blueprint list shows 5 entries before scrolling
+
+Editing
+- Pasted props now keep the original's color variation by default - a blue bench stays blue. A new Original/Random toggle in the panel restores the old random behavior if you prefer it
+- Undo of a delete also restores the original color variation now
+- New Align buttons: Center H / Center V line up the selection through its center, relative to the camera like nudge
+- Move drag no longer jerks at the start - the selection follows the cursor smoothly from the first frame
+- Nudge (Ctrl+arrows) step halved for finer control
+
+Blueprints
+- Blueprints now store color variations too; older blueprint files still load fine</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>

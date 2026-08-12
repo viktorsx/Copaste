@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.6] - 2026-08-12
+
+Panel redesign and quality-of-life update.
+
+### Panel
+- Complete visual redesign: grouped cards, clear button states, readable counters
+- The panel can now be dragged by its header and remembers its position between sessions
+- Single click-selected props show their name in the panel (marquee selections don't)
+- Blueprint list shows 5 entries before scrolling
+
+### Editing
+- Pasted props now keep the original's color variation by default — a blue bench stays blue. A new Original/Random toggle in the panel restores the old random behavior
+- Undo of a delete also restores the original color variation now
+- New Align buttons: Center H / Center V line up the selection through its center, relative to the camera like nudge
+- Move drag no longer jerks at the start — the selection follows the cursor smoothly from the first frame
+- Nudge (Ctrl+arrows) step halved for finer control
+
+### Blueprints
+- Blueprints now store color variations too; older blueprint files still load fine
+
 ## [1.0.5] - 2026-08-10
 
 Toolbar button facelift.

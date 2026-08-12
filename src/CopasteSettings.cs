@@ -79,11 +79,17 @@ namespace Copaste
         [SettingsUIHidden]
         public int PanelY { get; set; } = -1;
 
+        // Paste izgled: false = nalepljeni prop zadržava boju/varijaciju originala,
+        // true = igra bira nasumično (staro ponašanje).
+        [SettingsUIHidden]
+        public bool RandomPasteVariation { get; set; } = false;
+
         public override void SetDefaults()
         {
             AnarchyPaste = true;
             PanelX = -1;
             PanelY = -1;
+            RandomPasteVariation = false;
         }
     }
 }

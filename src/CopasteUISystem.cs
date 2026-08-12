@@ -17,6 +17,7 @@ namespace Copaste
         private ValueBinding<string> m_SelectedName;
         private ValueBinding<int> m_PanelX;
         private ValueBinding<int> m_PanelY;
+        private ValueBinding<bool> m_RandomVariation;
         private ToolSystem m_ToolSystem;
         private CopasteToolSystem m_CopasteToolSystem;
 
@@ -40,6 +41,18 @@ namespace Copaste
             AddBinding(m_SelectedName = new ValueBinding<string>("copaste", "selectedName", string.Empty));
             AddBinding(m_PanelX = new ValueBinding<int>("copaste", "panelX", Mod.Settings != null ? Mod.Settings.PanelX : -1));
             AddBinding(m_PanelY = new ValueBinding<int>("copaste", "panelY", Mod.Settings != null ? Mod.Settings.PanelY : -1));
+
+            AddBinding(m_RandomVariation = new ValueBinding<bool>("copaste", "randomVariation", Mod.Settings != null && Mod.Settings.RandomPasteVariation));
+            AddBinding(new TriggerBinding<bool>("copaste", "setRandomVariation", (random) =>
+            {
+                if (Mod.Settings != null)
+                {
+                    Mod.Settings.RandomPasteVariation = random;
+                    Mod.Settings.ApplyAndSave();
+                    m_RandomVariation.Update(random);
+                }
+            }));
+            AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) => m_CopasteToolSystem.TriggerAlignCenter(mode == 0)));
 
             AddBinding(new TriggerBinding<string>("copaste", "setPanelPos", (payload) =>
             {

@@ -31,6 +31,7 @@ const register = (moduleRegistry) => {
     const selectedName$ = bindValue("copaste", "selectedName", "");
     const panelX$ = bindValue("copaste", "panelX", -1);
     const panelY$ = bindValue("copaste", "panelY", -1);
+    const randomVariation$ = bindValue("copaste", "randomVariation", false);
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -93,6 +94,7 @@ const register = (moduleRegistry) => {
       const selectedName = useValue(selectedName$);
       const savedX = useValue(panelX$);
       const savedY = useValue(panelY$);
+      const randomVariation = useValue(randomVariation$);
       const [dragPos, setDragPos] = React.useState(null);
       const panelRef = React.useRef(null);
 
@@ -313,6 +315,37 @@ const register = (moduleRegistry) => {
             actionBtn("rotr.svg", "Rotate 45° right", selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", 45), false),
             actionBtn("up.svg", "Raise 0.5 m (PgUp)", selected > 0 || pasteMode, () => trigger("copaste", "actionHeight", 1), false),
             actionBtn("down.svg", "Lower 0.5 m (PgDn)", selected > 0 || pasteMode, () => trigger("copaste", "actionHeight", -1), false)
+          ),
+          h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Align"),
+          h(
+            "div",
+            { className: "copasteBtns" },
+            actionBtn("Center H", "Align selection onto a horizontal line through its center", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
+            actionBtn("Center V", "Align selection onto a vertical line through its center", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 1), false)
+          ),
+          h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Paste look"),
+          withTooltip(
+            "Original: pasted props keep the copied prop's color variation. Random: the game picks one",
+            h(
+              "div",
+              { className: "copasteToggleTrack" },
+              h(
+                "div",
+                {
+                  className: "copasteToggleOpt" + (!randomVariation ? " copasteToggleOptActive" : ""),
+                  onClick: () => trigger("copaste", "setRandomVariation", false),
+                },
+                "Original"
+              ),
+              h(
+                "div",
+                {
+                  className: "copasteToggleOpt" + (randomVariation ? " copasteToggleOptActive" : ""),
+                  onClick: () => trigger("copaste", "setRandomVariation", true),
+                },
+                "Random"
+              )
+            )
           )
         ),
         section(
