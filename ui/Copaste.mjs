@@ -114,21 +114,25 @@ const register = (moduleRegistry) => {
           })
         : [];
 
-      // Stepper: +/− 0.5 m; ispod 0.5 se vraća na "auto"; menja i živu align sesiju.
+      // Stepper: dok je align sesija živa, strelice idu ISTIM putem kao [ i ]
+      // prečice (C# korak od 0,5 m); bez sesije samo menjaju lokalnu vrednost
+      // koja će važiti za sledeći align. Prikaz prati živu sesiju.
+      const [gapFocused, setGapFocused] = React.useState(false);
+      const sessionGapText = alignGapLive > 0 ? String(Math.round(alignGapLive * 10) / 10) : "";
+      const gapDisplay = gapFocused ? alignGap : sessionGapText || alignGap;
+
       const stepGap = (dir) => {
-        let value = parseFloat((alignGap || "").replace(",", "."));
-        if (isNaN(value)) {
-          value = alignGapLive > 0 ? alignGapLive + dir * 0.5 : dir > 0 ? 0.5 : 0;
-        } else {
-          value += dir * 0.5;
+        if (alignGapLive > 0) {
+          trigger("copaste", "adjustAlignGap", dir);
+          return;
         }
+        let value = parseFloat((alignGap || "").replace(",", "."));
+        value = isNaN(value) ? (dir > 0 ? 0.5 : 0) : value + dir * 0.5;
         if (value < 0.5) {
           setAlignGap("");
           return;
         }
-        value = Math.round(value * 10) / 10;
-        setAlignGap(String(value));
-        trigger("copaste", "setAlignGapLive", String(value));
+        setAlignGap(String(Math.round(value * 10) / 10));
       };
       const [dragPos, setDragPos] = React.useState(null);
       const panelRef = React.useRef(null);
@@ -400,11 +404,22 @@ const register = (moduleRegistry) => {
                 ),
                 h("input", {
                   className: "copasteStepperInput",
-                  value: alignGap,
+                  value: gapDisplay,
                   placeholder: "auto",
                   onChange: (e) => setAlignGap(e.target.value),
-                  onFocus: () => trigger("copaste", "setTyping", true),
-                  onBlur: () => trigger("copaste", "setTyping", false),
+                  onFocus: () => {
+                    setGapFocused(true);
+                    setAlignGap(gapDisplay);
+                    trigger("copaste", "setTyping", true);
+                  },
+                  onBlur: () => {
+                    setGapFocused(false);
+                    trigger("copaste", "setTyping", false);
+                    // Ručno ukucana vrednost odmah važi i za živu sesiju.
+                    if (alignGapLive > 0) {
+                      trigger("copaste", "setAlignGapLive", alignGap);
+                    }
+                  },
                 }),
                 h(
                   "button",

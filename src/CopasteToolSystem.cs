@@ -2703,6 +2703,18 @@ namespace Copaste
             ApplyAlignSession();
         }
 
+        // Stepper strelice: identičan korak kao [ i ] prečice.
+        public void AdjustAlignSessionGap(int direction)
+        {
+            if (m_AlignKind == AlignKind.None || direction == 0)
+            {
+                return;
+            }
+
+            m_AlignGap = math.max(0.5f, m_AlignGap + (0.5f * math.sign(direction)));
+            ApplyAlignSession();
+        }
+
 
         private void EndAlignSession()
         {

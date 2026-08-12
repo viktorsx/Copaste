@@ -93,6 +93,7 @@ namespace Copaste
             AddBinding(new TriggerBinding<string>("copaste", "actionAlignRef", (payload) =>
                 m_CopasteToolSystem.TriggerAlignPick(ParseGap(payload))));
             AddBinding(new TriggerBinding<string>("copaste", "setAlignGapLive", (payload) => m_CopasteToolSystem.SetAlignSessionGap(ParseGap(payload))));
+            AddBinding(new TriggerBinding<int>("copaste", "adjustAlignGap", (direction) => m_CopasteToolSystem.AdjustAlignSessionGap(direction)));
             AddBinding(m_AlignPickArmed = new ValueBinding<bool>("copaste", "alignPickArmed", false));
             AddBinding(m_AlignSessionSource = new ValueBinding<int>("copaste", "alignSessionSource", 0));
             AddBinding(m_SelectionList = new ValueBinding<string>("copaste", "selectionList", string.Empty));
