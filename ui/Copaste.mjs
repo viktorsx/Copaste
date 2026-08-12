@@ -137,8 +137,9 @@ const register = (moduleRegistry) => {
       const [dragPos, setDragPos] = React.useState(null);
       const panelRef = React.useRef(null);
 
-      // Blueprints: stranice od po 5, listanje strelicama u naslovu.
+      // Blueprints i Selected props: stranice od po 5, listanje strelicama u naslovu.
       const [bpPage, setBpPage] = React.useState(0);
+      const [selPage, setSelPage] = React.useState(0);
 
       if (!active) {
         return null;
@@ -181,6 +182,28 @@ const register = (moduleRegistry) => {
       const bpPages = Math.max(1, Math.ceil(blueprints.length / 5));
       const bpPageSafe = Math.min(bpPage, bpPages - 1);
       const bpPageItems = blueprints.slice(bpPageSafe * 5, (bpPageSafe * 5) + 5);
+      const selPages = Math.max(1, Math.ceil(selectionEntries.length / 5));
+      const selPageSafe = Math.min(selPage, selPages - 1);
+      const selPageItems = selectionEntries.slice(selPageSafe * 5, (selPageSafe * 5) + 5);
+
+      const pager = (pageSafe, pages, setPage) =>
+        pages > 1
+          ? h(
+              "div",
+              { className: "copasteStepper" },
+              h(
+                "button",
+                { className: "copasteStepperBtn", onClick: () => setPage(Math.max(0, pageSafe - 1)) },
+                h("img", { src: "coui://copaste/chevl.svg" })
+              ),
+              h("div", { className: "copastePageLabel" }, (pageSafe + 1) + "/" + pages),
+              h(
+                "button",
+                { className: "copasteStepperBtn", onClick: () => setPage(Math.min(pages - 1, pageSafe + 1)) },
+                h("img", { src: "coui://copaste/chevr.svg" })
+              )
+            )
+          : null;
 
       // Dugme: label ili SVG ikonica, sa tooltip-om i vidljivim stanjem.
       const actionBtn = (content, tooltip, enabled, onClick, isActive, variant, icon) => {
@@ -332,11 +355,16 @@ const register = (moduleRegistry) => {
           ? h(
               "div",
               { className: "copasteCard" },
-              h("div", { className: "copasteSectionTitle" }, "Selected props"),
               h(
                 "div",
-                { className: "copasteBpList" },
-                selectionEntries.map((entry, i) =>
+                { className: "copasteSubTitleRow", style: { margin: "0 2rem 5rem" } },
+                h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, "Selected props"),
+                pager(selPageSafe, selPages, setSelPage)
+              ),
+              h(
+                "div",
+                null,
+                selPageItems.map((entry, i) =>
                   h(
                     "div",
                     { key: entry.id + "-" + i, className: "copasteBpRow" },
@@ -512,23 +540,7 @@ const register = (moduleRegistry) => {
             "div",
             { className: "copasteSubTitleRow", style: { margin: "0 2rem 5rem" } },
             h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, "Blueprints"),
-            bpPages > 1
-              ? h(
-                  "div",
-                  { className: "copasteStepper" },
-                  h(
-                    "button",
-                    { className: "copasteStepperBtn", onClick: () => setBpPage(Math.max(0, bpPageSafe - 1)) },
-                    h("img", { src: "coui://copaste/chevl.svg" })
-                  ),
-                  h("div", { className: "copastePageLabel" }, (bpPageSafe + 1) + "/" + bpPages),
-                  h(
-                    "button",
-                    { className: "copasteStepperBtn", onClick: () => setBpPage(Math.min(bpPages - 1, bpPageSafe + 1)) },
-                    h("img", { src: "coui://copaste/chevr.svg" })
-                  )
-                )
-              : null
+            pager(bpPageSafe, bpPages, setBpPage)
           ),
           blueprints.length === 0
             ? h("div", { className: "copasteEmpty" }, "No saved blueprints")
