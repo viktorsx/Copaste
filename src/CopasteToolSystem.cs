@@ -93,6 +93,9 @@ namespace Copaste
         // Ctrl+klik ciklus: biranje propova "zakopanih" u druge objekte.
         private float3 m_CyclePoint = new float3(float.MaxValue);
         private int m_CycleIndex;
+
+        // Preostali frejmovi doterivanja boja ghost preview-a posle promene definicija.
+        private int m_PreviewLookFrames;
         private ProxyAction m_NudgeUpAction;
         private ProxyAction m_NudgeDownAction;
         private ProxyAction m_NudgeLeftAction;
@@ -801,12 +804,11 @@ namespace Copaste
                 }
             }
 
-            PushTransformUndo();
-
             // Ofseti se NE računaju odavde: sidro iz ovog frejma je pogodak na
             // površini propa, a od sledećeg frejma raycast gađa samo teren —
             // paralaksa između ta dva pogotka je pravila vidljivo cimanje na
-            // startu prevlačenja. InitMoveOffsets čeka prvi terenski pogodak.
+            // startu prevlačenja. InitMoveOffsets čeka prvi terenski pogodak
+            // (i tek TAMO ide undo zapis — inače prekinut drag ostavi prazan undo).
             m_MoveItems.Clear();
             m_MoveDragging = true;
             m_MoveOffsetsPending = true;
@@ -817,6 +819,9 @@ namespace Copaste
         // se SAMO uhvaćeni prop, ne cela selekcija.
         private void InitMoveOffsets(float3 anchor)
         {
+            // Pomeranje sad zaista kreće — snapshot za undo ide ovde, pre prvog pomaka.
+            PushTransformUndo();
+
             m_MoveItems.Clear();
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
             IEnumerable<Entity> moveTargets =
@@ -1036,11 +1041,22 @@ namespace Copaste
             if (m_MatchHeightAction.WasPressedThisFrame())
             {
                 m_HeightPickArmed = !m_HeightPickArmed && m_Selected.Count > 0;
+                if (m_HeightPickArmed)
+                {
+                    m_AlignPickArmed = false; // samo jedan pick mod istovremeno
+                }
+            }
+
+            // Pick modovi ne važe bez selekcije (npr. posle Delete) — inače guta klikove.
+            if (m_AlignPickArmed && m_Selected.Count == 0)
+            {
+                m_AlignPickArmed = false;
             }
 
             // Pritisak: na propu = potencijalni klik ili početak pomeranja; na praznom tlu = početak marquee-a.
             bool ctrlHeld = Keyboard.current != null &&
                 (Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed);
+            Entity ctrlPick = Entity.Null;
 
             if (ClickedThisFrame())
             {
@@ -1051,21 +1067,24 @@ namespace Copaste
                     AlignRowToReference(hitEntity, m_AlignPickGap);
                     m_AlignPickArmed = false;
                 }
-                else if (ctrlHeld && raycastValid)
-                {
-                    // Ctrl+klik: kruži kroz propove oko tačke pogotka — bira i one
-                    // delimično uronjene u druge objekte/zgrade koje raycast preskače.
-                    Entity pick = CyclePick(hit.m_HitPosition, hitEntity);
-                    if (pick != Entity.Null)
-                    {
-                        ApplyClickSelection(pick, shiftHeld);
-                    }
-                }
                 else if (m_HeightPickArmed && hitEntity != Entity.Null)
                 {
                     // Klik bira uzor-prop: cela selekcija preuzima njegovu visinu iznad terena.
                     MatchSelectionHeight(hitEntity);
                     m_HeightPickArmed = false;
+                }
+                else if (ctrlHeld && raycastValid &&
+                    (hitEntity != Entity.Null ||
+                        (raycastEntity != Entity.Null && EntityManager.HasComponent<Game.Objects.Object>(raycastEntity))) &&
+                    (ctrlPick = CyclePick(hit.m_HitPosition, hitEntity)) != Entity.Null)
+                {
+                    // Ctrl+klik: kruži kroz propove oko tačke pogotka — bira i one
+                    // delimično uronjene u druge objekte/zgrade koje raycast preskače.
+                    // Uslovi: posle pick grana (Match H / To prop imaju prednost),
+                    // samo na pogodak OBJEKTA (Ctrl+klik na golo tlo i dalje čisti
+                    // selekciju / kreće marquee — bitno jer se Ctrl drži za nudge),
+                    // i samo ako kandidat postoji (inače klik normalno propada dalje).
+                    ApplyClickSelection(ctrlPick, shiftHeld);
                 }
                 else if (hitEntity != Entity.Null)
                 {
@@ -1243,23 +1262,17 @@ namespace Copaste
                 }
             }
 
-            // Align sesija: [ i ] (rebindable) fino menjaju razmak poslednjeg poravnanja.
-            if (m_AlignKind != AlignKind.None && !m_UiTyping)
+            // Align sesija: [ i ] (rebindable) fino menjaju razmak poslednjeg
+            // poravnanja — ISTOM metodom kao stepper u panelu.
+            if (!m_UiTyping)
             {
-                float gapDelta = 0f;
                 if (m_AlignGapPlusAction.WasPressedThisFrame())
                 {
-                    gapDelta = 0.5f;
+                    AdjustAlignSessionGap(1);
                 }
                 else if (m_AlignGapMinusAction.WasPressedThisFrame())
                 {
-                    gapDelta = -0.5f;
-                }
-
-                if (gapDelta != 0f)
-                {
-                    m_AlignGap = math.max(0.5f, m_AlignGap + gapDelta);
-                    ApplyAlignSession();
+                    AdjustAlignSessionGap(-1);
                 }
             }
 
@@ -1381,13 +1394,21 @@ namespace Copaste
                 m_LastAnchor = anchor;
                 m_PasteDirty = false;
                 CreatePasteDefinitions(anchor);
+
+                // Temp entiteti kaskaju za definicijama — doteruj boje ghost-a
+                // još nekoliko frejmova, pa prestani (skupo je za velike grupe).
+                m_PreviewLookFrames = 10;
             }
             else
             {
                 applyMode = ApplyMode.None;
             }
 
-            UpdatePreviewLook();
+            if (m_PreviewLookFrames > 0)
+            {
+                m_PreviewLookFrames--;
+                UpdatePreviewLook();
+            }
         }
 
         // Ghost preview: Temp entiteti dobijaju seed/boju originala, da preview
@@ -1425,9 +1446,18 @@ namespace Copaste
             NativeArray<Entity> entities = m_TempPreviewQuery.ToEntityArray(Allocator.Temp);
             NativeArray<Game.Objects.Transform> transforms = m_TempPreviewQuery.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
             NativeArray<PrefabRef> prefabRefs = m_TempPreviewQuery.ToComponentDataArray<PrefabRef>(Allocator.Temp);
+            NativeArray<Temp> temps = m_TempPreviewQuery.ToComponentDataArray<Temp>(Allocator.Temp);
 
             for (int i = 0; i < entities.Length; i++)
             {
+                // KRITIČNO: Temp sa m_Original je proxy POSTOJEĆEG objekta zahvaćenog
+                // postavljanjem — farbanje njega bi na apply trajno prefarbalo tuđ prop.
+                // Naši ghost entiteti (iz CreationDefinition) nemaju original.
+                if (temps[i].m_Original != Entity.Null)
+                {
+                    continue;
+                }
+
                 float3 entityPosition = transforms[i].m_Position;
                 if (math.any(entityPosition < boundsMin) || math.any(entityPosition > boundsMax))
                 {
@@ -1476,6 +1506,7 @@ namespace Copaste
             entities.Dispose();
             transforms.Dispose();
             prefabRefs.Dispose();
+            temps.Dispose();
         }
 
         private void DrawSelectOverlays()
@@ -1691,9 +1722,11 @@ namespace Copaste
                 CreationDefinition creation = default;
                 creation.m_Prefab = item.m_Prefab;
 
-                // Fiksan seed po stavci: preview ne treperi bojama iz frejma u frejm;
-                // u random modu svaki stamp ipak dobija novu kombinaciju.
-                creation.m_RandomSeed = keepLook ? item.m_PreviewSeed : random.NextInt();
+                // Fiksan seed po stavci SAMO kad imamo original seed koji će ga posle
+                // pregaziti (stabilan preview bez posledica). Stavke bez sačuvanog
+                // seed-a (stari blueprinti) i random mod dobijaju svež seed po stamp-u
+                // — inače bi svi stampovi bili identični klonovi.
+                creation.m_RandomSeed = keepLook && item.m_HasSeed ? item.m_PreviewSeed : random.NextInt();
 
                 ObjectDefinition definition = default;
                 definition.m_ParentMesh = -1;
@@ -1727,7 +1760,17 @@ namespace Copaste
 
             for (int i = 0; i < entities.Length; i++)
             {
-                float distance = math.distance(transforms[i].m_Position.xz, point.xz);
+                // Puna 3D udaljenost — inače prop na trotoaru "preglasa" prop na
+                // krovu iako je kursor na krovu.
+                float distance = math.distance(transforms[i].m_Position, point);
+
+                // Gruba odbrana prvo — GetDiameter/IsCopyable su skupi po entitetu,
+                // a upit pokriva sve objekte na mapi.
+                if (distance > 30f)
+                {
+                    continue;
+                }
+
                 float radius = math.max(2.5f, (GetDiameter(entities[i]) * 0.5f) + 0.5f);
                 if (distance > radius || !IsCopyable(entities[i]))
                 {
@@ -2573,6 +2616,9 @@ namespace Copaste
         // Suzi postojeću selekciju na propove istog prefaba kao izvor.
         private void FilterSelectionToSamePrefab(Entity sourceEntity)
         {
+            // Menja sastav selekcije — živa align sesija više ne važi.
+            EndAlignSession();
+
             if (!EntityManager.TryGetComponent(sourceEntity, out PrefabRef sourcePrefab))
             {
                 return;
@@ -2699,11 +2745,11 @@ namespace Copaste
                 return;
             }
 
-            m_AlignGap = math.max(0.5f, gap);
+            m_AlignGap = math.max(0.1f, gap);
             ApplyAlignSession();
         }
 
-        // Stepper strelice: identičan korak kao [ i ] prečice.
+        // Stepper strelice i [ ] prečice: isti korak od 0,5 m, isti minimum.
         public void AdjustAlignSessionGap(int direction)
         {
             if (m_AlignKind == AlignKind.None || direction == 0)
@@ -2711,7 +2757,7 @@ namespace Copaste
                 return;
             }
 
-            m_AlignGap = math.max(0.5f, m_AlignGap + (0.5f * math.sign(direction)));
+            m_AlignGap = math.max(0.1f, m_AlignGap + (0.5f * math.sign(direction)));
             ApplyAlignSession();
         }
 
@@ -2779,6 +2825,30 @@ namespace Copaste
                 return;
             }
 
+            // Jedan prop: nema sesije (nema šta da se razmiče) — samo ga zarotiraj
+            // kao uzor i prisloni na njegovu liniju.
+            if (valid.Count == 1)
+            {
+                EndAlignSession();
+                PushTransformUndo();
+                if (EntityManager.TryGetComponent(valid[0], out Game.Objects.Transform single))
+                {
+                    TerrainHeightData singleHeightData = m_TerrainSystem.GetHeightData();
+                    float heightOffset = single.m_Position.y - TerrainUtils.SampleHeight(ref singleHeightData, single.m_Position);
+                    float3 position = single.m_Position;
+                    position.xz = origin + (direction * projections[0]);
+                    position.y = TerrainUtils.SampleHeight(ref singleHeightData, position) + heightOffset;
+                    single.m_Position = position;
+                    single.m_Rotation = referenceTransform.m_Rotation;
+                    EntityManager.SetComponentData(valid[0], single);
+                    WriteElevation(valid[0], heightOffset);
+                    EntityManager.AddComponent<Updated>(valid[0]);
+                    EntityManager.AddComponent<BatchesUpdated>(valid[0]);
+                }
+
+                return;
+            }
+
             List<int> order = new List<int>(valid.Count);
             for (int i = 0; i < valid.Count; i++)
             {
@@ -2810,6 +2880,10 @@ namespace Copaste
                 {
                     transform.m_Rotation = referenceTransform.m_Rotation;
                     EntityManager.SetComponentData(entity, transform);
+
+                    // I bez pomeranja pozicije rotacija mora da se vidi odmah.
+                    EntityManager.AddComponent<Updated>(entity);
+                    EntityManager.AddComponent<BatchesUpdated>(entity);
                 }
             }
 
@@ -2950,7 +3024,7 @@ namespace Copaste
 
             m_AlignKind = AlignKind.Circle;
             m_AlignSource = 3;
-            m_AlignGap = (2f * math.PI * radius) / valid.Count;
+            m_AlignGap = math.max(0.1f, (2f * math.PI * radius) / valid.Count);
             m_AlignOrigin = center;
             m_AlignStartAngle = angles[order[0]];
 
@@ -3075,6 +3149,10 @@ namespace Copaste
                     {
                         transform.m_Rotation = targetRotation;
                         EntityManager.SetComponentData(entity, transform);
+
+                        // I bez pomeranja pozicije rotacija mora da se vidi odmah.
+                        EntityManager.AddComponent<Updated>(entity);
+                        EntityManager.AddComponent<BatchesUpdated>(entity);
                     }
                 }
             }
@@ -3093,6 +3171,8 @@ namespace Copaste
         {
             if (m_Mode != Mode.Select || m_Selected.Count < 2 || m_Selected.Count > kSelectionListMax)
             {
+                // Lista nestaje bez mouseleave događaja — fokus prsten ne sme da ostane.
+                m_ListFocusEntity = Entity.Null;
                 return string.Empty;
             }
 
@@ -3158,6 +3238,10 @@ namespace Copaste
             if (ToolIsActive && m_Mode == Mode.Select)
             {
                 m_HeightPickArmed = !m_HeightPickArmed && m_Selected.Count > 0;
+                if (m_HeightPickArmed)
+                {
+                    m_AlignPickArmed = false; // samo jedan pick mod istovremeno
+                }
             }
         }
 

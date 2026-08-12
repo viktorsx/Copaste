@@ -169,8 +169,8 @@ const register = (moduleRegistry) => {
         const onUp = (ev) => {
           window.removeEventListener("mousemove", onMove);
           window.removeEventListener("mouseup", onUp);
-          const fx = Math.round(baseX + (ev.clientX - startX));
-          const fy = Math.round(baseY + (ev.clientY - startY));
+          const fx = Math.max(0, Math.round(baseX + (ev.clientX - startX)));
+          const fy = Math.max(0, Math.round(baseY + (ev.clientY - startY)));
           setDragPos({ x: fx, y: fy });
           trigger("copaste", "setPanelPos", fx + "," + fy);
         };
@@ -430,7 +430,7 @@ const register = (moduleRegistry) => {
               "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m" : "")
             ),
             withTooltip(
-              "Gap in meters for Spaced and Circle (empty = auto). Adjusts a live align too — same as [ and ] keys",
+              "Gap in meters for the align tools (empty = auto). Adjusts a live align too — same as [ and ] keys",
               h(
                 "div",
                 { className: "copasteStepper" },
@@ -484,7 +484,7 @@ const register = (moduleRegistry) => {
               "Line",
               "Tidy row: straight line, equal gaps AND all props rotated the same way. While lit, [ ] or the stepper adjust the gap",
               selected > 1 && !pasteMode,
-              () => trigger("copaste", "actionAlignLine", alignGap),
+              () => trigger("copaste", "actionAlignLine", gapDisplay),
               alignSessionSource === 1,
               undefined,
               "alignline.svg"
@@ -493,7 +493,7 @@ const register = (moduleRegistry) => {
               "To prop",
               "Pick a reference prop: the row goes through it, side by side along its facing, all rotated like it. RMB cancels",
               selected > 0 && !pasteMode,
-              () => trigger("copaste", "actionAlignRef", alignGap),
+              () => trigger("copaste", "actionAlignRef", gapDisplay),
               alignPickArmed || alignSessionSource === 2,
               undefined,
               "alignspaced.svg"
@@ -502,7 +502,7 @@ const register = (moduleRegistry) => {
               "Circle",
               "Arrange evenly on a circle (stepper = gap in meters, empty = keep size). While lit, [ ] fine-tune",
               selected > 2 && !pasteMode,
-              () => trigger("copaste", "actionAlignCircle", alignGap),
+              () => trigger("copaste", "actionAlignCircle", gapDisplay),
               alignSessionSource === 3,
               undefined,
               "aligncircle.svg"
