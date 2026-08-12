@@ -11,14 +11,15 @@ Panel redesign and quality-of-life update.
 - Blueprint list shows 5 entries before scrolling
 
 ### Editing
-- Pasted props now keep the original's color variation by default — a blue bench stays blue. A new Original/Random toggle in the panel restores the old random behavior
-- Undo of a delete also restores the original color variation now
-- New Align buttons: Center H / Center V line up the selection through its center, relative to the camera like nudge
+- Pasted props now keep the original's look by default — both the game's color variation and any custom color picked in the Customization tab. A blue bench stays blue, a recolored one keeps its custom color. The Original/Random toggle in the panel restores the old random behavior
+- The paste preview shows the real colors too, instead of shuffling them while you move
+- Undo of a delete also restores the original colors now
+- New Align buttons: Line puts the selection onto a straight line between its two farthest props, Spaced additionally makes the gaps equal, Center V aligns onto a vertical line through the center
 - Move drag no longer jerks at the start — the selection follows the cursor smoothly from the first frame
 - Nudge (Ctrl+arrows) step halved for finer control
 
 ### Blueprints
-- Blueprints now store color variations too; older blueprint files still load fine
+- Blueprints now store color variations and custom colors too; older blueprint files still load fine
 
 ## [1.0.5] - 2026-08-10
 
