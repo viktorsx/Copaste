@@ -33,7 +33,6 @@ const register = (moduleRegistry) => {
     const panelY$ = bindValue("copaste", "panelY", -1);
     const randomVariation$ = bindValue("copaste", "randomVariation", false);
     const alignGapLive$ = bindValue("copaste", "alignGapLive", -1);
-    const alignPickArmed$ = bindValue("copaste", "alignPickArmed", false);
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -99,8 +98,6 @@ const register = (moduleRegistry) => {
       const savedY = useValue(panelY$);
       const randomVariation = useValue(randomVariation$);
       const alignGapLive = useValue(alignGapLive$);
-      const alignPickArmed = useValue(alignPickArmed$);
-
       // Stepper: +/− 0.5 m; ispod 0.5 se vraća na "auto"; menja i živu align sesiju.
       const stepGap = (dir) => {
         let value = parseFloat((alignGap || "").replace(",", "."));
@@ -382,16 +379,16 @@ const register = (moduleRegistry) => {
             { className: "copasteBtns" },
             actionBtn(
               "Line",
-              "Pick a reference prop: the selection lines up on a line through it, along its facing. RMB cancels",
-              selected > 0 && !pasteMode,
-              () => trigger("copaste", "actionAlignPick"),
-              alignPickArmed,
+              "Tidy row: straight line, equal gaps AND all props rotated the same way. [ ] or the stepper adjust the gap",
+              selected > 1 && !pasteMode,
+              () => trigger("copaste", "actionAlignLine", alignGap),
+              false,
               undefined,
               "alignline.svg"
             ),
             actionBtn(
               "Spaced",
-              "Line up with equal gaps (stepper = exact meters, empty = auto). Then [ and ] fine-tune",
+              "Equal gaps on a straight line, rotations untouched. [ ] or the stepper adjust the gap",
               selected > 1 && !pasteMode,
               () => trigger("copaste", "actionAlignSpaced", alignGap),
               false,
@@ -446,8 +443,6 @@ const register = (moduleRegistry) => {
             ? "Click: place • RMB drag: rotate • PgUp/PgDn: height • RMB: back"
             : heightPickArmed
             ? "Click a prop to copy its height • RMB: cancel"
-            : alignPickArmed
-            ? "Click a prop: the line goes through it, along its facing • RMB: cancel"
             : "Click/box: select • Drag prop: move • RMB drag: rotate • Ctrl+arrows: nudge"
         )
       );

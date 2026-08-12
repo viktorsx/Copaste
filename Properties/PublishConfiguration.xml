@@ -59,7 +59,7 @@ Editing
 - Pasted props now keep the original's look by default - both the game's color variation and any custom color picked in the Customization tab. The Original/Random toggle in the panel restores the old random behavior
 - The paste preview shows the real colors too, instead of shuffling them while you move
 - Undo of a delete also restores the original colors now
-- New Align tools: Line lets you pick a reference prop and lines the selection up along its facing; Spaced makes the gaps equal on a line (exact meters via the stepper); Circle arranges the selection evenly on a circle. After Spaced or Circle, [ and ] keys (rebindable) or the stepper resize the layout live
+- New Align tools: Line makes a tidy row - straight line, equal gaps and all props rotated the same way; Spaced does the same but leaves rotations untouched; Circle arranges the selection evenly on a circle. The gap stepper sets exact meters, and [ and ] keys (rebindable) or the stepper resize the layout live afterwards
 - Move drag no longer jerks at the start - the selection follows the cursor smoothly from the first frame
 - Nudge (Ctrl+arrows) step halved for finer control
 
