@@ -22,6 +22,8 @@ namespace Copaste
         public const string kNudgeDownAction = "CopasteNudgeDown";
         public const string kNudgeLeftAction = "CopasteNudgeLeft";
         public const string kNudgeRightAction = "CopasteNudgeRight";
+        public const string kAlignGapPlusAction = "CopasteAlignGapPlus";
+        public const string kAlignGapMinusAction = "CopasteAlignGapMinus";
 
         public CopasteSettings(IMod mod)
             : base(mod)
@@ -69,6 +71,12 @@ namespace Copaste
 
         [SettingsUIKeyboardBinding(BindingKeyboard.RightArrow, kNudgeRightAction, ctrl: true)]
         public ProxyBinding NudgeRightBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.RightArrow, kAlignGapPlusAction, alt: true)]
+        public ProxyBinding AlignGapPlusBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.LeftArrow, kAlignGapMinusAction, alt: true)]
+        public ProxyBinding AlignGapMinusBinding { get; set; }
 
         public bool AnarchyPaste { get; set; } = true;
 

@@ -38,6 +38,10 @@ namespace Copaste
                 { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeLeftBinding)), "Nudges the selection to the left." },
                 { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Nudge right" },
                 { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Nudges the selection to the right." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AlignGapPlusBinding)), "Align gap +" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AlignGapPlusBinding)), "Increases the gap of the last Spaced/Circle align by 0.5 m." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AlignGapMinusBinding)), "Align gap -" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AlignGapMinusBinding)), "Decreases the gap of the last Spaced/Circle align by 0.5 m." },
                 { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Anarchy while pasting" },
                 { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Ignores placement errors (overlaps, collisions) while pasting, so props can be placed anywhere — like the Anarchy mod." },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kToggleAction), "Toggle Copaste tool" },
@@ -53,6 +57,8 @@ namespace Copaste
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeDownAction), "Nudge towards" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeLeftAction), "Nudge left" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeRightAction), "Nudge right" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapPlusAction), "Align gap +" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapMinusAction), "Align gap -" },
                 { settings.GetBindingMapLocaleID(), "Copaste" },
             };
         }
@@ -91,6 +97,10 @@ namespace Copaste
                 { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeLeftBinding)), "Fino pomera selekciju ulevo." },
                 { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Pomak desno" },
                 { settings.GetOptionDescLocaleID(nameof(CopasteSettings.NudgeRightBinding)), "Fino pomera selekciju udesno." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AlignGapPlusBinding)), "Align razmak +" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AlignGapPlusBinding)), "Povećava razmak poslednjeg Spaced/Circle poravnanja za 0,5 m." },
+                { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AlignGapMinusBinding)), "Align razmak -" },
+                { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AlignGapMinusBinding)), "Smanjuje razmak poslednjeg Spaced/Circle poravnanja za 0,5 m." },
                 { settings.GetOptionLabelLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Anarchy pri lepljenju" },
                 { settings.GetOptionDescLocaleID(nameof(CopasteSettings.AnarchyPaste)), "Ignoriše greške postavljanja (preklapanja, kolizije) pri lepljenju — kao Anarchy mod." },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kToggleAction), "Uključi/isključi Copaste alat" },
@@ -106,6 +116,8 @@ namespace Copaste
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeDownAction), "Pomak ka kameri" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeLeftAction), "Pomak levo" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeRightAction), "Pomak desno" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapPlusAction), "Align razmak +" },
+                { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapMinusAction), "Align razmak -" },
                 { settings.GetBindingMapLocaleID(), "Copaste" },
             };
         }

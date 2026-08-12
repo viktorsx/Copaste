@@ -88,6 +88,8 @@ namespace Copaste
         private ProxyAction m_NudgeDownAction;
         private ProxyAction m_NudgeLeftAction;
         private ProxyAction m_NudgeRightAction;
+        private ProxyAction m_AlignGapPlusAction;
+        private ProxyAction m_AlignGapMinusAction;
         private float m_PasteHeightBoost;
 
         private enum UndoKind
@@ -280,6 +282,8 @@ namespace Copaste
             m_NudgeDownAction = Mod.Settings.GetAction(CopasteSettings.kNudgeDownAction);
             m_NudgeLeftAction = Mod.Settings.GetAction(CopasteSettings.kNudgeLeftAction);
             m_NudgeRightAction = Mod.Settings.GetAction(CopasteSettings.kNudgeRightAction);
+            m_AlignGapPlusAction = Mod.Settings.GetAction(CopasteSettings.kAlignGapPlusAction);
+            m_AlignGapMinusAction = Mod.Settings.GetAction(CopasteSettings.kAlignGapMinusAction);
 
             m_ToggleAction.shouldBeEnabled = true;
             m_ToggleAction.onInteraction += OnToggleInteraction;
@@ -325,6 +329,8 @@ namespace Copaste
             m_NudgeDownAction.shouldBeEnabled = true;
             m_NudgeLeftAction.shouldBeEnabled = true;
             m_NudgeRightAction.shouldBeEnabled = true;
+            m_AlignGapPlusAction.shouldBeEnabled = true;
+            m_AlignGapMinusAction.shouldBeEnabled = true;
             m_Mode = Mode.Select;
             m_HoverEntity = Entity.Null;
             m_PasteDirty = false;
@@ -350,6 +356,8 @@ namespace Copaste
             m_NudgeDownAction.shouldBeEnabled = false;
             m_NudgeLeftAction.shouldBeEnabled = false;
             m_NudgeRightAction.shouldBeEnabled = false;
+            m_AlignGapPlusAction.shouldBeEnabled = false;
+            m_AlignGapMinusAction.shouldBeEnabled = false;
 
             // Ukloni highlight samo sa naših entiteta — ne diramo tuđe.
             foreach (Entity entity in m_Selected)
@@ -1171,28 +1179,24 @@ namespace Copaste
                 NudgeSelection(nudgeDelta);
             }
 
-            // Align sesija: strelice levo/desno (bez Ctrl — to je nudge) fino
-            // menjaju razmak poslednjeg Spaced/Circle poravnanja.
-            if (m_AlignKind != AlignKind.None && !m_UiTyping && Keyboard.current != null)
+            // Align sesija: Alt+strelice levo/desno (rebindable) fino menjaju
+            // razmak poslednjeg Spaced/Circle poravnanja.
+            if (m_AlignKind != AlignKind.None && !m_UiTyping)
             {
-                bool ctrlHeld = Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed;
-                if (!ctrlHeld)
+                float gapDelta = 0f;
+                if (m_AlignGapPlusAction.WasPressedThisFrame())
                 {
-                    float gapDelta = 0f;
-                    if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
-                    {
-                        gapDelta = 0.5f;
-                    }
-                    else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
-                    {
-                        gapDelta = -0.5f;
-                    }
+                    gapDelta = 0.5f;
+                }
+                else if (m_AlignGapMinusAction.WasPressedThisFrame())
+                {
+                    gapDelta = -0.5f;
+                }
 
-                    if (gapDelta != 0f)
-                    {
-                        m_AlignGap = math.max(0.5f, m_AlignGap + gapDelta);
-                        ApplyAlignSession();
-                    }
+                if (gapDelta != 0f)
+                {
+                    m_AlignGap = math.max(0.5f, m_AlignGap + gapDelta);
+                    ApplyAlignSession();
                 }
             }
 

@@ -322,7 +322,7 @@ const register = (moduleRegistry) => {
           h(
             "div",
             { className: "copasteSectionTitle copasteSubTitle" },
-            "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m (←/→)" : "")
+            "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m (Alt+←/→)" : "")
           ),
           h(
             "div",
@@ -330,14 +330,14 @@ const register = (moduleRegistry) => {
             actionBtn("Line", "Line up the selection between its two farthest props", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
             actionBtn(
               "Spaced",
-              "Line up with equal gaps (box = exact meters, empty = auto). Then Left/Right arrows fine-tune",
+              "Line up with equal gaps (box = exact meters, empty = auto). Then Alt+Left/Right fine-tunes",
               selected > 1 && !pasteMode,
               () => trigger("copaste", "actionAlignSpaced", alignGap),
               false
             ),
             actionBtn(
               "Circle",
-              "Arrange evenly on a circle (box = gap in meters, empty = keep size). Then Left/Right arrows fine-tune",
+              "Arrange evenly on a circle (box = gap in meters, empty = keep size). Then Alt+Left/Right fine-tunes",
               selected > 2 && !pasteMode,
               () => trigger("copaste", "actionAlignCircle", alignGap),
               false

@@ -14,7 +14,7 @@ Panel redesign and quality-of-life update.
 - Pasted props now keep the original's look by default — both the game's color variation and any custom color picked in the Customization tab. A blue bench stays blue, a recolored one keeps its custom color. The Original/Random toggle in the panel restores the old random behavior
 - The paste preview shows the real colors too, instead of shuffling them while you move
 - Undo of a delete also restores the original colors now
-- New Align tools: Line puts the selection onto a straight line between its two farthest props; Spaced additionally makes the gaps equal (optional exact gap in meters); Circle arranges the selection evenly on a circle. After Spaced or Circle, Left/Right arrow keys fine-tune the gap live
+- New Align tools: Line puts the selection onto a straight line between its two farthest props; Spaced additionally makes the gaps equal (optional exact gap in meters); Circle arranges the selection evenly on a circle. After Spaced or Circle, Alt+Left/Right (rebindable) fine-tunes the gap live
 - Move drag no longer jerks at the start — the selection follows the cursor smoothly from the first frame
 - Nudge (Ctrl+arrows) step halved for finer control
 
