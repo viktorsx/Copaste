@@ -64,6 +64,9 @@ Editing
 - Nudge (Ctrl+arrows) step halved for finer control
 
 Blueprints
-- Blueprints now store color variations and custom colors too; older blueprint files still load fine</ChangeLog>
+- Blueprints now store color variations and custom colors too; older blueprint files still load fine
+
+Options
+- Mod settings are now split into General and Key bindings tabs, with key bindings grouped by what they do</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>

@@ -21,6 +21,9 @@ Panel redesign and quality-of-life update.
 ### Blueprints
 - Blueprints now store color variations and custom colors too; older blueprint files still load fine
 
+### Options
+- Mod settings are now split into General and Key bindings tabs, with key bindings grouped by what they do
+
 ## [1.0.5] - 2026-08-10
 
 Toolbar button facelift.
