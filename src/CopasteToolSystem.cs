@@ -84,6 +84,10 @@ namespace Copaste
         private ProxyAction m_SnapGroundAction;
         private ProxyAction m_MatchHeightAction;
         private bool m_HeightPickArmed;
+        private bool m_AlignPickArmed;
+        private float m_AlignPickGap = -1f;
+        private float m_LastAltSpinTime;
+        private bool m_LeftPressAlt;
         private ProxyAction m_NudgeUpAction;
         private ProxyAction m_NudgeDownAction;
         private ProxyAction m_NudgeLeftAction;
@@ -325,6 +329,7 @@ namespace Copaste
             m_SnapGroundAction.shouldBeEnabled = true;
             m_MatchHeightAction.shouldBeEnabled = true;
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_NudgeUpAction.shouldBeEnabled = true;
             m_NudgeDownAction.shouldBeEnabled = true;
             m_NudgeLeftAction.shouldBeEnabled = true;
@@ -393,6 +398,7 @@ namespace Copaste
             m_SameFilterPrefab = Entity.Null;
             SetSameFilterName();
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_UiTyping = false;
             base.OnStopRunning();
         }
@@ -475,6 +481,7 @@ namespace Copaste
             m_SameFilterPrefab = Entity.Null;
             SetSameFilterName();
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_PostPasteFix = null;
             m_PostPasteFixFrames = 0;
             m_HoverEntity = Entity.Null;
@@ -801,12 +808,17 @@ namespace Copaste
         }
 
         // Popuni ofsete selekcije prema prvom TERENSKOM sidru (isti raycast kao
-        // kasniji MoveSelection pozivi — nema skoka).
+        // kasniji MoveSelection pozivi — nema skoka). ALT pri hvatanju = pomera
+        // se SAMO uhvaćeni prop, ne cela selekcija.
         private void InitMoveOffsets(float3 anchor)
         {
             m_MoveItems.Clear();
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
-            foreach (Entity entity in m_Selected)
+            IEnumerable<Entity> moveTargets =
+                m_LeftPressAlt && m_Selected.Contains(m_LeftPressEntity)
+                    ? new List<Entity> { m_LeftPressEntity }
+                    : (IEnumerable<Entity>)m_Selected;
+            foreach (Entity entity in moveTargets)
             {
                 if (!EntityManager.Exists(entity) ||
                     !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
@@ -1024,7 +1036,14 @@ namespace Copaste
             // Pritisak: na propu = potencijalni klik ili početak pomeranja; na praznom tlu = početak marquee-a.
             if (ClickedThisFrame())
             {
-                if (m_HeightPickArmed && hitEntity != Entity.Null)
+                if (m_AlignPickArmed && hitEntity != Entity.Null)
+                {
+                    // Klik bira uzor-prop: red kroz njega, duž njegove desne ose,
+                    // svi propovi rotirani kao uzor.
+                    AlignRowToReference(hitEntity, m_AlignPickGap);
+                    m_AlignPickArmed = false;
+                }
+                else if (m_HeightPickArmed && hitEntity != Entity.Null)
                 {
                     // Klik bira uzor-prop: cela selekcija preuzima njegovu visinu iznad terena.
                     MatchSelectionHeight(hitEntity);
@@ -1037,6 +1056,8 @@ namespace Copaste
                     m_MoveOffsetsPending = false;
                     m_LeftPressEntity = hitEntity;
                     m_LeftPressShift = shiftHeld;
+                    m_LeftPressAlt = Keyboard.current != null &&
+                        (Keyboard.current.leftAltKey.isPressed || Keyboard.current.rightAltKey.isPressed);
                     m_MoveStart = hit.m_HitPosition;
                 }
                 else if (raycastValid && !m_LeftHeldOnProp &&
@@ -1124,7 +1145,11 @@ namespace Copaste
             // Brzi desni klik: prvo gasi height-pick, pa čisti selekciju, pa izlazi iz alata.
             if (rightClick)
             {
-                if (m_HeightPickArmed)
+                if (m_AlignPickArmed)
+                {
+                    m_AlignPickArmed = false;
+                }
+                else if (m_HeightPickArmed)
                 {
                     m_HeightPickArmed = false;
                 }
@@ -1179,8 +1204,28 @@ namespace Copaste
                 NudgeSelection(nudgeDelta);
             }
 
-            // Align sesija: Alt+strelice levo/desno (rebindable) fino menjaju
-            // razmak poslednjeg Spaced/Circle poravnanja.
+            // ALT + točkić: svaki selektovani prop se okreće oko svoje ose
+            // (15° po koraku točkića). Ne prekida align sesiju.
+            if (m_Selected.Count > 0 && !m_UiTyping &&
+                Keyboard.current != null && UnityEngine.InputSystem.Mouse.current != null &&
+                (Keyboard.current.leftAltKey.isPressed || Keyboard.current.rightAltKey.isPressed))
+            {
+                float scroll = UnityEngine.InputSystem.Mouse.current.scroll.ReadValue().y;
+                if (scroll != 0f)
+                {
+                    // Jedan undo zapis po "naletu" okretanja, ne po svakom koraku.
+                    if (UnityEngine.Time.time - m_LastAltSpinTime > 1f)
+                    {
+                        PushTransformUndo();
+                    }
+
+                    m_LastAltSpinTime = UnityEngine.Time.time;
+                    float notches = math.abs(scroll) > 10f ? scroll / 120f : scroll;
+                    SpinSelection(math.radians(15f) * notches);
+                }
+            }
+
+            // Align sesija: [ i ] (rebindable) fino menjaju razmak poslednjeg poravnanja.
             if (m_AlignKind != AlignKind.None && !m_UiTyping)
             {
                 float gapDelta = 0f;
@@ -1761,6 +1806,7 @@ namespace Copaste
 
             m_HoverEntity = Entity.Null;
             m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
             m_LeftHeldOnProp = false;
             m_MoveDragging = false;
             m_MoveOffsetsPending = false;
@@ -2547,6 +2593,7 @@ namespace Copaste
         }
 
         private AlignKind m_AlignKind = AlignKind.None;
+        private int m_AlignSource; // 1 = Line, 2 = To prop, 3 = Circle (za UI glow)
         private float m_AlignGap = -1f;
         private readonly List<Entity> m_AlignOrder = new List<Entity>();
         private float2 m_AlignOrigin;      // Spaced: sidro (prvi prop na liniji); Circle: centar kruga
@@ -2555,6 +2602,9 @@ namespace Copaste
 
         public float AlignSessionGap => m_AlignKind != AlignKind.None ? m_AlignGap : -1f;
 
+        public int AlignSessionSource => m_AlignKind != AlignKind.None ? m_AlignSource : 0;
+
+        public bool AlignPickArmed => m_AlignPickArmed;
 
         // Živa promena razmaka aktivne sesije iz panela (stepper).
         public void SetAlignSessionGap(float gap)
@@ -2572,7 +2622,121 @@ namespace Copaste
         private void EndAlignSession()
         {
             m_AlignKind = AlignKind.None;
+            m_AlignSource = 0;
             m_AlignOrder.Clear();
+        }
+
+        // "To prop" dugme: naoružaj biranje uzor-propa (kao Match H za visinu).
+        public void TriggerAlignPick(float gap = -1f)
+        {
+            if (!ToolIsActive || m_Mode != Mode.Select)
+            {
+                return;
+            }
+
+            m_AlignPickArmed = !m_AlignPickArmed && m_Selected.Count > 0;
+            m_AlignPickGap = gap;
+            if (m_AlignPickArmed)
+            {
+                m_HeightPickArmed = false;
+            }
+        }
+
+        // Red poravnat na uzor-prop: linija kroz njega, duž njegove DESNE ose
+        // (klupe staju jedna do druge), svi propovi preuzimaju njegovu rotaciju,
+        // razmaci jednaki. Pokreće align sesiju.
+        private void AlignRowToReference(Entity reference, float gap)
+        {
+            if (!EntityManager.Exists(reference) ||
+                !EntityManager.TryGetComponent(reference, out Game.Objects.Transform referenceTransform) ||
+                m_Selected.Count == 0)
+            {
+                return;
+            }
+
+            float3 rightAxis = math.mul(referenceTransform.m_Rotation, new float3(1f, 0f, 0f));
+            float2 direction = math.normalizesafe(rightAxis.xz, new float2(1f, 0f));
+            float2 origin = referenceTransform.m_Position.xz;
+
+            List<Entity> valid = new List<Entity>();
+            List<float> projections = new List<float>();
+            float tMin = float.MaxValue;
+            float tMax = float.MinValue;
+            foreach (Entity entity in m_Selected)
+            {
+                if (!EntityManager.Exists(entity) ||
+                    !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    continue;
+                }
+
+                float projection = math.dot(transform.m_Position.xz - origin, direction);
+                valid.Add(entity);
+                projections.Add(projection);
+                tMin = math.min(tMin, projection);
+                tMax = math.max(tMax, projection);
+            }
+
+            if (valid.Count == 0)
+            {
+                return;
+            }
+
+            List<int> order = new List<int>(valid.Count);
+            for (int i = 0; i < valid.Count; i++)
+            {
+                order.Add(i);
+            }
+
+            order.Sort((a, b) => projections[a].CompareTo(projections[b]));
+
+            EndAlignSession();
+            m_AlignOrder.Capacity = order.Count;
+            foreach (int index in order)
+            {
+                m_AlignOrder.Add(valid[index]);
+            }
+
+            m_AlignKind = AlignKind.Spaced;
+            m_AlignSource = 2;
+            m_AlignGap = math.max(0.1f, gap > 0f
+                ? gap
+                : (valid.Count > 1 ? (tMax - tMin) / (valid.Count - 1) : 1f));
+            m_AlignOrigin = origin + (direction * tMin);
+            m_AlignDirection = direction;
+
+            PushTransformUndo();
+
+            foreach (Entity entity in valid)
+            {
+                if (EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    transform.m_Rotation = referenceTransform.m_Rotation;
+                    EntityManager.SetComponentData(entity, transform);
+                }
+            }
+
+            ApplyAlignSession();
+            Mod.Log.Info($"Copaste: align to reference prop on {valid.Count} props (gap {m_AlignGap:F1} m)");
+        }
+
+        // ALT + točkić: svaki selektovani prop se okreće oko SVOJE ose.
+        private void SpinSelection(float angle)
+        {
+            quaternion spin = quaternion.RotateY(angle);
+            foreach (Entity entity in m_Selected)
+            {
+                if (!EntityManager.Exists(entity) ||
+                    !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    continue;
+                }
+
+                transform.m_Rotation = math.mul(spin, transform.m_Rotation);
+                EntityManager.SetComponentData(entity, transform);
+                EntityManager.AddComponent<Updated>(entity);
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+            }
         }
 
         // Postavi propove sesije na trenutni m_AlignGap (linija ili krug).
@@ -2688,6 +2852,7 @@ namespace Copaste
             }
 
             m_AlignKind = AlignKind.Circle;
+            m_AlignSource = 3;
             m_AlignGap = (2f * math.PI * radius) / valid.Count;
             m_AlignOrigin = center;
             m_AlignStartAngle = angles[order[0]];
@@ -2780,6 +2945,7 @@ namespace Copaste
             }
 
             m_AlignKind = AlignKind.Spaced;
+            m_AlignSource = 1;
             m_AlignGap = math.max(0.1f, gap > 0f ? gap : (tMax - tMin) / (order.Count - 1));
             m_AlignOrigin = origin + (direction * tMin);
             m_AlignDirection = direction;

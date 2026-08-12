@@ -19,6 +19,8 @@ namespace Copaste
         private ValueBinding<int> m_PanelY;
         private ValueBinding<bool> m_RandomVariation;
         private ValueBinding<float> m_AlignGapLive;
+        private ValueBinding<bool> m_AlignPickArmed;
+        private ValueBinding<int> m_AlignSessionSource;
 
         private static float ParseGap(string payload)
         {
@@ -69,14 +71,15 @@ namespace Copaste
                     m_RandomVariation.Update(random);
                 }
             }));
-            // Line = red (pozicije + rotacije); Spaced = samo pozicije/razmaci.
+            // Line = red (pozicije + rotacije); To prop = red po uzor-propu (pick).
             AddBinding(new TriggerBinding<string>("copaste", "actionAlignLine", (payload) =>
                 m_CopasteToolSystem.TriggerAlignRow(true, ParseGap(payload))));
+            AddBinding(new TriggerBinding<string>("copaste", "actionAlignRef", (payload) =>
+                m_CopasteToolSystem.TriggerAlignPick(ParseGap(payload))));
             AddBinding(new TriggerBinding<string>("copaste", "setAlignGapLive", (payload) => m_CopasteToolSystem.SetAlignSessionGap(ParseGap(payload))));
+            AddBinding(m_AlignPickArmed = new ValueBinding<bool>("copaste", "alignPickArmed", false));
+            AddBinding(m_AlignSessionSource = new ValueBinding<int>("copaste", "alignSessionSource", 0));
 
-            // Spaced/Circle sa opcionim razmakom u metrima ("" ili neispravno = auto).
-            AddBinding(new TriggerBinding<string>("copaste", "actionAlignSpaced", (payload) =>
-                m_CopasteToolSystem.TriggerAlignRow(false, ParseGap(payload))));
             AddBinding(new TriggerBinding<string>("copaste", "actionAlignCircle", (payload) =>
                 m_CopasteToolSystem.TriggerAlignCircle(ParseGap(payload))));
             AddBinding(m_AlignGapLive = new ValueBinding<float>("copaste", "alignGapLive", -1f));
@@ -175,6 +178,8 @@ namespace Copaste
             m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
             m_SelectedName.Update(m_CopasteToolSystem.SelectedPropName);
             m_AlignGapLive.Update(m_CopasteToolSystem.AlignSessionGap);
+            m_AlignPickArmed.Update(m_CopasteToolSystem.AlignPickArmed);
+            m_AlignSessionSource.Update(m_CopasteToolSystem.AlignSessionSource);
         }
     }
 }

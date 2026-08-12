@@ -33,6 +33,8 @@ const register = (moduleRegistry) => {
     const panelY$ = bindValue("copaste", "panelY", -1);
     const randomVariation$ = bindValue("copaste", "randomVariation", false);
     const alignGapLive$ = bindValue("copaste", "alignGapLive", -1);
+    const alignPickArmed$ = bindValue("copaste", "alignPickArmed", false);
+    const alignSessionSource$ = bindValue("copaste", "alignSessionSource", 0);
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -98,6 +100,9 @@ const register = (moduleRegistry) => {
       const savedY = useValue(panelY$);
       const randomVariation = useValue(randomVariation$);
       const alignGapLive = useValue(alignGapLive$);
+      const alignPickArmed = useValue(alignPickArmed$);
+      const alignSessionSource = useValue(alignSessionSource$);
+
       // Stepper: +/− 0.5 m; ispod 0.5 se vraća na "auto"; menja i živu align sesiju.
       const stepGap = (dir) => {
         let value = parseFloat((alignGap || "").replace(",", "."));
@@ -379,28 +384,28 @@ const register = (moduleRegistry) => {
             { className: "copasteBtns" },
             actionBtn(
               "Line",
-              "Tidy row: straight line, equal gaps AND all props rotated the same way. [ ] or the stepper adjust the gap",
+              "Tidy row: straight line, equal gaps AND all props rotated the same way. While lit, [ ] or the stepper adjust the gap",
               selected > 1 && !pasteMode,
               () => trigger("copaste", "actionAlignLine", alignGap),
-              false,
+              alignSessionSource === 1,
               undefined,
               "alignline.svg"
             ),
             actionBtn(
-              "Spaced",
-              "Equal gaps on a straight line, rotations untouched. [ ] or the stepper adjust the gap",
-              selected > 1 && !pasteMode,
-              () => trigger("copaste", "actionAlignSpaced", alignGap),
-              false,
+              "To prop",
+              "Pick a reference prop: the row goes through it, side by side along its facing, all rotated like it. RMB cancels",
+              selected > 0 && !pasteMode,
+              () => trigger("copaste", "actionAlignRef", alignGap),
+              alignPickArmed || alignSessionSource === 2,
               undefined,
               "alignspaced.svg"
             ),
             actionBtn(
               "Circle",
-              "Arrange evenly on a circle (stepper = gap in meters, empty = keep size). Then [ and ] fine-tune",
+              "Arrange evenly on a circle (stepper = gap in meters, empty = keep size). While lit, [ ] fine-tune",
               selected > 2 && !pasteMode,
               () => trigger("copaste", "actionAlignCircle", alignGap),
-              false,
+              alignSessionSource === 3,
               undefined,
               "aligncircle.svg"
             )
@@ -443,7 +448,9 @@ const register = (moduleRegistry) => {
             ? "Click: place • RMB drag: rotate • PgUp/PgDn: height • RMB: back"
             : heightPickArmed
             ? "Click a prop to copy its height • RMB: cancel"
-            : "Click/box: select • Drag prop: move • RMB drag: rotate • Ctrl+arrows: nudge"
+            : alignPickArmed
+            ? "Click a reference prop: row through it, all rotated like it • RMB: cancel"
+            : "Click/box: select • Drag: move all • Alt+drag: move one • Alt+wheel: spin each • RMB drag: rotate"
         )
       );
     };
