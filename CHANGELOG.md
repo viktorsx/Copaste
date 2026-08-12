@@ -9,7 +9,7 @@ Panel redesign and quality-of-life update.
 - The panel can now be dragged by its header and remembers its position between sessions
 - Single click-selected props show their name in the panel (marquee selections don't)
 - Small selections (up to 15 props) get a Selected props list in the panel: hovering an entry rings that prop in the world, clicking it keeps only that prop selected - handy when a prop is hard to click directly
-- Blueprint list shows 5 entries before scrolling
+- Blueprint list is paged: 5 per page with arrows in the section header; the selected props list scrolls with a visible green scrollbar
 
 ### Editing
 - Pasted props now keep the original's look by default — both the game's color variation and any custom color picked in the Customization tab. A blue bench stays blue, a recolored one keeps its custom color. The Original/Random toggle in the panel restores the old random behavior

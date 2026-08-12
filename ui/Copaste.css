@@ -46,17 +46,17 @@
 .copasteStepperBtn img{width:9rem;height:9rem;opacity:0.7}
 .copasteStepperBtn:hover{background-color:rgba(111,211,154,0.25)}
 .copasteStepperInput{width:32rem;height:20rem;padding:0;margin:0;border:none;background:transparent;color:#e6e9f0;font-size:10.5rem;text-align:center;line-height:20rem;display:flex;align-items:center;justify-content:center}
-
-.copasteSelRow{width:100%;margin:1.5rem 0}
 .copasteToggleTrack{display:flex;background:rgba(0,0,0,0.35);border-radius:6rem;padding:2rem}
 .copasteToggleOpt{flex:1 1 0;height:20rem;display:flex;align-items:center;justify-content:center;border-radius:4rem;font-size:10rem;color:rgba(255,255,255,0.55);cursor:pointer;transition:color .12s}
 .copasteToggleOpt:hover{color:rgba(255,255,255,0.85)}
 .copasteToggleOptActive{background:linear-gradient(180deg,#79dba3,#45a06c);color:#0b2114;font-weight:bold}
 
-.copasteBpList{max-height:125rem;overflow-y:auto;padding-right:2rem}
-.copasteBpList::-webkit-scrollbar{width:4rem}
-.copasteBpList::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.25);border-radius:2rem}
-.copasteBpList::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);border-radius:2rem}
+.copasteBpList{max-height:125rem;overflow-y:auto;padding-right:3rem}
+.copasteBpList::-webkit-scrollbar{width:5rem}
+.copasteBpList::-webkit-scrollbar-thumb{background:rgba(111,211,154,0.55);border-radius:3rem}
+.copasteBpList::-webkit-scrollbar-thumb:hover{background:rgba(111,211,154,0.8)}
+.copasteBpList::-webkit-scrollbar-track{background:rgba(255,255,255,0.06);border-radius:3rem}
+.copastePageLabel{min-width:26rem;height:20rem;display:flex;align-items:center;justify-content:center;font-size:10rem;color:rgba(255,255,255,0.6)}
 .copasteBpRow{display:flex;align-items:center;margin:1.5rem 0}
 .copasteBpLoad{flex:1;height:22rem;display:flex;align-items:center;text-align:left;padding:0 7rem;border:none;border-radius:5rem;background-color:rgba(255,255,255,0.06);color:#e8e9f2;font-size:11rem;cursor:pointer;transition:background-color .12s}
 .copasteBpLoad:hover{background-color:rgba(111,211,154,0.22)}

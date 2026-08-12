@@ -137,6 +137,9 @@ const register = (moduleRegistry) => {
       const [dragPos, setDragPos] = React.useState(null);
       const panelRef = React.useRef(null);
 
+      // Blueprints: stranice od po 5, listanje strelicama u naslovu.
+      const [bpPage, setBpPage] = React.useState(0);
+
       if (!active) {
         return null;
       }
@@ -175,6 +178,9 @@ const register = (moduleRegistry) => {
       };
 
       const blueprints = blueprintsRaw ? blueprintsRaw.split("\n").filter((n) => n.length > 0) : [];
+      const bpPages = Math.max(1, Math.ceil(blueprints.length / 5));
+      const bpPageSafe = Math.min(bpPage, bpPages - 1);
+      const bpPageItems = blueprints.slice(bpPageSafe * 5, (bpPageSafe * 5) + 5);
 
       // Dugme: label ili SVG ikonica, sa tooltip-om i vidljivim stanjem.
       const actionBtn = (content, tooltip, enabled, onClick, isActive, variant, icon) => {
@@ -332,15 +338,18 @@ const register = (moduleRegistry) => {
                 { className: "copasteBpList" },
                 selectionEntries.map((entry, i) =>
                   h(
-                    "button",
-                    {
-                      key: entry.id + "-" + i,
-                      className: "copasteBpLoad copasteSelRow",
-                      onClick: () => trigger("copaste", "selectOnlyProp", entry.id),
-                      onMouseEnter: () => trigger("copaste", "focusProp", entry.id),
-                      onMouseLeave: () => trigger("copaste", "focusProp", ""),
-                    },
-                    entry.name
+                    "div",
+                    { key: entry.id + "-" + i, className: "copasteBpRow" },
+                    h(
+                      "button",
+                      {
+                        className: "copasteBpLoad",
+                        onClick: () => trigger("copaste", "selectOnlyProp", entry.id),
+                        onMouseEnter: () => trigger("copaste", "focusProp", entry.id),
+                        onMouseLeave: () => trigger("copaste", "focusProp", ""),
+                      },
+                      entry.name
+                    )
                   )
                 )
               )
@@ -411,6 +420,17 @@ const register = (moduleRegistry) => {
                     setGapFocused(true);
                     setAlignGap(gapDisplay);
                     trigger("copaste", "setTyping", true);
+                  },
+                  onKeyDown: (e) => {
+                    // Enter odmah primenjuje ukucani razmak na živu sesiju.
+                    if (e.key === "Enter") {
+                      if (alignGapLive > 0) {
+                        trigger("copaste", "setAlignGapLive", alignGap);
+                      }
+                      if (e.target && e.target.blur) {
+                        e.target.blur();
+                      }
+                    }
                   },
                   onBlur: () => {
                     setGapFocused(false);
@@ -485,11 +505,34 @@ const register = (moduleRegistry) => {
             )
           )
         ),
-        section(
-          "Blueprints",
+        h(
+          "div",
+          { key: "Blueprints", className: "copasteCard" },
+          h(
+            "div",
+            { className: "copasteSubTitleRow", style: { margin: "0 2rem 5rem" } },
+            h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, "Blueprints"),
+            bpPages > 1
+              ? h(
+                  "div",
+                  { className: "copasteStepper" },
+                  h(
+                    "button",
+                    { className: "copasteStepperBtn", onClick: () => setBpPage(Math.max(0, bpPageSafe - 1)) },
+                    h("img", { src: "coui://copaste/chevl.svg" })
+                  ),
+                  h("div", { className: "copastePageLabel" }, (bpPageSafe + 1) + "/" + bpPages),
+                  h(
+                    "button",
+                    { className: "copasteStepperBtn", onClick: () => setBpPage(Math.min(bpPages - 1, bpPageSafe + 1)) },
+                    h("img", { src: "coui://copaste/chevr.svg" })
+                  )
+                )
+              : null
+          ),
           blueprints.length === 0
             ? h("div", { className: "copasteEmpty" }, "No saved blueprints")
-            : h("div", { className: "copasteBpList" }, blueprints.map(bpRow))
+            : h("div", null, bpPageItems.map(bpRow))
         ),
         h(
           "div",
