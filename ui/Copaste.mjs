@@ -32,6 +32,7 @@ const register = (moduleRegistry) => {
     const panelX$ = bindValue("copaste", "panelX", -1);
     const panelY$ = bindValue("copaste", "panelY", -1);
     const randomVariation$ = bindValue("copaste", "randomVariation", false);
+    const alignGapLive$ = bindValue("copaste", "alignGapLive", -1);
 
     const withTooltip = (tooltip, element) =>
       ui.Tooltip ? h(ui.Tooltip, { tooltip: tooltip }, element) : element;
@@ -96,6 +97,7 @@ const register = (moduleRegistry) => {
       const savedX = useValue(panelX$);
       const savedY = useValue(panelY$);
       const randomVariation = useValue(randomVariation$);
+      const alignGapLive = useValue(alignGapLive$);
       const [dragPos, setDragPos] = React.useState(null);
       const panelRef = React.useRef(null);
 
@@ -317,20 +319,31 @@ const register = (moduleRegistry) => {
             actionBtn("up.svg", "Raise 0.5 m (PgUp)", selected > 0 || pasteMode, () => trigger("copaste", "actionHeight", 1), false),
             actionBtn("down.svg", "Lower 0.5 m (PgDn)", selected > 0 || pasteMode, () => trigger("copaste", "actionHeight", -1), false)
           ),
-          h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Align"),
+          h(
+            "div",
+            { className: "copasteSectionTitle copasteSubTitle" },
+            "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m (←/→)" : "")
+          ),
           h(
             "div",
             { className: "copasteBtns" },
             actionBtn("Line", "Line up the selection between its two farthest props", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
             actionBtn(
               "Spaced",
-              "Line up with equal gaps. Empty box = spread between the ends, a number = exact gap in meters",
+              "Line up with equal gaps (box = exact meters, empty = auto). Then Left/Right arrows fine-tune",
               selected > 1 && !pasteMode,
               () => trigger("copaste", "actionAlignSpaced", alignGap),
               false
             ),
+            actionBtn(
+              "Circle",
+              "Arrange evenly on a circle (box = gap in meters, empty = keep size). Then Left/Right arrows fine-tune",
+              selected > 2 && !pasteMode,
+              () => trigger("copaste", "actionAlignCircle", alignGap),
+              false
+            ),
             withTooltip(
-              "Optional gap in meters for Spaced (empty = auto)",
+              "Optional gap in meters for Spaced and Circle (empty = auto)",
               h("input", {
                 className: "copasteGapInput",
                 value: alignGap,

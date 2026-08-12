@@ -18,6 +18,23 @@ namespace Copaste
         private ValueBinding<int> m_PanelX;
         private ValueBinding<int> m_PanelY;
         private ValueBinding<bool> m_RandomVariation;
+        private ValueBinding<float> m_AlignGapLive;
+
+        private static float ParseGap(string payload)
+        {
+            if (string.IsNullOrEmpty(payload))
+            {
+                return -1f;
+            }
+
+            payload = payload.Trim().Replace(',', '.');
+            if (!float.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float gap) || gap <= 0f)
+            {
+                return -1f;
+            }
+
+            return gap;
+        }
         private ToolSystem m_ToolSystem;
         private CopasteToolSystem m_CopasteToolSystem;
 
@@ -55,21 +72,12 @@ namespace Copaste
             // 0 = na liniju, 1 = na liniju sa jednakim razmacima.
             AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) => m_CopasteToolSystem.TriggerAlignLine(mode == 1)));
 
-            // Spaced sa opcionim razmakom u metrima ("" ili neispravno = auto).
+            // Spaced/Circle sa opcionim razmakom u metrima ("" ili neispravno = auto).
             AddBinding(new TriggerBinding<string>("copaste", "actionAlignSpaced", (payload) =>
-            {
-                float gap = -1f;
-                if (!string.IsNullOrEmpty(payload))
-                {
-                    payload = payload.Trim().Replace(',', '.');
-                    if (!float.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out gap) || gap <= 0f)
-                    {
-                        gap = -1f;
-                    }
-                }
-
-                m_CopasteToolSystem.TriggerAlignLine(true, gap);
-            }));
+                m_CopasteToolSystem.TriggerAlignLine(true, ParseGap(payload))));
+            AddBinding(new TriggerBinding<string>("copaste", "actionAlignCircle", (payload) =>
+                m_CopasteToolSystem.TriggerAlignCircle(ParseGap(payload))));
+            AddBinding(m_AlignGapLive = new ValueBinding<float>("copaste", "alignGapLive", -1f));
 
             AddBinding(new TriggerBinding<string>("copaste", "setPanelPos", (payload) =>
             {
@@ -164,6 +172,7 @@ namespace Copaste
             m_SameFilter.Update(m_CopasteToolSystem.SameFilterName);
             m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
             m_SelectedName.Update(m_CopasteToolSystem.SelectedPropName);
+            m_AlignGapLive.Update(m_CopasteToolSystem.AlignSessionGap);
         }
     }
 }

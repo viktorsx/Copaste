@@ -432,6 +432,7 @@ namespace Copaste
 
         private void ResetToolState()
         {
+            EndAlignSession();
             if (m_Mode == Mode.Paste && m_ToolSystem != null)
             {
                 m_ToolSystem.ignoreErrors = m_PreviousIgnoreErrors;
@@ -624,6 +625,7 @@ namespace Copaste
         private void CommitMarquee(bool additive)
         {
             m_SelectionFromMarquee = true;
+            EndAlignSession();
 
             if (!additive)
             {
@@ -721,6 +723,7 @@ namespace Copaste
 
         private void ApplyClickSelection(Entity entity, bool shiftHeld)
         {
+            EndAlignSession();
             if (entity == Entity.Null || !EntityManager.Exists(entity))
             {
                 return;
@@ -761,6 +764,7 @@ namespace Copaste
 
         private void BeginMoveDrag(float3 anchor)
         {
+            EndAlignSession();
             // Prop pod mišem ulazi u selekciju ako već nije u njoj.
             if (!m_Selected.Contains(m_LeftPressEntity) && EntityManager.Exists(m_LeftPressEntity))
             {
@@ -892,6 +896,7 @@ namespace Copaste
 
         private void RotateSelection(float angle)
         {
+            EndAlignSession();
             quaternion rotation = quaternion.RotateY(angle);
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
 
@@ -933,6 +938,7 @@ namespace Copaste
 
         private void DeleteSelection()
         {
+            EndAlignSession();
             List<TransformSnapshot> snapshots = SnapshotSelection();
             if (snapshots.Count > 0)
             {
@@ -1163,6 +1169,31 @@ namespace Copaste
                 }
 
                 NudgeSelection(nudgeDelta);
+            }
+
+            // Align sesija: strelice levo/desno (bez Ctrl — to je nudge) fino
+            // menjaju razmak poslednjeg Spaced/Circle poravnanja.
+            if (m_AlignKind != AlignKind.None && !m_UiTyping && Keyboard.current != null)
+            {
+                bool ctrlHeld = Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed;
+                if (!ctrlHeld)
+                {
+                    float gapDelta = 0f;
+                    if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
+                    {
+                        gapDelta = 0.5f;
+                    }
+                    else if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
+                    {
+                        gapDelta = -0.5f;
+                    }
+
+                    if (gapDelta != 0f)
+                    {
+                        m_AlignGap = math.max(0.5f, m_AlignGap + gapDelta);
+                        ApplyAlignSession();
+                    }
+                }
             }
 
             // PageUp/PageDown: podizanje/spuštanje selekcije.
@@ -1639,6 +1670,7 @@ namespace Copaste
 
         private void ClearSelection()
         {
+            EndAlignSession();
             foreach (Entity entity in m_Selected)
             {
                 if (entity != m_HoverEntity)
@@ -1716,6 +1748,7 @@ namespace Copaste
         // Jedinstven ulazak u paste mod — čisti SVA stanja selekcionog moda.
         private void EnterPasteMode()
         {
+            EndAlignSession();
             CancelMarquee();
             if (m_HoverEntity != Entity.Null && !m_Selected.Contains(m_HoverEntity))
             {
@@ -2117,6 +2150,7 @@ namespace Copaste
 
         private void Undo()
         {
+            EndAlignSession();
             if (m_UndoStack.Count == 0)
             {
                 return;
@@ -2476,6 +2510,7 @@ namespace Copaste
 
         private void NudgeSelection(float3 delta)
         {
+            EndAlignSession();
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
 
             foreach (Entity entity in m_Selected)
@@ -2496,6 +2531,152 @@ namespace Copaste
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+        }
+
+        // Aktivna align "sesija": posle Spaced/Circle poravnanja strelice
+        // levo/desno menjaju razmak uživo, dok se selekcija ne promeni.
+        private enum AlignKind
+        {
+            None,
+            Spaced,
+            Circle,
+        }
+
+        private AlignKind m_AlignKind = AlignKind.None;
+        private float m_AlignGap = -1f;
+        private readonly List<Entity> m_AlignOrder = new List<Entity>();
+        private float2 m_AlignOrigin;      // Spaced: sidro (prvi prop na liniji); Circle: centar kruga
+        private float2 m_AlignDirection;   // Spaced: smer linije
+        private float m_AlignStartAngle;   // Circle: ugao prvog propa
+
+        public float AlignSessionGap => m_AlignKind != AlignKind.None ? m_AlignGap : -1f;
+
+        private void EndAlignSession()
+        {
+            m_AlignKind = AlignKind.None;
+            m_AlignOrder.Clear();
+        }
+
+        // Postavi propove sesije na trenutni m_AlignGap (linija ili krug).
+        private void ApplyAlignSession()
+        {
+            if (m_AlignKind == AlignKind.None || m_AlignOrder.Count < 2)
+            {
+                return;
+            }
+
+            int count = m_AlignOrder.Count;
+            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
+            for (int rank = 0; rank < count; rank++)
+            {
+                Entity entity = m_AlignOrder[rank];
+                if (!EntityManager.Exists(entity) ||
+                    !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    continue;
+                }
+
+                float2 newXz;
+                if (m_AlignKind == AlignKind.Spaced)
+                {
+                    newXz = m_AlignOrigin + (m_AlignDirection * (m_AlignGap * rank));
+                }
+                else
+                {
+                    // m_AlignGap = razmak po luku; iz njega sledi poluprečnik.
+                    float radius = (m_AlignGap * count) / (2f * math.PI);
+                    float angle = m_AlignStartAngle + (2f * math.PI * rank / count);
+                    newXz = m_AlignOrigin + (new float2(math.cos(angle), math.sin(angle)) * radius);
+                }
+
+                if (math.distancesq(newXz, transform.m_Position.xz) < 0.000001f)
+                {
+                    continue;
+                }
+
+                float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
+                float3 position = transform.m_Position;
+                position.xz = newXz;
+                position.y = TerrainUtils.SampleHeight(ref heightData, position) + heightOffset;
+
+                transform.m_Position = position;
+                EntityManager.SetComponentData(entity, transform);
+                WriteElevation(entity, heightOffset);
+                EntityManager.AddComponent<Updated>(entity);
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+            }
+        }
+
+        // Align circle: rasporedi selekciju ravnomerno po krugu oko centra
+        // selekcije. gap > 0 zadaje razmak po luku (određuje poluprečnik);
+        // inače poluprečnik = prosečna udaljenost propova od centra.
+        public void TriggerAlignCircle(float gap = -1f)
+        {
+            if (!ToolIsActive || m_Mode != Mode.Select || m_Selected.Count < 3)
+            {
+                return;
+            }
+
+            List<Entity> valid = new List<Entity>();
+            List<float3> positions = new List<float3>();
+            foreach (Entity entity in m_Selected)
+            {
+                if (EntityManager.Exists(entity) && EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    valid.Add(entity);
+                    positions.Add(transform.m_Position);
+                }
+            }
+
+            if (valid.Count < 3)
+            {
+                return;
+            }
+
+            float2 center = float2.zero;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                center += positions[i].xz;
+            }
+
+            center /= positions.Count;
+
+            float averageRadius = 0f;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                averageRadius += math.distance(positions[i].xz, center);
+            }
+
+            averageRadius = math.max(1f, averageRadius / positions.Count);
+            float radius = gap > 0f ? math.max(0.5f, (gap * valid.Count) / (2f * math.PI)) : averageRadius;
+
+            // Redosled po trenutnom uglu — propovi zadržavaju međusobni raspored.
+            List<int> order = new List<int>(positions.Count);
+            float[] angles = new float[positions.Count];
+            for (int i = 0; i < positions.Count; i++)
+            {
+                order.Add(i);
+                float2 offset = positions[i].xz - center;
+                angles[i] = math.atan2(offset.y, offset.x);
+            }
+
+            order.Sort((a, b) => angles[a].CompareTo(angles[b]));
+
+            EndAlignSession();
+            m_AlignOrder.Capacity = valid.Count;
+            foreach (int index in order)
+            {
+                m_AlignOrder.Add(valid[index]);
+            }
+
+            m_AlignKind = AlignKind.Circle;
+            m_AlignGap = (2f * math.PI * radius) / valid.Count;
+            m_AlignOrigin = center;
+            m_AlignStartAngle = angles[order[0]];
+
+            PushTransformUndo();
+            ApplyAlignSession();
+            Mod.Log.Info($"Copaste: align circle on {valid.Count} props (radius {radius:F1} m)");
         }
 
         // Align line: postavi sve selektovane propove na pravu liniju određenu
@@ -2562,10 +2743,12 @@ namespace Copaste
                 tMax = math.max(tMax, targets[i]);
             }
 
+            EndAlignSession();
+
             if (equalSpacing && (positions.Count > 2 || gap > 0f))
             {
-                // Redosled po liniji ostaje, razmaci postaju jednaki:
-                // gap > 0 → tačno toliko metara; inače ravnomerno između krajeva.
+                // Jednaki razmaci: redosled po liniji ostaje, prvi prop je sidro.
+                // Pokreće align sesiju — strelice levo/desno kasnije menjaju razmak.
                 List<int> order = new List<int>(positions.Count);
                 for (int i = 0; i < positions.Count; i++)
                 {
@@ -2574,11 +2757,22 @@ namespace Copaste
 
                 float[] projections = (float[])targets.Clone();
                 order.Sort((a, b) => projections[a].CompareTo(projections[b]));
-                float step = gap > 0f ? gap : (tMax - tMin) / (order.Count - 1);
-                for (int rank = 0; rank < order.Count; rank++)
+
+                m_AlignOrder.Capacity = order.Count;
+                foreach (int index in order)
                 {
-                    targets[order[rank]] = tMin + (step * rank);
+                    m_AlignOrder.Add(valid[index]);
                 }
+
+                m_AlignKind = AlignKind.Spaced;
+                m_AlignGap = math.max(0.1f, gap > 0f ? gap : (tMax - tMin) / (order.Count - 1));
+                m_AlignOrigin = origin + (direction * tMin);
+                m_AlignDirection = direction;
+
+                PushTransformUndo();
+                ApplyAlignSession();
+                Mod.Log.Info($"Copaste: align spaced on {valid.Count} props (gap {m_AlignGap:F1} m)");
+                return;
             }
 
             PushTransformUndo();
