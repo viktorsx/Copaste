@@ -90,6 +90,7 @@ const register = (moduleRegistry) => {
       const heightPickArmed = useValue(heightPickArmed$);
       const [renaming, setRenaming] = React.useState(null);
       const [renameValue, setRenameValue] = React.useState("");
+      const [alignGap, setAlignGap] = React.useState("");
       const version = useValue(version$);
       const selectedName = useValue(selectedName$);
       const savedX = useValue(panelX$);
@@ -321,8 +322,24 @@ const register = (moduleRegistry) => {
             "div",
             { className: "copasteBtns" },
             actionBtn("Line", "Line up the selection between its two farthest props", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
-            actionBtn("Spaced", "Line up with equal gaps between props", selected > 2 && !pasteMode, () => trigger("copaste", "actionAlign", 1), false),
-            actionBtn("Center V", "Align onto a vertical line through the selection center", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 2), false)
+            actionBtn(
+              "Spaced",
+              "Line up with equal gaps. Empty box = spread between the ends, a number = exact gap in meters",
+              selected > 1 && !pasteMode,
+              () => trigger("copaste", "actionAlignSpaced", alignGap),
+              false
+            ),
+            withTooltip(
+              "Optional gap in meters for Spaced (empty = auto)",
+              h("input", {
+                className: "copasteGapInput",
+                value: alignGap,
+                placeholder: "auto",
+                onChange: (e) => setAlignGap(e.target.value),
+                onFocus: () => trigger("copaste", "setTyping", true),
+                onBlur: () => trigger("copaste", "setTyping", false),
+              })
+            )
           ),
           h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Paste look"),
           withTooltip(

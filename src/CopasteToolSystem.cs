@@ -2500,8 +2500,9 @@ namespace Copaste
 
         // Align line: postavi sve selektovane propove na pravu liniju određenu
         // sa dva međusobno najudaljenija propa selekcije. equalSpacing dodatno
-        // raspoređuje propove na jednake razmake duž te linije (redosled ostaje).
-        public void TriggerAlignLine(bool equalSpacing)
+        // raspoređuje propove na jednake razmake duž te linije (redosled ostaje);
+        // gap > 0 zadaje tačan razmak u metrima (prvi prop na liniji ostaje).
+        public void TriggerAlignLine(bool equalSpacing, float gap = -1f)
         {
             if (!ToolIsActive || m_Mode != Mode.Select || m_Selected.Count < 2)
             {
@@ -2561,9 +2562,10 @@ namespace Copaste
                 tMax = math.max(tMax, targets[i]);
             }
 
-            if (equalSpacing && positions.Count > 2)
+            if (equalSpacing && (positions.Count > 2 || gap > 0f))
             {
-                // Redosled po liniji ostaje, razmaci postaju jednaki.
+                // Redosled po liniji ostaje, razmaci postaju jednaki:
+                // gap > 0 → tačno toliko metara; inače ravnomerno između krajeva.
                 List<int> order = new List<int>(positions.Count);
                 for (int i = 0; i < positions.Count; i++)
                 {
@@ -2572,9 +2574,10 @@ namespace Copaste
 
                 float[] projections = (float[])targets.Clone();
                 order.Sort((a, b) => projections[a].CompareTo(projections[b]));
+                float step = gap > 0f ? gap : (tMax - tMin) / (order.Count - 1);
                 for (int rank = 0; rank < order.Count; rank++)
                 {
-                    targets[order[rank]] = tMin + ((tMax - tMin) * rank / (order.Count - 1));
+                    targets[order[rank]] = tMin + (step * rank);
                 }
             }
 
@@ -2610,75 +2613,6 @@ namespace Copaste
             Mod.Log.Info($"Copaste: align line ({(equalSpacing ? "spaced" : "project")}) on {valid.Count} props");
         }
 
-        // Align center: poravnaj sve selektovane propove na liniju kroz centar
-        // selekcije. Osa je relativna kameri, kao nudge i marquee:
-        // horizontal=true → horizontalna linija na ekranu (poravnanje po dubini),
-        // horizontal=false → vertikalna linija (poravnanje po širini).
-        public void TriggerAlignCenter(bool horizontal)
-        {
-            if (!ToolIsActive || m_Mode != Mode.Select || m_Selected.Count < 2)
-            {
-                return;
-            }
-
-            UnityEngine.Camera camera = UnityEngine.Camera.main;
-            float3 cameraForward = camera != null ? (float3)camera.transform.forward : new float3(0f, 0f, 1f);
-            float2 forward = math.normalizesafe(cameraForward.xz, new float2(0f, 1f));
-            float2 right = new float2(forward.y, -forward.x);
-            float2 axis = horizontal ? forward : right;
-
-            // Centar selekcije po izabranoj osi.
-            float2 centroid = float2.zero;
-            int count = 0;
-            foreach (Entity entity in m_Selected)
-            {
-                if (EntityManager.Exists(entity) && EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
-                {
-                    centroid += transform.m_Position.xz;
-                    count++;
-                }
-            }
-
-            if (count < 2)
-            {
-                return;
-            }
-
-            centroid /= count;
-            float centroidAlongAxis = math.dot(centroid, axis);
-
-            PushTransformUndo();
-
-            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
-            foreach (Entity entity in m_Selected)
-            {
-                if (!EntityManager.Exists(entity) ||
-                    !EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
-                {
-                    continue;
-                }
-
-                float2 xz = transform.m_Position.xz;
-                float delta = centroidAlongAxis - math.dot(xz, axis);
-                if (delta == 0f)
-                {
-                    continue;
-                }
-
-                float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
-                float3 position = transform.m_Position;
-                position.xz = xz + (axis * delta);
-                position.y = TerrainUtils.SampleHeight(ref heightData, position) + heightOffset;
-
-                transform.m_Position = position;
-                EntityManager.SetComponentData(entity, transform);
-                WriteElevation(entity, heightOffset);
-                EntityManager.AddComponent<Updated>(entity);
-                EntityManager.AddComponent<BatchesUpdated>(entity);
-            }
-
-            Mod.Log.Info($"Copaste: align center ({(horizontal ? "H" : "V")}) on {count} props");
-        }
 
         public bool HeightPickArmed => m_HeightPickArmed;
 

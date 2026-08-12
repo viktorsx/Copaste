@@ -52,17 +52,23 @@ namespace Copaste
                     m_RandomVariation.Update(random);
                 }
             }));
-            // 0 = na liniju, 1 = na liniju sa jednakim razmacima, 2 = vertikalna linija kroz centar.
-            AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) =>
+            // 0 = na liniju, 1 = na liniju sa jednakim razmacima.
+            AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) => m_CopasteToolSystem.TriggerAlignLine(mode == 1)));
+
+            // Spaced sa opcionim razmakom u metrima ("" ili neispravno = auto).
+            AddBinding(new TriggerBinding<string>("copaste", "actionAlignSpaced", (payload) =>
             {
-                if (mode == 2)
+                float gap = -1f;
+                if (!string.IsNullOrEmpty(payload))
                 {
-                    m_CopasteToolSystem.TriggerAlignCenter(false);
+                    payload = payload.Trim().Replace(',', '.');
+                    if (!float.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out gap) || gap <= 0f)
+                    {
+                        gap = -1f;
+                    }
                 }
-                else
-                {
-                    m_CopasteToolSystem.TriggerAlignLine(mode == 1);
-                }
+
+                m_CopasteToolSystem.TriggerAlignLine(true, gap);
             }));
 
             AddBinding(new TriggerBinding<string>("copaste", "setPanelPos", (payload) =>

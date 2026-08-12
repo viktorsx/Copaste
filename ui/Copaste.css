@@ -37,6 +37,8 @@
 .copasteBtnDisabled img{opacity:0.25}
 
 .copasteSubTitle{margin:8rem 2rem 5rem}
+.copasteGapInput{width:38rem;flex:0 0 auto;height:25rem;margin:2rem;padding:0 4rem;border-radius:6rem;border:1rem solid rgba(255,255,255,0.13);background:rgba(0,0,0,0.35);color:#e6e9f0;font-size:11rem;text-align:center}
+.copasteGapInput:focus{border-color:#6fd39a}
 .copasteToggleTrack{display:flex;background:rgba(0,0,0,0.35);border-radius:6rem;padding:2rem}
 .copasteToggleOpt{flex:1 1 0;height:20rem;display:flex;align-items:center;justify-content:center;border-radius:4rem;font-size:10rem;color:rgba(255,255,255,0.55);cursor:pointer;transition:color .12s}
 .copasteToggleOpt:hover{color:rgba(255,255,255,0.85)}
