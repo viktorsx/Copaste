@@ -59,6 +59,14 @@ namespace Copaste
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeRightAction), "Nudge right" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapPlusAction), "Align gap +" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapMinusAction), "Align gap -" },
+                { settings.GetOptionTabLocaleID(CopasteSettings.kGeneralTab), "General" },
+                { settings.GetOptionTabLocaleID(CopasteSettings.kKeybindingsTab), "Key bindings" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kBehaviorGroup), "Behavior" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kToolGroup), "Tool" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kClipboardGroup), "Clipboard" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kEditingGroup), "Editing" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kNudgeGroup), "Nudge" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kAlignGroup), "Align" },
                 { settings.GetBindingMapLocaleID(), "Copaste" },
             };
         }
@@ -118,6 +126,14 @@ namespace Copaste
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kNudgeRightAction), "Pomak desno" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapPlusAction), "Align razmak +" },
                 { settings.GetBindingKeyLocaleID(CopasteSettings.kAlignGapMinusAction), "Align razmak -" },
+                { settings.GetOptionTabLocaleID(CopasteSettings.kGeneralTab), "Opšte" },
+                { settings.GetOptionTabLocaleID(CopasteSettings.kKeybindingsTab), "Prečice" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kBehaviorGroup), "Ponašanje" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kToolGroup), "Alat" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kClipboardGroup), "Clipboard" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kEditingGroup), "Uređivanje" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kNudgeGroup), "Fini pomak" },
+                { settings.GetOptionGroupLocaleID(CopasteSettings.kAlignGroup), "Poravnanje" },
                 { settings.GetBindingMapLocaleID(), "Copaste" },
             };
         }
