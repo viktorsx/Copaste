@@ -62,6 +62,7 @@ Editing
 - Undo of a delete also restores the original colors now
 - New Align tools: Line makes a tidy row - straight line, equal gaps and all props rotated the same way; To prop does the same anchored to a reference prop you click (its position, facing and rotation); Circle arranges the selection evenly on a circle. The gap stepper sets exact meters; while an align button is lit, [ and ] keys (rebindable) or the stepper resize the layout live
 - Alt+drag moves a single prop out of the selection; Alt+mouse wheel spins every selected prop around its own axis (15 degree steps)
+- Ctrl+click cycles through props around the click point - picks up props partially buried in other objects or buildings that a normal click can never reach; click the same spot again to go to the next one
 - Move drag no longer jerks at the start - the selection follows the cursor smoothly from the first frame
 - Nudge (Ctrl+arrows) step halved for finer control
 

@@ -89,6 +89,10 @@ namespace Copaste
         private float m_AlignPickGap = -1f;
         private float m_LastAltSpinTime;
         private bool m_LeftPressAlt;
+
+        // Ctrl+klik ciklus: biranje propova "zakopanih" u druge objekte.
+        private float3 m_CyclePoint = new float3(float.MaxValue);
+        private int m_CycleIndex;
         private ProxyAction m_NudgeUpAction;
         private ProxyAction m_NudgeDownAction;
         private ProxyAction m_NudgeLeftAction;
@@ -1035,6 +1039,9 @@ namespace Copaste
             }
 
             // Pritisak: na propu = potencijalni klik ili početak pomeranja; na praznom tlu = početak marquee-a.
+            bool ctrlHeld = Keyboard.current != null &&
+                (Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed);
+
             if (ClickedThisFrame())
             {
                 if (m_AlignPickArmed && hitEntity != Entity.Null)
@@ -1043,6 +1050,16 @@ namespace Copaste
                     // svi propovi rotirani kao uzor.
                     AlignRowToReference(hitEntity, m_AlignPickGap);
                     m_AlignPickArmed = false;
+                }
+                else if (ctrlHeld && raycastValid)
+                {
+                    // Ctrl+klik: kruži kroz propove oko tačke pogotka — bira i one
+                    // delimično uronjene u druge objekte/zgrade koje raycast preskače.
+                    Entity pick = CyclePick(hit.m_HitPosition, hitEntity);
+                    if (pick != Entity.Null)
+                    {
+                        ApplyClickSelection(pick, shiftHeld);
+                    }
                 }
                 else if (m_HeightPickArmed && hitEntity != Entity.Null)
                 {
@@ -1695,6 +1712,63 @@ namespace Copaste
                 buffer.AddComponent(definitionEntity, definition);
                 buffer.AddComponent(definitionEntity, default(Updated));
             }
+        }
+
+        // Ctrl+klik: vrati sledećeg kandidata oko tačke pogotka. Ponovljeni klik
+        // na (približno) isto mesto ide na sledeći prop ukrug — tako se dohvataju
+        // propovi delimično uronjeni u veće objekte koje raycast uvek pogađa prvi.
+        private Entity CyclePick(float3 point, Entity topHit)
+        {
+            List<Entity> candidates = new List<Entity>();
+            List<float> distances = new List<float>();
+
+            NativeArray<Entity> entities = m_PropQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<Game.Objects.Transform> transforms = m_PropQuery.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
+
+            for (int i = 0; i < entities.Length; i++)
+            {
+                float distance = math.distance(transforms[i].m_Position.xz, point.xz);
+                float radius = math.max(2.5f, (GetDiameter(entities[i]) * 0.5f) + 0.5f);
+                if (distance > radius || !IsCopyable(entities[i]))
+                {
+                    continue;
+                }
+
+                // Umetni sortirano po udaljenosti (kandidata je šačica).
+                int insertAt = distances.Count;
+                for (int j = 0; j < distances.Count; j++)
+                {
+                    if (distance < distances[j])
+                    {
+                        insertAt = j;
+                        break;
+                    }
+                }
+
+                candidates.Insert(insertAt, entities[i]);
+                distances.Insert(insertAt, distance);
+            }
+
+            entities.Dispose();
+            transforms.Dispose();
+
+            if (candidates.Count == 0)
+            {
+                return topHit;
+            }
+
+            // Isto mesto kao prošli Ctrl+klik → sledeći kandidat; novo mesto → najbliži.
+            if (math.distancesq(point.xz, m_CyclePoint.xz) < 1f)
+            {
+                m_CycleIndex++;
+            }
+            else
+            {
+                m_CycleIndex = 0;
+            }
+
+            m_CyclePoint = point;
+            return candidates[m_CycleIndex % candidates.Count];
         }
 
         private bool IsCopyable(Entity entity)

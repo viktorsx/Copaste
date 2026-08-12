@@ -485,7 +485,7 @@ const register = (moduleRegistry) => {
             ? "Click a prop to copy its height • RMB: cancel"
             : alignPickArmed
             ? "Click a reference prop: row through it, all rotated like it • RMB: cancel"
-            : "Click/box: select • Drag: move all • Alt+drag: move one • Alt+wheel: spin each • RMB drag: rotate"
+            : "Click/box: select • Ctrl+click: pick overlapped • Alt+drag: move one • Alt+wheel: spin each • RMB drag: rotate"
         )
       );
     };
