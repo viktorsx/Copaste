@@ -49,6 +49,13 @@ namespace Copaste
             // PseudoRandomSeed originala — određuje varijaciju boje/izgleda.
             public bool m_HasSeed;
             public ushort m_Seed;
+
+            // Custom boja (Recolor mod): ColorSet sa originala, ako postoji.
+            public bool m_HasCustomColor;
+            public Game.Rendering.ColorSet m_CustomColor;
+
+            // Fiksan seed za CreationDefinition — da preview ne menja boje iz frejma u frejm.
+            public int m_PreviewSeed;
         }
 
         public int SelectedCount => m_Selected.Count;
@@ -101,6 +108,8 @@ namespace Copaste
             public Game.Objects.Tree m_Tree;
             public bool m_HasSeed;
             public ushort m_Seed;
+            public bool m_HasCustomColor;
+            public Game.Rendering.ColorSet m_CustomColor;
         }
 
         private class UndoRecord
@@ -137,6 +146,7 @@ namespace Copaste
         private float2 m_MarqueeForward;
         private readonly List<Entity> m_MarqueeHits = new List<Entity>();
         private EntityQuery m_PropQuery;
+        private EntityQuery m_TempPreviewQuery;
 
         private struct PastedRecord
         {
@@ -146,6 +156,8 @@ namespace Copaste
             public Game.Objects.Tree m_Tree;
             public bool m_HasSeed;
             public ushort m_Seed;
+            public bool m_HasCustomColor;
+            public Game.Rendering.ColorSet m_CustomColor;
 
             // Stvarni entitet koji je paste stvorio — razrešava se u RunPostPasteFix,
             // da undo briše baš njega, a ne bilo koji istovetan prop na istom mestu.
@@ -234,6 +246,22 @@ namespace Copaste
                     ComponentType.ReadOnly<Game.Vehicles.Vehicle>(),
                     ComponentType.ReadOnly<Owner>(),
                     ComponentType.ReadOnly<Temp>(),
+                    ComponentType.ReadOnly<Deleted>(),
+                },
+            });
+
+            // Preview (Temp) entiteti našeg paste-a — za doterivanje boja ghost-a.
+            m_TempPreviewQuery = GetEntityQuery(new EntityQueryDesc
+            {
+                All = new ComponentType[]
+                {
+                    ComponentType.ReadOnly<Temp>(),
+                    ComponentType.ReadOnly<Game.Objects.Object>(),
+                    ComponentType.ReadOnly<Game.Objects.Transform>(),
+                    ComponentType.ReadOnly<PrefabRef>(),
+                },
+                None = new ComponentType[]
+                {
                     ComponentType.ReadOnly<Deleted>(),
                 },
             });
@@ -1260,6 +1288,96 @@ namespace Copaste
             {
                 applyMode = ApplyMode.None;
             }
+
+            UpdatePreviewLook();
+        }
+
+        // Ghost preview: Temp entiteti dobijaju seed/boju originala, da preview
+        // prikazuje ono što će stvarno biti nalepljeno ("Original" mod).
+        private void UpdatePreviewLook()
+        {
+            if (m_LastPreview.Count == 0)
+            {
+                return;
+            }
+
+            bool anyLook = false;
+            float3 boundsMin = new float3(float.MaxValue);
+            float3 boundsMax = new float3(float.MinValue);
+            foreach (PastedRecord record in m_LastPreview)
+            {
+                if (record.m_HasSeed || record.m_HasCustomColor)
+                {
+                    anyLook = true;
+                }
+
+                boundsMin = math.min(boundsMin, record.m_Position);
+                boundsMax = math.max(boundsMax, record.m_Position);
+            }
+
+            if (!anyLook)
+            {
+                return;
+            }
+
+            // Širok margin: Temp entiteti kaskaju frejm za anchor-om dok se miš pomera.
+            boundsMin -= 50f;
+            boundsMax += 50f;
+
+            NativeArray<Entity> entities = m_TempPreviewQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<Game.Objects.Transform> transforms = m_TempPreviewQuery.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
+            NativeArray<PrefabRef> prefabRefs = m_TempPreviewQuery.ToComponentDataArray<PrefabRef>(Allocator.Temp);
+
+            for (int i = 0; i < entities.Length; i++)
+            {
+                float3 entityPosition = transforms[i].m_Position;
+                if (math.any(entityPosition < boundsMin) || math.any(entityPosition > boundsMax))
+                {
+                    continue;
+                }
+
+                // Najbliži zapis istog prefaba — dovoljno tačno za preview.
+                int bestIndex = -1;
+                float bestDistance = float.MaxValue;
+                for (int j = 0; j < m_LastPreview.Count; j++)
+                {
+                    PastedRecord record = m_LastPreview[j];
+                    if (record.m_Prefab != prefabRefs[i].m_Prefab)
+                    {
+                        continue;
+                    }
+
+                    float distance = math.distancesq(entityPosition, record.m_Position);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestIndex = j;
+                    }
+                }
+
+                if (bestIndex < 0)
+                {
+                    continue;
+                }
+
+                PastedRecord match = m_LastPreview[bestIndex];
+                if (match.m_HasSeed &&
+                    EntityManager.TryGetComponent(entities[i], out PseudoRandomSeed tempSeed) &&
+                    tempSeed.m_Seed != match.m_Seed)
+                {
+                    EntityManager.SetComponentData(entities[i], new PseudoRandomSeed(match.m_Seed));
+                    EntityManager.AddComponent<BatchesUpdated>(entities[i]);
+                }
+
+                if (match.m_HasCustomColor)
+                {
+                    ApplyInstanceColors(entities[i], match.m_CustomColor);
+                }
+            }
+
+            entities.Dispose();
+            transforms.Dispose();
+            prefabRefs.Dispose();
         }
 
         private void DrawSelectOverlays()
@@ -1395,6 +1513,7 @@ namespace Copaste
             centroid /= count;
 
             TerrainHeightData copyHeightData = m_TerrainSystem.GetHeightData();
+            Unity.Mathematics.Random previewRandom = RandomSeed.Next().GetRandom(0);
 
             foreach (Entity entity in m_Selected)
             {
@@ -1409,6 +1528,7 @@ namespace Copaste
                 float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref copyHeightData, transform.m_Position);
                 bool hadTree = EntityManager.TryGetComponent(entity, out Game.Objects.Tree tree);
                 bool hasSeed = EntityManager.TryGetComponent(entity, out PseudoRandomSeed seed);
+                bool hasCustomColor = TryGetCustomColor(entity, out Game.Rendering.ColorSet customColor);
 
                 m_Clipboard.Add(new ClipboardItem
                 {
@@ -1421,6 +1541,9 @@ namespace Copaste
                     m_Tree = tree,
                     m_HasSeed = hasSeed,
                     m_Seed = hasSeed ? seed.m_Seed : (ushort)0,
+                    m_HasCustomColor = hasCustomColor,
+                    m_CustomColor = customColor,
+                    m_PreviewSeed = previewRandom.NextInt(),
                 });
             }
 
@@ -1435,8 +1558,8 @@ namespace Copaste
             float baseDelta = GetAnchorHeightDelta(anchor, ref heightData);
             m_LastPreview.Clear();
 
-            // "Original" izgled: nalepljeni prop preuzima seed (boju/varijaciju) originala.
-            // "Random varijacije": igra bira nasumično, kao do sada.
+            // "Original" izgled: nalepljeni prop preuzima seed (boju/varijaciju) i
+            // custom boju originala. "Random varijacije": igra bira nasumično.
             bool keepLook = Mod.Settings == null || !Mod.Settings.RandomPasteVariation;
 
             foreach (ClipboardItem item in m_Clipboard)
@@ -1451,13 +1574,18 @@ namespace Copaste
                     m_Tree = item.m_Tree,
                     m_HasSeed = keepLook && item.m_HasSeed,
                     m_Seed = item.m_Seed,
+                    m_HasCustomColor = keepLook && item.m_HasCustomColor,
+                    m_CustomColor = item.m_CustomColor,
                 });
 
                 Entity definitionEntity = buffer.CreateEntity();
 
                 CreationDefinition creation = default;
                 creation.m_Prefab = item.m_Prefab;
-                creation.m_RandomSeed = random.NextInt();
+
+                // Fiksan seed po stavci: preview ne treperi bojama iz frejma u frejm;
+                // u random modu svaki stamp ipak dobija novu kombinaciju.
+                creation.m_RandomSeed = keepLook ? item.m_PreviewSeed : random.NextInt();
 
                 ObjectDefinition definition = default;
                 definition.m_ParentMesh = -1;
@@ -1774,6 +1902,77 @@ namespace Copaste
                 EntityManager.SetComponentData(entity, new PseudoRandomSeed(record.m_Seed));
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+
+            // Custom boja (vanila Customization tab): prenesi ColorSet originala.
+            if (record.m_HasCustomColor)
+            {
+                ApplyInstanceColors(entity, record.m_CustomColor);
+            }
+        }
+
+        // Custom boja postoji ako prop ima UKLJUČEN CustomMeshColor bafer
+        // (vanila Customization tab ga puni i enable-uje po instanci).
+        private bool TryGetCustomColor(Entity entity, out Game.Rendering.ColorSet colorSet)
+        {
+            colorSet = default;
+            if (!EntityManager.HasBuffer<Game.Rendering.CustomMeshColor>(entity) ||
+                !EntityManager.IsComponentEnabled<Game.Rendering.CustomMeshColor>(entity))
+            {
+                return false;
+            }
+
+            DynamicBuffer<Game.Rendering.CustomMeshColor> custom = EntityManager.GetBuffer<Game.Rendering.CustomMeshColor>(entity, true);
+            if (custom.Length == 0)
+            {
+                return false;
+            }
+
+            colorSet = custom[0].m_ColorSet;
+            return true;
+        }
+
+        private static bool ColorSetEquals(Game.Rendering.ColorSet a, Game.Rendering.ColorSet b)
+        {
+            return a.m_Channel0 == b.m_Channel0 && a.m_Channel1 == b.m_Channel1 && a.m_Channel2 == b.m_Channel2;
+        }
+
+        // Upiši custom ColorSet na entitet: CustomMeshColor (trajno, igra ga snima)
+        // + MeshColor (trenutni prikaz) + BatchesUpdated. No-op ako prefab ne
+        // podržava customizaciju (nema bafer u arhetipu).
+        private void ApplyInstanceColors(Entity entity, Game.Rendering.ColorSet colorSet)
+        {
+            if (!EntityManager.HasBuffer<Game.Rendering.CustomMeshColor>(entity))
+            {
+                return;
+            }
+
+            DynamicBuffer<Game.Rendering.CustomMeshColor> custom = EntityManager.GetBuffer<Game.Rendering.CustomMeshColor>(entity);
+            if (EntityManager.IsComponentEnabled<Game.Rendering.CustomMeshColor>(entity) &&
+                custom.Length > 0 &&
+                ColorSetEquals(custom[0].m_ColorSet, colorSet))
+            {
+                return; // već primenjeno (post-paste prolazi više frejmova)
+            }
+
+            int count = 1;
+            if (EntityManager.HasBuffer<Game.Rendering.MeshColor>(entity))
+            {
+                DynamicBuffer<Game.Rendering.MeshColor> meshColors = EntityManager.GetBuffer<Game.Rendering.MeshColor>(entity);
+                count = math.max(1, meshColors.Length);
+                for (int i = 0; i < meshColors.Length; i++)
+                {
+                    meshColors[i] = new Game.Rendering.MeshColor { m_ColorSet = colorSet };
+                }
+            }
+
+            custom.Clear();
+            for (int i = 0; i < count; i++)
+            {
+                custom.Add(new Game.Rendering.CustomMeshColor { m_ColorSet = colorSet });
+            }
+
+            EntityManager.SetComponentEnabled<Game.Rendering.CustomMeshColor>(entity, true);
+            EntityManager.AddComponent<BatchesUpdated>(entity);
         }
 
         private void RunPostPasteFix()
@@ -1887,6 +2086,7 @@ namespace Copaste
                 bool hadElevation = EntityManager.TryGetComponent(entity, out Game.Objects.Elevation elevation);
                 bool hadTree = EntityManager.TryGetComponent(entity, out Game.Objects.Tree tree);
                 bool hasSeed = EntityManager.TryGetComponent(entity, out PseudoRandomSeed seed);
+                bool hasCustomColor = TryGetCustomColor(entity, out Game.Rendering.ColorSet customColor);
                 snapshots.Add(new TransformSnapshot
                 {
                     m_Entity = entity,
@@ -1898,6 +2098,8 @@ namespace Copaste
                     m_Tree = tree,
                     m_HasSeed = hasSeed,
                     m_Seed = hasSeed ? seed.m_Seed : (ushort)0,
+                    m_HasCustomColor = hasCustomColor,
+                    m_CustomColor = customColor,
                 });
             }
 
@@ -2020,6 +2222,12 @@ namespace Copaste
             if (snapshot.m_HadTree && EntityManager.HasComponent<Game.Objects.Tree>(entity))
             {
                 EntityManager.SetComponentData(entity, snapshot.m_Tree);
+            }
+
+            // Custom boja: vrati je zajedno sa propom.
+            if (snapshot.m_HasCustomColor)
+            {
+                ApplyInstanceColors(entity, snapshot.m_CustomColor);
             }
 
             // Bez ovoga vraćeni prop ume da ostane nevidljiv (batches) ili da ga igra
@@ -2290,6 +2498,118 @@ namespace Copaste
             }
         }
 
+        // Align line: postavi sve selektovane propove na pravu liniju određenu
+        // sa dva međusobno najudaljenija propa selekcije. equalSpacing dodatno
+        // raspoređuje propove na jednake razmake duž te linije (redosled ostaje).
+        public void TriggerAlignLine(bool equalSpacing)
+        {
+            if (!ToolIsActive || m_Mode != Mode.Select || m_Selected.Count < 2)
+            {
+                return;
+            }
+
+            List<Entity> valid = new List<Entity>();
+            List<float3> positions = new List<float3>();
+            foreach (Entity entity in m_Selected)
+            {
+                if (EntityManager.Exists(entity) && EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    valid.Add(entity);
+                    positions.Add(transform.m_Position);
+                }
+            }
+
+            if (valid.Count < 2)
+            {
+                return;
+            }
+
+            // Krajevi linije: najudaljeniji par propova (po tlu).
+            int endA = 0;
+            int endB = 1;
+            float bestDistance = -1f;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                for (int j = i + 1; j < positions.Count; j++)
+                {
+                    float distance = math.distancesq(positions[i].xz, positions[j].xz);
+                    if (distance > bestDistance)
+                    {
+                        bestDistance = distance;
+                        endA = i;
+                        endB = j;
+                    }
+                }
+            }
+
+            if (bestDistance < 0.0001f)
+            {
+                return; // svi propovi praktično na istom mestu
+            }
+
+            float2 origin = positions[endA].xz;
+            float2 direction = math.normalize(positions[endB].xz - origin);
+
+            // Projekcija svakog propa na liniju.
+            float[] targets = new float[positions.Count];
+            float tMin = float.MaxValue;
+            float tMax = float.MinValue;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                targets[i] = math.dot(positions[i].xz - origin, direction);
+                tMin = math.min(tMin, targets[i]);
+                tMax = math.max(tMax, targets[i]);
+            }
+
+            if (equalSpacing && positions.Count > 2)
+            {
+                // Redosled po liniji ostaje, razmaci postaju jednaki.
+                List<int> order = new List<int>(positions.Count);
+                for (int i = 0; i < positions.Count; i++)
+                {
+                    order.Add(i);
+                }
+
+                float[] projections = (float[])targets.Clone();
+                order.Sort((a, b) => projections[a].CompareTo(projections[b]));
+                for (int rank = 0; rank < order.Count; rank++)
+                {
+                    targets[order[rank]] = tMin + ((tMax - tMin) * rank / (order.Count - 1));
+                }
+            }
+
+            PushTransformUndo();
+
+            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
+            for (int i = 0; i < valid.Count; i++)
+            {
+                Entity entity = valid[i];
+                if (!EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
+                {
+                    continue;
+                }
+
+                float2 newXz = origin + (direction * targets[i]);
+                if (math.distancesq(newXz, transform.m_Position.xz) < 0.000001f)
+                {
+                    continue;
+                }
+
+                float heightOffset = transform.m_Position.y - TerrainUtils.SampleHeight(ref heightData, transform.m_Position);
+                float3 position = transform.m_Position;
+                position.xz = newXz;
+                position.y = TerrainUtils.SampleHeight(ref heightData, position) + heightOffset;
+
+                transform.m_Position = position;
+                EntityManager.SetComponentData(entity, transform);
+                WriteElevation(entity, heightOffset);
+                EntityManager.AddComponent<Updated>(entity);
+                EntityManager.AddComponent<BatchesUpdated>(entity);
+            }
+
+            Mod.Log.Info($"Copaste: align line ({(equalSpacing ? "spaced" : "project")}) on {valid.Count} props");
+        }
+
         // Align center: poravnaj sve selektovane propove na liniju kroz centar
         // selekcije. Osa je relativna kameri, kao nudge i marquee:
         // horizontal=true → horizontalna linija na ekranu (poravnanje po dubini),
@@ -2535,6 +2855,7 @@ namespace Copaste
                         ((int)item.m_Tree.m_State).ToString(inv),
                         item.m_Tree.m_Growth.ToString(inv),
                         item.m_HasSeed ? item.m_Seed.ToString(inv) : "-1",
+                        item.m_HasCustomColor ? SerializeColorSet(item.m_CustomColor, inv) : "-",
                     }));
                 }
 
@@ -2580,13 +2901,15 @@ namespace Copaste
                 System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
                 List<ClipboardItem> items = new List<ClipboardItem>();
                 int missing = 0;
+                Unity.Mathematics.Random loadRandom = RandomSeed.Next().GetRandom(0);
 
                 for (int i = 1; i < lines.Length; i++)
                 {
                     string[] parts = lines[i].Split('|');
 
-                    // 11 polja = najstariji format, 14 = sa drvećem (v1.0.4), 15 = sa seed-om (v1.0.6).
-                    if (parts.Length != 11 && parts.Length != 14 && parts.Length != 15)
+                    // 11 polja = najstariji format, 14 = sa drvećem (v1.0.4),
+                    // 15 = sa seed-om, 16 = sa custom bojom (v1.0.6).
+                    if (parts.Length != 11 && parts.Length != 14 && parts.Length != 15 && parts.Length != 16)
                     {
                         continue;
                     }
@@ -2630,6 +2953,13 @@ namespace Copaste
                         item.m_Seed = (ushort)seedValue;
                     }
 
+                    if (parts.Length >= 16 && TryParseColorSet(parts[15], inv, out Game.Rendering.ColorSet loadedColor))
+                    {
+                        item.m_HasCustomColor = true;
+                        item.m_CustomColor = loadedColor;
+                    }
+
+                    item.m_PreviewSeed = loadRandom.NextInt();
                     items.Add(item);
                 }
 
@@ -2649,6 +2979,53 @@ namespace Copaste
                 Mod.Log.Warn($"Blueprint load failed: {e.Message}");
                 return false;
             }
+        }
+
+        // ColorSet ↔ string za blueprint fajlove: "r,g,b,a;r,g,b,a;r,g,b,a".
+        private static string SerializeColorSet(Game.Rendering.ColorSet colorSet, System.Globalization.CultureInfo inv)
+        {
+            string Channel(UnityEngine.Color c) =>
+                c.r.ToString("R", inv) + "," + c.g.ToString("R", inv) + "," + c.b.ToString("R", inv) + "," + c.a.ToString("R", inv);
+            return Channel(colorSet.m_Channel0) + ";" + Channel(colorSet.m_Channel1) + ";" + Channel(colorSet.m_Channel2);
+        }
+
+        private static bool TryParseColorSet(string text, System.Globalization.CultureInfo inv, out Game.Rendering.ColorSet colorSet)
+        {
+            colorSet = default;
+            if (string.IsNullOrEmpty(text) || text == "-")
+            {
+                return false;
+            }
+
+            string[] channels = text.Split(';');
+            if (channels.Length != 3)
+            {
+                return false;
+            }
+
+            UnityEngine.Color[] parsed = new UnityEngine.Color[3];
+            for (int i = 0; i < 3; i++)
+            {
+                string[] rgba = channels[i].Split(',');
+                if (rgba.Length != 4 ||
+                    !float.TryParse(rgba[0], System.Globalization.NumberStyles.Float, inv, out float r) ||
+                    !float.TryParse(rgba[1], System.Globalization.NumberStyles.Float, inv, out float g) ||
+                    !float.TryParse(rgba[2], System.Globalization.NumberStyles.Float, inv, out float b) ||
+                    !float.TryParse(rgba[3], System.Globalization.NumberStyles.Float, inv, out float a))
+                {
+                    return false;
+                }
+
+                parsed[i] = new UnityEngine.Color(r, g, b, a);
+            }
+
+            colorSet = new Game.Rendering.ColorSet
+            {
+                m_Channel0 = parsed[0],
+                m_Channel1 = parsed[1],
+                m_Channel2 = parsed[2],
+            };
+            return true;
         }
 
         public void DeleteBlueprint(string name)

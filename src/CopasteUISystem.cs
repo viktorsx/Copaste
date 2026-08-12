@@ -52,7 +52,18 @@ namespace Copaste
                     m_RandomVariation.Update(random);
                 }
             }));
-            AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) => m_CopasteToolSystem.TriggerAlignCenter(mode == 0)));
+            // 0 = na liniju, 1 = na liniju sa jednakim razmacima, 2 = vertikalna linija kroz centar.
+            AddBinding(new TriggerBinding<int>("copaste", "actionAlign", (mode) =>
+            {
+                if (mode == 2)
+                {
+                    m_CopasteToolSystem.TriggerAlignCenter(false);
+                }
+                else
+                {
+                    m_CopasteToolSystem.TriggerAlignLine(mode == 1);
+                }
+            }));
 
             AddBinding(new TriggerBinding<string>("copaste", "setPanelPos", (payload) =>
             {

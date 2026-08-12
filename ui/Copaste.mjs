@@ -320,8 +320,9 @@ const register = (moduleRegistry) => {
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Center H", "Align selection onto a horizontal line through its center", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
-            actionBtn("Center V", "Align selection onto a vertical line through its center", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 1), false)
+            actionBtn("Line", "Line up the selection between its two farthest props", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 0), false),
+            actionBtn("Spaced", "Line up with equal gaps between props", selected > 2 && !pasteMode, () => trigger("copaste", "actionAlign", 1), false),
+            actionBtn("Center V", "Align onto a vertical line through the selection center", selected > 1 && !pasteMode, () => trigger("copaste", "actionAlign", 2), false)
           ),
           h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Paste look"),
           withTooltip(
