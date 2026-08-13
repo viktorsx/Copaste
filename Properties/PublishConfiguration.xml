@@ -5,20 +5,22 @@
   <LongDescription>## Copaste
 Copy and paste for props. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
 
-## What it does
-- Click props or drag a box to select them. Works on props, decals and trees
-- Paste with a ghost preview that follows your mouse. Click to place, keep clicking to stamp more
-- Pasted props keep their colors, including custom ones from the Customization tab. A blue bench stays blue. If you want variety instead, flip the panel toggle to Random
-- Align tools: Line turns a messy selection into a clean row (equal gaps, everything facing the same way), To prop lines the row up on a prop you pick, Circle makes a circle. Grow or shrink the layout live with the [ and ] keys
-- Drag to move the whole selection, or hold Alt to move just one prop. Alt+scroll spins every selected prop around its own axis
-- Ctrl+click grabs props that are stuck inside other objects or buildings, where a normal click can't reach them. Click the same spot again to cycle through the pile
-- Raise and lower with PgUp/PgDn, snap to ground with End, copy another prop's height with Home
-- Delete removes the whole selection, Ctrl+Z brings it back (32 undo steps, trees return the same age). With the type filter this clears an overgrown forest in three clicks
-- Type filter on T: box selection only picks the prop type you point at
-- Blueprints: save a group to disk and use it in any city or save, colors included
-- Anarchy style pasting built in (toggleable). The Anarchy mod is not required, but if you have it installed they cooperate
-- The panel can be dragged around and remembers where you left it. Small selections get a per-prop list: hover a row to see which prop it is, click to keep only that one
-- Every hotkey is rebindable, options come in English and Serbian
+## Features
+- **Click &amp; marquee selection**: click props or drag a box on the ground, with live highlight while dragging. Works on props, decals and trees
+- **Copy &amp; paste with preview**: the copied group follows your mouse as a ghost. Click to place, keep clicking to stamp more
+- **Original colors kept on paste**: pasted props keep their color variation and any custom color from the Customization tab, so a blue bench stays blue. If you want variety instead, flip the panel toggle to Random
+- **Align tools**: Line turns a messy selection into a clean row (equal gaps, everything facing the same way), To prop lines the row up on a reference prop you pick, Circle makes a circle. Grow or shrink the layout live with the [ and ] keys or the panel stepper
+- **Move**: drag a selected prop and the whole selection follows. Hold Alt to move just that one prop
+- **Group rotation**: hold right mouse button and drag (Alt snaps to 45 degrees), or use the panel buttons. Alt+scroll spins every selected prop around its own axis
+- **Ctrl+click picking**: grabs props stuck inside other objects or buildings where a normal click can't reach. Click the same spot again to cycle through the pile
+- **Height controls**: raise and lower with PgUp/PgDn, snap to ground with End, copy another prop's height with Home
+- **Delete**: removes the whole selection at once. Combined with the type filter it clears an overgrown forest in three clicks, and Ctrl+Z brings everything back with tree ages preserved
+- **Type filter**: press T and box selection only picks the prop type you point at. While active, clicking any prop switches the filter to its type
+- **Undo**: Ctrl+Z reverts move, rotate, align, height, delete and paste, up to 32 steps back
+- **Blueprints**: save a group to disk and use it in any city or save, colors included
+- **Anarchy-style pasting**: overlap errors are ignored while pasting (toggleable). The Anarchy mod is not required, but if you have it installed they cooperate
+- **Toolbar button + panel**: the panel can be dragged around and remembers where you left it. It shows counters, the selected prop's name and, for small selections, a per-prop list where hovering a row highlights that prop in the world and clicking keeps only it
+- All hotkeys rebindable, options in English and Serbian
 
 ## Usage
 Activate with Ctrl+Shift+C or the toolbar button. Select, Ctrl+C, Ctrl+V, click to place. A quick right-click always steps back.
