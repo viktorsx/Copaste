@@ -3,44 +3,42 @@
   <DisplayName Value="Copaste" />
   <ShortDescription Value="Copy &amp; paste props — select, move, rotate, blueprint and stamp groups of props" />
   <LongDescription>## Copaste
-A copy &amp; paste tool for props — select groups of props, copy them, and stamp them anywhere with preserved layout, rotation and height.
+Copy and paste for props. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
 
-## Features
-- **Click &amp; marquee selection** — click props or drag a camera-aligned box; live highlight while dragging. Works on props, decals AND trees
-- **Copy &amp; paste with preview** — the copied group follows your mouse as a ghost; click to place, repeat to stamp
-- **Original colors kept on paste** — pasted props keep the source's color variation AND any custom color from the Customization tab; a blue bench stays blue (Original/Random toggle in the panel)
-- **Align tools** — Line makes a tidy row (straight line, equal gaps, uniform rotation); To prop anchors the row to a reference prop you click; Circle arranges props evenly on a circle. Resize the layout live with [ and ] or the panel stepper
-- **Move** — drag a selected prop to move the whole selection; Alt+drag moves just one prop
-- **Group rotation** — hold right mouse button and drag (Alt snaps to 45°), or use the panel buttons; Alt+mouse wheel spins each prop around its own axis
-- **Ctrl+click picking** — selects props partially buried in other objects or buildings; repeat on the same spot to cycle through stacked props
-- **Height controls** — raise/lower (PgUp/PgDn), snap to ground (End), match another prop's height (Home)
-- **Delete** — press Delete to remove the whole selection at once. Combined with marquee + type filter it's great for bulk cleanup: box-select an area, press T on a tree to keep only that tree type, hit Delete — a whole overgrown forest gone in three clicks (and Ctrl+Z brings it back, ages preserved)
-- **Type filter** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too). While the filter is active, clicking any prop switches the filter to that prop's type
-- **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps); deleted trees come back with their original growth stage
-- **Blueprints** — save prop groups to disk (colors included) and reuse them in any city or save
-- **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable). Anarchy is NOT required: if it happens to be installed, Copaste additionally protects pasted props from being hidden by the game
-- **Toolbar button + panel** — a draggable panel that remembers its position: counters, the selected prop's name, a per-prop list for small selections (hover highlights the prop in the world, click isolates it), align controls, blueprints — every action clickable, with tooltips
-- All hotkeys rebindable, English and Serbian localization
+## What it does
+- Click props or drag a box to select them. Works on props, decals and trees
+- Paste with a ghost preview that follows your mouse. Click to place, keep clicking to stamp more
+- Pasted props keep their colors, including custom ones from the Customization tab. A blue bench stays blue. If you want variety instead, flip the panel toggle to Random
+- Align tools: Line turns a messy selection into a clean row (equal gaps, everything facing the same way), To prop lines the row up on a prop you pick, Circle makes a circle. Grow or shrink the layout live with the [ and ] keys
+- Drag to move the whole selection, or hold Alt to move just one prop. Alt+scroll spins every selected prop around its own axis
+- Ctrl+click grabs props that are stuck inside other objects or buildings, where a normal click can't reach them. Click the same spot again to cycle through the pile
+- Raise and lower with PgUp/PgDn, snap to ground with End, copy another prop's height with Home
+- Delete removes the whole selection, Ctrl+Z brings it back (32 undo steps, trees return the same age). With the type filter this clears an overgrown forest in three clicks
+- Type filter on T: box selection only picks the prop type you point at
+- Blueprints: save a group to disk and use it in any city or save, colors included
+- Anarchy style pasting built in (toggleable). The Anarchy mod is not required, but if you have it installed they cooperate
+- The panel can be dragged around and remembers where you left it. Small selections get a per-prop list: hover a row to see which prop it is, click to keep only that one
+- Every hotkey is rebindable, options come in English and Serbian
 
 ## Usage
-Activate with **Ctrl+Shift+C** or the toolbar button. Click or drag-select props, **Ctrl+C** to copy, **Ctrl+V** to paste, click to place. Quick right-click steps back.
+Activate with Ctrl+Shift+C or the toolbar button. Select, Ctrl+C, Ctrl+V, click to place. A quick right-click always steps back.
 
 ## Transparency
-AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. Full source code is public on GitHub (link below) — judge it freely. Bug reports are read and fixed by a human.
+AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. Bug reports are read and fixed by a human.
+
+Source code (MIT): https://github.com/viktorsx/Copaste
 
 ## Credits &amp; thanks
-Copaste started as a personal tool and grew into this release. It stands on the shoulders of the CS2 modding community — written from scratch, with patterns and APIs learned from open-source mods whose MIT and Apache-2.0 licenses explicitly welcome that. Sincere thanks to:
+Copaste started as a personal tool and grew into this release. It was written from scratch, but the patterns and APIs were learned from open-source mods whose MIT and Apache-2.0 licenses explicitly welcome that. Sincere thanks to:
 
-- **yenyang** — the selection, highlighting and raycasting patterns were learned from the sources of *Better Bulldozer*, *Anarchy*, *Tree Controller* and *Move It*; Anarchy's PreventOverride is integrated at runtime when present
-- **algernon** — the object placement approach (the game's definition pipeline) was learned from the sources of *Line Tool*
-- **Bruceyboy24804** — *Node Controller* served as the reference for how mod UI integrates with the game's interface
+- **yenyang** — selection, highlighting and raycasting patterns learned from *Better Bulldozer*, *Anarchy*, *Tree Controller* and *Move It*; Anarchy's PreventOverride is integrated at runtime when present
+- **algernon** — the object placement approach (the game's definition pipeline) learned from *Line Tool*
+- **Bruceyboy24804** — *Node Controller* served as the reference for mod UI integration
 - **Colossal Order &amp; Paradox** — for Cities: Skylines II and the official modding documentation
-- The **CS2 modding community** for keeping their mods open source — none of this would exist otherwise
+- The **CS2 modding community** for keeping their mods open source
 
 ### Special thanks
-A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNerd** — simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing!
-
-Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
+A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNerd**, simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing!</LongDescription>
   <Thumbnail Value="Properties/Thumbnail.png" />
   <Screenshot Value="Properties/Screenshots/v1.jpg" />
   <Screenshot Value="Properties/Screenshots/v2.jpg" />
