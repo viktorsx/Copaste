@@ -42,10 +42,14 @@ A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNe
 
 Source code (MIT): https://github.com/viktorsx/Copaste</LongDescription>
   <Thumbnail Value="Properties/Thumbnail.png" />
-  <Screenshot Value="Properties/Screenshots/s1.jpg" />
-  <Screenshot Value="Properties/Screenshots/s2.jpg" />
-  <Screenshot Value="Properties/Screenshots/s3.jpg" />
-  <Screenshot Value="Properties/Screenshots/Panel.png" />
+  <Screenshot Value="Properties/Screenshots/v1.jpg" />
+  <Screenshot Value="Properties/Screenshots/v2.jpg" />
+  <Screenshot Value="Properties/Screenshots/n0.jpg" />
+  <Screenshot Value="Properties/Screenshots/n1.jpg" />
+  <Screenshot Value="Properties/Screenshots/n2.jpg" />
+  <Screenshot Value="Properties/Screenshots/n3.jpg" />
+  <Screenshot Value="Properties/Screenshots/n4.jpg" />
+  <Screenshot Value="Properties/Screenshots/n5.jpg" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
   <ModVersion Value="1.0.6" />
