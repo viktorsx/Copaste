@@ -8,15 +8,18 @@ A copy &amp; paste tool for props — select groups of props, copy them, and sta
 ## Features
 - **Click &amp; marquee selection** — click props or drag a camera-aligned box; live highlight while dragging. Works on props, decals AND trees
 - **Copy &amp; paste with preview** — the copied group follows your mouse as a ghost; click to place, repeat to stamp
-- **Move** — drag a selected prop to move the whole selection
-- **Group rotation** — hold right mouse button and drag, or use the panel buttons
+- **Original colors kept on paste** — pasted props keep the source's color variation AND any custom color from the Customization tab; a blue bench stays blue (Original/Random toggle in the panel)
+- **Align tools** — Line makes a tidy row (straight line, equal gaps, uniform rotation); To prop anchors the row to a reference prop you click; Circle arranges props evenly on a circle. Resize the layout live with [ and ] or the panel stepper
+- **Move** — drag a selected prop to move the whole selection; Alt+drag moves just one prop
+- **Group rotation** — hold right mouse button and drag (Alt snaps to 45°), or use the panel buttons; Alt+mouse wheel spins each prop around its own axis
+- **Ctrl+click picking** — selects props partially buried in other objects or buildings; repeat on the same spot to cycle through stacked props
 - **Height controls** — raise/lower (PgUp/PgDn), snap to ground (End), match another prop's height (Home)
 - **Delete** — press Delete to remove the whole selection at once. Combined with marquee + type filter it's great for bulk cleanup: box-select an area, press T on a tree to keep only that tree type, hit Delete — a whole overgrown forest gone in three clicks (and Ctrl+Z brings it back, ages preserved)
 - **Type filter** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too). While the filter is active, clicking any prop switches the filter to that prop's type
 - **Undo** — Ctrl+Z reverts move, rotate, height, delete and paste (32 steps); deleted trees come back with their original growth stage
-- **Blueprints** — save prop groups to disk and reuse them in any city or save
+- **Blueprints** — save prop groups to disk (colors included) and reuse them in any city or save
 - **Anarchy-style pasting** — ignores overlap errors while pasting (toggleable). Anarchy is NOT required: if it happens to be installed, Copaste additionally protects pasted props from being hidden by the game
-- **Toolbar button + panel** — clickable buttons for every action, with tooltips
+- **Toolbar button + panel** — a draggable panel that remembers its position: counters, the selected prop's name, a per-prop list for small selections (hover highlights the prop in the world, click isolates it), align controls, blueprints — every action clickable, with tooltips
 - All hotkeys rebindable, English and Serbian localization
 
 ## Usage

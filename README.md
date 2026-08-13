@@ -17,13 +17,17 @@ It was built by studying the source code of the excellent open-source mods credi
 - **Move** — drag a selected prop to move the whole selection, layout and heights preserved
 - **Delete** — remove the whole selection with one key. Combined with marquee + type filter it makes bulk cleanup trivial: box-select an area, press **T** on a tree to keep only that tree type, hit **Delete** — a whole overgrown forest gone in three clicks (Ctrl+Z brings it back, growth stages preserved)
 - **Paste onto roads & paths** — the group lifts to the surface you point at
+- **Original colors kept on paste** — pasted props keep the source prop's color variation *and* any custom color picked in the game's Customization tab; a blue bench stays blue. An Original/Random toggle in the panel restores the old randomized behavior. The ghost preview shows the real colors too
+- **Align tools** — **Line** turns a messy selection into a tidy row (straight line, equal gaps, all props rotated the same way); **To prop** does the same anchored to a reference prop you click; **Circle** arranges the selection evenly on a circle. Afterwards, `[` and `]` (or the panel stepper) resize the layout live — the gap can also be typed in exact meters
+- **Per-prop touch-ups** — **Alt+drag** moves a single prop out of the selection; **Alt+mouse wheel** spins every selected prop around its own axis (great after a Line align)
+- **Ctrl+click picking** — selects props partially buried in other objects or buildings that a normal click can never reach; repeated Ctrl+clicks on the same spot cycle through everything piled up there
 - **Anarchy-style pasting** — placement errors (overlapping items etc.) are ignored while pasting (toggleable in options); pasted props are protected from being hidden by the game when the [Anarchy](https://mods.paradoxplaza.com/mods/74604/Windows) mod is installed
-- **Undo** — Ctrl+Z reverts the last action (move, rotate, height change, delete, paste), up to 32 steps back; deleted trees come back with their original growth stage
-- **Blueprints** — save the copied group to disk and reuse it in any city or save; managed from the in-game panel
+- **Undo** — Ctrl+Z reverts the last action (move, rotate, align, height change, delete, paste), up to 32 steps back; deleted trees come back with their original growth stage and colors
+- **Blueprints** — save the copied group to disk and reuse it in any city or save; managed from the in-game panel (paged list, inline rename); colors are stored too, older blueprint files still load
 - **Type filter ("Same")** — press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too)
 - **Nudge & snap** — fine-position the selection with Ctrl+arrows, drop it back to terrain with End
-- **Toolbar button + status panel** — a top-left toolbar button toggles the tool; a small panel shows the current mode, selection and clipboard counts, shortcut hints, and your blueprints
-- **Rebindable hotkeys** — all shortcuts can be changed in Options → Copaste
+- **Toolbar button + panel** — a top-left toolbar button toggles the tool; the panel (draggable, remembers its position) shows counters, the selected prop's name, a per-prop list for small selections (hover rings the prop in the world, click isolates it), align controls and your blueprints
+- **Rebindable hotkeys** — all shortcuts can be changed in Options → Copaste → Key bindings
 - **English and Serbian** options localization
 
 ## Controls (defaults)
@@ -32,13 +36,20 @@ It was built by studying the source code of the excellent open-source mods credi
 |---|---|
 | Toggle tool | **Ctrl+Shift+C** or the toolbar button |
 | Select a prop | **Left click** (white circle on hover, blue when selected) |
+| Pick a buried/overlapped prop | **Ctrl + left click** — repeat on the same spot to cycle through stacked props (Shift+Ctrl adds to selection) |
 | Add/remove from selection | **Shift + left click** |
 | Marquee selection | **Left click on empty ground + drag** (Shift adds to selection) |
 | Move selection | **Left click on a prop + drag** — the whole selection follows the mouse |
+| Move a single prop | **Alt + left click on a prop + drag** — only that prop moves |
 | Clear selection | **Click on empty ground** |
 | Copy selection | **Ctrl+C** |
 | Paste (preview follows mouse) | **Ctrl+V**, then **left click** to place — repeat to stamp multiple copies |
-| Rotate selection / paste preview | **Hold right mouse button + drag** |
+| Rotate selection / paste preview | **Hold right mouse button + drag** (hold **Alt** to snap to 45°) |
+| Spin each prop around its own axis | **Alt + mouse wheel** (15° per notch) |
+| Align: tidy row | **Line** panel button — straight line, equal gaps, uniform rotation |
+| Align: row through a reference prop | **To prop** panel button, then click the reference prop (RMB cancels) |
+| Align: circle | **Circle** panel button (3+ props) |
+| Adjust align gap live | **[** and **]** while an align button glows, or the panel stepper (type a number + Enter for exact meters) |
 | Raise / lower selection or paste preview | **Page Up / Page Down** (hold for continuous) |
 | Delete selection | **Delete** |
 | Undo last action | **Ctrl+Z** (works in paste mode too — removes the last stamp) |
