@@ -9,15 +9,37 @@ namespace Copaste
         private ValueBinding<bool> m_ToolActive;
         private ValueBinding<bool> m_PasteMode;
         private ValueBinding<int> m_SelectedCount;
+        private ValueBinding<int> m_PropCount;
+        private ValueBinding<int> m_HeightCount;
         private ValueBinding<int> m_ClipboardCount;
         private ValueBinding<string> m_Blueprints;
         private ValueBinding<int> m_UndoCount;
+        private ValueBinding<int> m_RedoCount;
         private ValueBinding<string> m_SameFilter;
         private ValueBinding<bool> m_HeightPickArmed;
         private ValueBinding<string> m_SelectedName;
         private ValueBinding<int> m_PanelX;
         private ValueBinding<int> m_PanelY;
         private ValueBinding<bool> m_RandomVariation;
+        private ValueBinding<bool> m_RoadSnap;
+        private ValueBinding<bool> m_BuildingProps;
+        private ValueBinding<bool> m_RelocateReady;
+        private ValueBinding<bool> m_Relocating;
+        private ValueBinding<int> m_SelectionFilters;
+
+        private static int CurrentFilterMask()
+        {
+            if (Mod.Settings == null)
+            {
+                return 1 | 2 | 4 | 8;
+            }
+
+            return (Mod.Settings.SelectProps ? 1 : 0) |
+                (Mod.Settings.SelectTrees ? 2 : 0) |
+                (Mod.Settings.SelectDecals ? 4 : 0) |
+                (Mod.Settings.SelectSurfaces ? 8 : 0) |
+                (Mod.Settings.SelectBuildings ? 16 : 0);
+        }
         private ValueBinding<float> m_AlignGapLive;
         private ValueBinding<bool> m_AlignPickArmed;
         private ValueBinding<int> m_AlignSessionSource;
@@ -68,14 +90,81 @@ namespace Copaste
             AddBinding(m_ToolActive = new ValueBinding<bool>("copaste", "toolActive", false));
             AddBinding(m_PasteMode = new ValueBinding<bool>("copaste", "pasteMode", false));
             AddBinding(m_SelectedCount = new ValueBinding<int>("copaste", "selectedCount", 0));
+            AddBinding(m_PropCount = new ValueBinding<int>("copaste", "propCount", 0));
+            AddBinding(m_HeightCount = new ValueBinding<int>("copaste", "heightCount", 0));
             AddBinding(m_ClipboardCount = new ValueBinding<int>("copaste", "clipboardCount", 0));
             AddBinding(m_Blueprints = new ValueBinding<string>("copaste", "blueprints", string.Empty));
             AddBinding(m_UndoCount = new ValueBinding<int>("copaste", "undoCount", 0));
+            AddBinding(m_RedoCount = new ValueBinding<int>("copaste", "redoCount", 0));
             AddBinding(m_SameFilter = new ValueBinding<string>("copaste", "sameFilter", string.Empty));
             AddBinding(m_HeightPickArmed = new ValueBinding<bool>("copaste", "heightPickArmed", false));
             AddBinding(m_SelectedName = new ValueBinding<string>("copaste", "selectedName", string.Empty));
             AddBinding(m_PanelX = new ValueBinding<int>("copaste", "panelX", Mod.Settings != null ? Mod.Settings.PanelX : -1));
             AddBinding(m_PanelY = new ValueBinding<int>("copaste", "panelY", Mod.Settings != null ? Mod.Settings.PanelY : -1));
+
+            // Selection filteri kao bitmask: 1=Props, 2=Trees, 4=Decals, 8=Surfaces, 16=Buildings.
+            AddBinding(m_SelectionFilters = new ValueBinding<int>("copaste", "selectionFilters", CurrentFilterMask()));
+            AddBinding(new TriggerBinding<int>("copaste", "toggleSelectionFilter", (bit) =>
+            {
+                if (Mod.Settings == null)
+                {
+                    return;
+                }
+
+                switch (bit)
+                {
+                    case 1: Mod.Settings.SelectProps = !Mod.Settings.SelectProps; break;
+                    case 2: Mod.Settings.SelectTrees = !Mod.Settings.SelectTrees; break;
+                    case 4: Mod.Settings.SelectDecals = !Mod.Settings.SelectDecals; break;
+                    case 8: Mod.Settings.SelectSurfaces = !Mod.Settings.SelectSurfaces; break;
+                    case 16: Mod.Settings.SelectBuildings = !Mod.Settings.SelectBuildings; break;
+                    default: return;
+                }
+
+                Mod.Settings.ApplyAndSave();
+                m_SelectionFilters.Update(CurrentFilterMask());
+            }));
+
+            // Desni klik na čip: "solo" — samo ta kategorija; ako je već jedina
+            // uključena, vrati sve (Photoshop layer ponašanje).
+            AddBinding(new TriggerBinding<int>("copaste", "soloSelectionFilter", (bit) =>
+            {
+                if (Mod.Settings == null)
+                {
+                    return;
+                }
+
+                int target = CurrentFilterMask() == bit ? 31 : bit;
+                Mod.Settings.SelectProps = (target & 1) != 0;
+                Mod.Settings.SelectTrees = (target & 2) != 0;
+                Mod.Settings.SelectDecals = (target & 4) != 0;
+                Mod.Settings.SelectSurfaces = (target & 8) != 0;
+                Mod.Settings.SelectBuildings = (target & 16) != 0;
+                Mod.Settings.ApplyAndSave();
+                m_SelectionFilters.Update(CurrentFilterMask());
+            }));
+
+            AddBinding(m_BuildingProps = new ValueBinding<bool>("copaste", "buildingProps", Mod.Settings != null && Mod.Settings.SelectBuildingProps));
+            AddBinding(new TriggerBinding<bool>("copaste", "setBuildingProps", (include) =>
+            {
+                if (Mod.Settings != null)
+                {
+                    Mod.Settings.SelectBuildingProps = include;
+                    Mod.Settings.ApplyAndSave();
+                    m_BuildingProps.Update(include);
+                }
+            }));
+
+            AddBinding(m_RoadSnap = new ValueBinding<bool>("copaste", "roadSnap", Mod.Settings == null || Mod.Settings.RoadSnapPaste));
+            AddBinding(new TriggerBinding<bool>("copaste", "setRoadSnap", (snap) =>
+            {
+                if (Mod.Settings != null)
+                {
+                    Mod.Settings.RoadSnapPaste = snap;
+                    Mod.Settings.ApplyAndSave();
+                    m_RoadSnap.Update(snap);
+                }
+            }));
 
             AddBinding(m_RandomVariation = new ValueBinding<bool>("copaste", "randomVariation", Mod.Settings != null && Mod.Settings.RandomPasteVariation));
             AddBinding(new TriggerBinding<bool>("copaste", "setRandomVariation", (random) =>
@@ -97,6 +186,8 @@ namespace Copaste
             AddBinding(m_AlignPickArmed = new ValueBinding<bool>("copaste", "alignPickArmed", false));
             AddBinding(m_AlignSessionSource = new ValueBinding<int>("copaste", "alignSessionSource", 0));
             AddBinding(m_SelectionList = new ValueBinding<string>("copaste", "selectionList", string.Empty));
+            AddBinding(m_RelocateReady = new ValueBinding<bool>("copaste", "relocateReady", false));
+            AddBinding(m_Relocating = new ValueBinding<bool>("copaste", "relocating", false));
 
             AddBinding(new TriggerBinding<string>("copaste", "focusProp", (payload) =>
             {
@@ -180,6 +271,9 @@ namespace Copaste
             AddBinding(new TriggerBinding("copaste", "actionPaste", () => m_CopasteToolSystem.TriggerPaste()));
             AddBinding(new TriggerBinding("copaste", "actionDelete", () => m_CopasteToolSystem.TriggerDelete()));
             AddBinding(new TriggerBinding("copaste", "actionUndo", () => m_CopasteToolSystem.TriggerUndo()));
+            AddBinding(new TriggerBinding("copaste", "actionRedo", () => m_CopasteToolSystem.TriggerRedo()));
+            AddBinding(new TriggerBinding("copaste", "actionRelocate", () => m_CopasteToolSystem.TriggerRelocate()));
+            AddBinding(new TriggerBinding("copaste", "clearClipboard", () => m_CopasteToolSystem.TriggerClearClipboard()));
             AddBinding(new TriggerBinding("copaste", "actionSelectSame", () => m_CopasteToolSystem.TriggerSelectSame()));
             AddBinding(new TriggerBinding("copaste", "actionSnapGround", () => m_CopasteToolSystem.TriggerSnapGround()));
             AddBinding(new TriggerBinding<int>("copaste", "actionRotate", (degrees) => m_CopasteToolSystem.TriggerRotate(degrees)));
@@ -209,8 +303,11 @@ namespace Copaste
             // (npr. Paste dugme "svetli" iako je alat u Select modu).
             m_PasteMode.Update(m_CopasteToolSystem.IsPasteMode);
             m_SelectedCount.Update(m_CopasteToolSystem.SelectedCount);
+            m_PropCount.Update(m_CopasteToolSystem.PropTargetCount);
+            m_HeightCount.Update(m_CopasteToolSystem.HeightTargetCount);
             m_ClipboardCount.Update(m_CopasteToolSystem.ClipboardCount);
             m_UndoCount.Update(m_CopasteToolSystem.UndoCount);
+            m_RedoCount.Update(m_CopasteToolSystem.RedoCount);
             m_SameFilter.Update(m_CopasteToolSystem.SameFilterName);
             m_HeightPickArmed.Update(m_CopasteToolSystem.HeightPickArmed);
             m_SelectedName.Update(m_CopasteToolSystem.SelectedPropName);
@@ -218,6 +315,8 @@ namespace Copaste
             m_AlignPickArmed.Update(m_CopasteToolSystem.AlignPickArmed);
             m_AlignSessionSource.Update(m_CopasteToolSystem.AlignSessionSource);
             m_SelectionList.Update(m_CopasteToolSystem.GetSelectionList());
+            m_RelocateReady.Update(m_CopasteToolSystem.CanRelocate);
+            m_Relocating.Update(m_CopasteToolSystem.IsRelocating);
         }
     }
 }

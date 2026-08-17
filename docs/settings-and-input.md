@@ -16,6 +16,10 @@ Hidden persisted state (`[SettingsUIHidden]`, not shown in Options):
 |---|---|
 | `PanelX`, `PanelY` | saved panel position in px; `-1` = "use CSS default" |
 | `RandomPasteVariation` | the Original/Random paste-look toggle |
+| `SelectProps/Trees/Decals/Surfaces` | selection filter chips (default on) |
+| `SelectBuildings` | Buildings filter chip (default **off**) |
+| `RoadSnapPaste` | road snap toggle for paste/relocate (default on) |
+| `SelectBuildingProps` | marquee may grab building-owned props (default off) |
 
 `SetDefaults()` must reset every property — the game calls it for "Reset
 settings".
@@ -30,7 +34,9 @@ the tool is active:
 | Action | Default |
 |---|---|
 | Toggle tool | Ctrl+Shift+C |
-| Copy / Paste / Undo | Ctrl+C / Ctrl+V / Ctrl+Z |
+| Copy / Paste | Ctrl+C / Ctrl+V |
+| Undo / Redo | Ctrl+Z / Ctrl+Y |
+| Relocate building | Tab (starts relocate when exactly one finished building is selected; cancels while relocating) |
 | Delete selection | Delete |
 | Raise / Lower | PgUp / PgDn |
 | Select same (filter) | T |
@@ -51,8 +57,10 @@ clicks, by tool-raycast validity.
 
 ## Localization
 
-`Localization.cs` builds one dictionary per locale (English `en-US`, Serbian
-`sr-SP`) and `Mod.OnLoad` registers them as localization sources. Every
+`Localization.cs` builds one dictionary per locale (English `en-US`, German
+`de-DE`, French `fr-FR`, Serbian `sr-SP`) and `Mod.OnLoad` registers them as
+localization sources (non-English ones only when the game/I18N mod reports
+the locale as supported). Every
 settings option, tab, group and binding name needs entries via the
 `ModSetting` locale-id helpers (`GetOptionLabelLocaleID`,
 `GetOptionDescLocaleID`, `GetOptionTabLocaleID`, `GetOptionGroupLocaleID`,

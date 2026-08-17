@@ -27,13 +27,23 @@ namespace Copaste
 
             GameManager.instance.localizationManager.AddSource("en-US", new MemorySource(Localization.BuildEnglish(Settings)));
 
-            // Srpski prevod — samo ako igra (ili I18N mod) podržava sr lokalizaciju.
+            // Prevodi — svaki samo ako igra (ili I18N mod) podržava taj locale.
             foreach (string localeId in GameManager.instance.localizationManager.GetSupportedLocales())
             {
                 if (localeId.StartsWith("sr"))
                 {
                     GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildSerbian(Settings)));
                     Log.Info($"Serbian locale registered for {localeId}");
+                }
+                else if (localeId.StartsWith("de"))
+                {
+                    GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildGerman(Settings)));
+                    Log.Info($"German locale registered for {localeId}");
+                }
+                else if (localeId.StartsWith("fr"))
+                {
+                    GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildFrench(Settings)));
+                    Log.Info($"French locale registered for {localeId}");
                 }
             }
 

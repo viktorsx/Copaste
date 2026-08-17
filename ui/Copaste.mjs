@@ -22,9 +22,12 @@ const register = (moduleRegistry) => {
     const toolActive$ = bindValue("copaste", "toolActive", false);
     const pasteMode$ = bindValue("copaste", "pasteMode", false);
     const selectedCount$ = bindValue("copaste", "selectedCount", 0);
+    const propCount$ = bindValue("copaste", "propCount", 0);
+    const heightCount$ = bindValue("copaste", "heightCount", 0);
     const clipboardCount$ = bindValue("copaste", "clipboardCount", 0);
     const blueprints$ = bindValue("copaste", "blueprints", "");
     const undoCount$ = bindValue("copaste", "undoCount", 0);
+    const redoCount$ = bindValue("copaste", "redoCount", 0);
     const sameFilter$ = bindValue("copaste", "sameFilter", "");
     const heightPickArmed$ = bindValue("copaste", "heightPickArmed", false);
     const version$ = bindValue("copaste", "version", "");
@@ -32,6 +35,11 @@ const register = (moduleRegistry) => {
     const panelX$ = bindValue("copaste", "panelX", -1);
     const panelY$ = bindValue("copaste", "panelY", -1);
     const randomVariation$ = bindValue("copaste", "randomVariation", false);
+    const roadSnap$ = bindValue("copaste", "roadSnap", true);
+    const buildingProps$ = bindValue("copaste", "buildingProps", false);
+    const selectionFilters$ = bindValue("copaste", "selectionFilters", 15);
+    const relocateReady$ = bindValue("copaste", "relocateReady", false);
+    const relocating$ = bindValue("copaste", "relocating", false);
     const alignGapLive$ = bindValue("copaste", "alignGapLive", -1);
     const alignPickArmed$ = bindValue("copaste", "alignPickArmed", false);
     const alignSessionSource$ = bindValue("copaste", "alignSessionSource", 0);
@@ -87,9 +95,12 @@ const register = (moduleRegistry) => {
       const active = useValue(toolActive$);
       const pasteMode = useValue(pasteMode$);
       const selected = useValue(selectedCount$);
+      const propCount = useValue(propCount$);
+      const heightCount = useValue(heightCount$);
       const clipboard = useValue(clipboardCount$);
       const blueprintsRaw = useValue(blueprints$);
       const undoCount = useValue(undoCount$);
+      const redoCount = useValue(redoCount$);
       const sameFilter = useValue(sameFilter$);
       const heightPickArmed = useValue(heightPickArmed$);
       const [renaming, setRenaming] = React.useState(null);
@@ -100,6 +111,11 @@ const register = (moduleRegistry) => {
       const savedX = useValue(panelX$);
       const savedY = useValue(panelY$);
       const randomVariation = useValue(randomVariation$);
+      const roadSnap = useValue(roadSnap$);
+      const buildingProps = useValue(buildingProps$);
+      const selectionFilters = useValue(selectionFilters$);
+      const relocateReady = useValue(relocateReady$);
+      const relocating = useValue(relocating$);
       const alignGapLive = useValue(alignGapLive$);
       const alignPickArmed = useValue(alignPickArmed$);
       const alignSessionSource = useValue(alignSessionSource$);
@@ -218,13 +234,17 @@ const register = (moduleRegistry) => {
             : content;
 
         const variantClass = isActive
-          ? " copasteBtnActive"
+          ? variant === "info"
+            ? " copasteBtnActiveInfo"
+            : " copasteBtnActive"
           : !enabled
           ? " copasteBtnDisabled"
           : variant === "primary"
           ? " copasteBtnPrimary"
           : variant === "danger"
           ? " copasteBtnDanger"
+          : variant === "info"
+          ? " copasteBtnInfo"
           : "";
 
         const btn = h(
@@ -245,9 +265,33 @@ const register = (moduleRegistry) => {
           h("div", { className: "copasteSectionTitle" }, title),
           ...rows);
 
-      const stat = (label, value, pad) =>
+      // Selection filter čip: klik = on/off, desni klik = solo (samo ta
+      // kategorija; ponovni desni klik na jedinu uključenu vraća sve).
+      const chip = (label, bit, tooltip, icon) =>
+        withTooltip(
+          tooltip + " • Right click: just this one / everything",
+          h(
+            "div",
+            {
+              key: label,
+              className: "copasteChip" + ((selectionFilters & bit) ? " copasteChipOn" : ""),
+              onClick: () => trigger("copaste", "toggleSelectionFilter", bit),
+              onMouseDown: (e) => {
+                if (e.button === 2) {
+                  trigger("copaste", "soloSelectionFilter", bit);
+                }
+              },
+            },
+            icon ? h("img", { src: "coui://copaste/" + icon }) : null,
+            label
+          )
+        );
+
+      const stat = (label, value, pad, extra) =>
         h("div", { className: "copasteStat" + (pad ? " copasteStatPad" : "") },
-          h("div", { className: "copasteStatValue" + (value > 0 ? " copasteStatValueLive" : "") }, String(value)),
+          h("div", { className: "copasteStatValueRow" },
+            h("div", { className: "copasteStatValue" + (value > 0 ? " copasteStatValueLive" : "") }, String(value)),
+            extra || null),
           h("div", { className: "copasteStatLabel" }, label));
 
       const commitRename = (oldName) => {
@@ -287,7 +331,8 @@ const register = (moduleRegistry) => {
           withTooltip("Load and start pasting", h(
             "button",
             { className: "copasteBpLoad", onClick: () => trigger("copaste", "loadBlueprint", name) },
-            name
+            // Ellipsis nosi unutrašnji div (dugme je flex kontejner).
+            h("div", { className: "copasteSelName" }, name)
           )),
           withTooltip("Rename", h(
             "button",
@@ -308,7 +353,11 @@ const register = (moduleRegistry) => {
               onClick: () => trigger("copaste", "deleteBlueprint", name),
             },
             h("img", { src: "coui://copaste/delete.svg" })
-          ))
+          )),
+          // Pun naziv na hover — isti šablon kao Selected props red.
+          name.length > 24
+            ? h("div", { className: "copasteNameTip" }, name)
+            : null
         );
       };
 
@@ -319,7 +368,7 @@ const register = (moduleRegistry) => {
           "div",
           { className: "copasteHeader", onMouseDown: onHeaderMouseDown },
           h("div", { className: "copasteLogo" }, h("img", { src: "coui://copaste/copaste.svg" })),
-          h("div", { className: "copasteTitle" }, "COPASTE"),
+          h("img", { className: "copasteTitleLogo", src: "coui://copaste/copastelogotext.svg" }),
           version ? h("div", { className: "copasteVersion" }, "v" + version) : null
         ),
         h(
@@ -330,26 +379,88 @@ const register = (moduleRegistry) => {
             { className: "copasteStatsRow" },
             stat("Selected", selected, false),
             h("div", { className: "copasteStatDivider" }),
-            stat("Clipboard", clipboard, true)
+            stat(
+              "Clipboard",
+              clipboard,
+              true,
+              clipboard > 0
+                ? withTooltip(
+                    "Clear the clipboard",
+                    h(
+                      "button",
+                      { className: "copasteStatClear", onClick: () => trigger("copaste", "clearClipboard") },
+                      "Clear"
+                    )
+                  )
+                : null
+            )
           ),
           selectedName
             ? h(
                 "div",
-                { className: "copasteFilterRow" },
+                { className: "copasteFilterRow copastePropRow" },
                 h("img", { src: "coui://copaste/prop.svg" }),
                 h("div", { className: "copasteFilterLabel" }, "Prop"),
-                h("div", { className: "copasteFilterValue copastePropName" }, selectedName)
+                h("div", { className: "copasteFilterValue copastePropName" }, selectedName),
+                // Dugačka imena se seku na "..." — pun naziv u tooltip-u iznad reda.
+                selectedName.length > 20
+                  ? h("div", { className: "copasteNameTip" }, selectedName)
+                  : null
               )
             : null,
-          sameFilter
-            ? h(
-                "div",
-                { className: "copasteFilterRow" },
+          // Uvek vidljiv red: [ikonica + Filter] dugme pali/gasi tip-filter.
+          h(
+            "div",
+            { className: "copasteFilterRow" },
+            withTooltip(
+              "Marquee prop filter: box select only picks this prop type. Click a prop to set it, click again to turn off (T)",
+              h(
+                "button",
+                { className: "copasteFilterBtn", onClick: () => trigger("copaste", "actionSelectSame") },
                 h("img", { src: "coui://copaste/filter.svg" }),
-                h("div", { className: "copasteFilterLabel" }, "Filter"),
-                h("div", { className: "copasteFilterValue" }, sameFilter)
+                h("span", null, "Filter")
               )
-            : null
+            ),
+            h(
+              "div",
+              { className: "copasteFilterValue copasteFilterValueClip" + (sameFilter ? "" : " copasteFilterValueOff") },
+              sameFilter || "Off"
+            )
+          )
+        ),
+        h(
+          "div",
+          { key: "Selection", className: "copasteCard" },
+          h("div", { className: "copasteSectionTitle" }, "Selection"),
+          h(
+            "div",
+            { className: "copasteChipRow" },
+            chip("Props", 1, "Benches, lamps, fences and other props", "prop.svg"),
+            chip("Trees", 2, "Trees, bushes and other vegetation", "tree.svg"),
+            chip("Decals", 4, "Road markings, stains and other decals", "decal.svg")
+          ),
+          h(
+            "div",
+            { className: "copasteChipRow" },
+            chip("Surfaces", 8, "Painted surfaces", "surface.svg"),
+            chip("Buildings", 16, "Service buildings, unique ones and grown homes", "building.svg")
+          ),
+          h(
+            "div",
+            { className: "copasteSubTitleRow" },
+            h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, "Building elements"),
+            withTooltip(
+              "When on, selection also reaches elements that belong to buildings — their props, trees, decals and lot surfaces, each following its filter above. Deleting a lot decoration surface also removes what it keeps spawning. When off, nothing building-owned can be selected, not even by click",
+              h(
+                "button",
+                {
+                  className: "copasteSwitch" + (buildingProps ? " copasteSwitchOn" : ""),
+                  onClick: () => trigger("copaste", "setBuildingProps", !buildingProps),
+                },
+                buildingProps ? "On" : "Off"
+              )
+            )
+          )
         ),
         selectionEntries.length > 0
           ? h(
@@ -376,8 +487,15 @@ const register = (moduleRegistry) => {
                         onMouseEnter: () => trigger("copaste", "focusProp", entry.id),
                         onMouseLeave: () => trigger("copaste", "focusProp", ""),
                       },
-                      entry.name
-                    )
+                      // Unutrašnji div nosi ellipsis — dugme je flex kontejner,
+                      // pa text-overflow na njemu samom ne radi.
+                      h("div", { className: "copasteSelName" }, entry.name)
+                    ),
+                    // Dugačka imena (kuće!) se seku na "..." — pun naziv u
+                    // tooltip-u iznad reda, isti šablon kao Prop red.
+                    entry.name.length > 24
+                      ? h("div", { className: "copasteNameTip" }, entry.name)
+                      : null
                   )
                 )
               )
@@ -393,7 +511,51 @@ const register = (moduleRegistry) => {
             selected > 0
               ? actionBtn("Save", "Save selection as blueprint", true, () => trigger("copaste", "saveBlueprint"), false, undefined, "save.svg")
               : null
-          )
+          ),
+          h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Paste look"),
+          withTooltip(
+            "Original: pasted props keep the copied prop's color variation. Random: the game picks one",
+            h(
+              "div",
+              { className: "copasteToggleTrack" },
+              h(
+                "div",
+                {
+                  className: "copasteToggleOpt" + (!randomVariation ? " copasteToggleOptActive" : ""),
+                  onClick: () => trigger("copaste", "setRandomVariation", false),
+                },
+                "Original"
+              ),
+              h(
+                "div",
+                {
+                  className: "copasteToggleOpt" + (randomVariation ? " copasteToggleOptActive" : ""),
+                  onClick: () => trigger("copaste", "setRandomVariation", true),
+                },
+                "Random"
+              )
+            )
+          ),
+          // Road snap red samo dok je Buildings filter uključen — da ne buni
+          // kod čistog prop kopiranja (snap se ionako pali samo uz zgradu).
+          (selectionFilters & 16)
+            ? h(
+                "div",
+                { className: "copasteSubTitleRow" },
+                h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, "Road snap"),
+                withTooltip(
+                  "Pasted buildings snap to the nearest road like normal plopping — the whole group rotates to face it. While snapped, rotation follows the road",
+                  h(
+                    "button",
+                    {
+                      className: "copasteSwitch" + (roadSnap ? " copasteSwitchOn" : ""),
+                      onClick: () => trigger("copaste", "setRoadSnap", !roadSnap),
+                    },
+                    roadSnap ? "On" : "Off"
+                  )
+                )
+              )
+            : null
         ),
         section(
           "Edit",
@@ -401,25 +563,38 @@ const register = (moduleRegistry) => {
             "div",
             { className: "copasteBtns" },
             actionBtn("Undo", "Undo last action (Ctrl+Z)", undoCount > 0, () => trigger("copaste", "actionUndo"), false, undefined, "undo.svg"),
-            actionBtn("Delete", "Delete selection (Del)", selected > 0 && !pasteMode, () => trigger("copaste", "actionDelete"), false, "danger", "trash.svg"),
-            actionBtn("Filter", "Type filter for marquee (T)", (selected > 0 || sameFilter) && !pasteMode, () => trigger("copaste", "actionSelectSame"), !!sameFilter, undefined, "filterw.svg")
+            actionBtn("Redo", "Redo the last undone action (Ctrl+Y)", redoCount > 0 && !pasteMode, () => trigger("copaste", "actionRedo"), false, undefined, "redo.svg")
           ),
           h(
             "div",
             { className: "copasteBtns" },
-            actionBtn("Ground", "Snap selection to terrain (End)", selected > 0 || pasteMode, () => trigger("copaste", "actionSnapGround"), false, undefined, "ground.svg"),
-            actionBtn("Match H", "Pick height from a prop (Home)", selected > 0 && !pasteMode, () => trigger("copaste", "actionMatchHeight"), heightPickArmed, undefined, "matchh.svg")
+            actionBtn(
+              "Relocate",
+              "Move the selected building (Tab): it follows the cursor, road snap sets the facing. Click to place, Tab or right click to cancel. To rotate freely, place it first and use RMB drag",
+              relocateReady || relocating,
+              () => trigger("copaste", "actionRelocate"),
+              relocating,
+              "info",
+              "relocate.svg"
+            ),
+            actionBtn("Delete", "Delete selection (Del)", selected > 0 && !pasteMode, () => trigger("copaste", "actionDelete"), false, "danger", "trash.svg")
           )
         ),
         section(
-          "Rotate & height",
+          "Align",
+          h(
+            "div",
+            { className: "copasteBtns" },
+            actionBtn("Ground", "Snap selection to terrain (End)", heightCount > 0 || pasteMode, () => trigger("copaste", "actionSnapGround"), false, undefined, "ground.svg"),
+            actionBtn("Match H", "Pick height from a prop (Home)", heightCount > 0 && !pasteMode, () => trigger("copaste", "actionMatchHeight"), heightPickArmed, undefined, "matchh.svg")
+          ),
           h(
             "div",
             { className: "copasteBtns" },
             actionBtn("rotl.svg", "Rotate 45° left", selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", -45), false),
             actionBtn("rotr.svg", "Rotate 45° right", selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", 45), false),
-            actionBtn("up.svg", "Raise 0.5 m (PgUp)", selected > 0 || pasteMode, () => trigger("copaste", "actionHeight", 1), false),
-            actionBtn("down.svg", "Lower 0.5 m (PgDn)", selected > 0 || pasteMode, () => trigger("copaste", "actionHeight", -1), false)
+            actionBtn("up.svg", "Raise 0.5 m (PgUp)", heightCount > 0 || pasteMode, () => trigger("copaste", "actionHeight", 1), false),
+            actionBtn("down.svg", "Lower 0.5 m (PgDn)", heightCount > 0 || pasteMode, () => trigger("copaste", "actionHeight", -1), false)
           ),
           h(
             "div",
@@ -427,7 +602,7 @@ const register = (moduleRegistry) => {
             h(
               "div",
               { className: "copasteSectionTitle copasteSubTitleFlat" },
-              "Align" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m" : "")
+              "Align props" + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m" : "")
             ),
             withTooltip(
               "Gap in meters for the align tools (empty = auto). Adjusts a live align too — same as [ and ] keys",
@@ -483,7 +658,7 @@ const register = (moduleRegistry) => {
             actionBtn(
               "Line",
               "Tidy row: straight line, equal gaps AND all props rotated the same way. While lit, [ ] or the stepper adjust the gap",
-              selected > 1 && !pasteMode,
+              propCount > 1 && !pasteMode,
               () => trigger("copaste", "actionAlignLine", gapDisplay),
               alignSessionSource === 1,
               undefined,
@@ -492,7 +667,7 @@ const register = (moduleRegistry) => {
             actionBtn(
               "To prop",
               "Pick a reference prop: the row goes through it, side by side along its facing, all rotated like it. RMB cancels",
-              selected > 0 && !pasteMode,
+              propCount > 0 && !pasteMode,
               () => trigger("copaste", "actionAlignRef", gapDisplay),
               alignPickArmed || alignSessionSource === 2,
               undefined,
@@ -501,35 +676,11 @@ const register = (moduleRegistry) => {
             actionBtn(
               "Circle",
               "Arrange evenly on a circle (stepper = gap in meters, empty = keep size). While lit, [ ] fine-tune",
-              selected > 2 && !pasteMode,
+              propCount > 2 && !pasteMode,
               () => trigger("copaste", "actionAlignCircle", gapDisplay),
               alignSessionSource === 3,
               undefined,
               "aligncircle.svg"
-            )
-          ),
-          h("div", { className: "copasteSectionTitle copasteSubTitle" }, "Paste look"),
-          withTooltip(
-            "Original: pasted props keep the copied prop's color variation. Random: the game picks one",
-            h(
-              "div",
-              { className: "copasteToggleTrack" },
-              h(
-                "div",
-                {
-                  className: "copasteToggleOpt" + (!randomVariation ? " copasteToggleOptActive" : ""),
-                  onClick: () => trigger("copaste", "setRandomVariation", false),
-                },
-                "Original"
-              ),
-              h(
-                "div",
-                {
-                  className: "copasteToggleOpt" + (randomVariation ? " copasteToggleOptActive" : ""),
-                  onClick: () => trigger("copaste", "setRandomVariation", true),
-                },
-                "Random"
-              )
             )
           )
         ),
@@ -549,7 +700,9 @@ const register = (moduleRegistry) => {
         h(
           "div",
           { className: "copasteHint" },
-          pasteMode
+          relocating
+            ? "Building follows the cursor • Road snap sets the facing • Click: place • Tab/RMB: cancel"
+            : pasteMode
             ? "Click: place • RMB drag: rotate • PgUp/PgDn: height • RMB: back"
             : heightPickArmed
             ? "Click a prop to copy its height • RMB: cancel"

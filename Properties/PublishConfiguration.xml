@@ -1,12 +1,19 @@
 <Publish>
   <ModId Value="154371" />
   <DisplayName Value="Copaste" />
-  <ShortDescription Value="Copy &amp; paste props — select, move, rotate, blueprint and stamp groups of props" />
+  <ShortDescription Value="Copy &amp; paste props and buildings — select, move, relocate, blueprint and stamp whole scenes" />
   <LongDescription>## Copaste
-Copy and paste for props. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
+Copy and paste for props and buildings. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
+
+**Save-game safe.** Copaste only ever writes the game's own vanilla components and stores **no custom data in your save file**. A city touched by Copaste loads identically with or without the mod, and unsubscribing leaves nothing behind.
 
 ## Features
-- **Click &amp; marquee selection**: click props or drag a box on the ground, with live highlight while dragging. Works on props, decals and trees
+- **Click &amp; marquee selection**: click objects or drag a box on the ground, with live highlight while dragging
+- **Selection filters**: five independent switches decide what selection grabs - props, trees, decals, painted surfaces and buildings. Right-click a filter to solo it, right-click again to bring everything back
+- **Building elements**: a separate switch lets selection reach things owned by buildings - their props, trees, decals and lot surfaces, each following its filter. Deleting a lot decoration surface also removes what it keeps spawning - the clean, save-safe way to get rid of regenerating lot clutter. With the switch off, nothing building-owned can be selected
+- **Buildings**: copy and paste whole groups of buildings with their pavements, driveways and attached props. Move them by dragging, rotate them, or hit Relocate and the building follows your cursor and snaps to the nearest road like normal plopping. Delete works like the bulldozer, and undo rebuilds the building
+- **Road snap**: pasted buildings glide along the nearest road and face it exactly like hand plopping. One switch turns it off for free placement
+- **Painted surfaces**: box select outlines them, click selects them, they copy, move, rotate and delete with the group and stay fully editable afterwards
 - **Copy &amp; paste with preview**: the copied group follows your mouse as a ghost. Click to place, keep clicking to stamp more
 - **Original colors kept on paste**: pasted props keep their color variation and any custom color from the Customization tab, so a blue bench stays blue. If you want variety instead, flip the panel toggle to Random
 - **Align tools**: Line turns a messy selection into a clean row (equal gaps, everything facing the same way), To prop lines the row up on a reference prop you pick, Circle makes a circle. Grow or shrink the layout live with the [ and ] keys or the panel stepper
@@ -16,14 +23,14 @@ Copy and paste for props. Select a group, copy it, stamp it anywhere. Layout, ro
 - **Height controls**: raise and lower with PgUp/PgDn, snap to ground with End, copy another prop's height with Home
 - **Delete**: removes the whole selection at once. Combined with the type filter it clears an overgrown forest in three clicks, and Ctrl+Z brings everything back with tree ages preserved
 - **Type filter**: press T and box selection only picks the prop type you point at. While active, clicking any prop switches the filter to its type
-- **Undo**: Ctrl+Z reverts move, rotate, align, height, delete and paste, up to 32 steps back
-- **Blueprints**: save a group to disk and use it in any city or save, colors included
+- **Undo &amp; redo**: Ctrl+Z reverts move, rotate, align, height, delete and paste, up to 32 steps back; Ctrl+Y re-applies it - deletes and pastes included
+- **Blueprints**: save a group to disk and use it in any city or save, colors included. With buildings in the mix a blueprint holds a whole mini neighborhood
 - **Anarchy-style pasting**: overlap errors are ignored while pasting (toggleable). The Anarchy mod is not required, but if you have it installed they cooperate
 - **Toolbar button + panel**: the panel can be dragged around and remembers where you left it. It shows counters, the selected prop's name and, for small selections, a per-prop list where hovering a row highlights that prop in the world and clicking keeps only it
-- All hotkeys rebindable, options in English and Serbian
+- All hotkeys rebindable, options in English, German, French and Serbian
 
 ## Usage
-Activate with Ctrl+Shift+C or the toolbar button. Select, Ctrl+C, Ctrl+V, click to place. A quick right-click always steps back.
+Activate with Ctrl+Shift+C or the toolbar button. Select, Ctrl+C, Ctrl+V, click to place. A quick right-click always steps back. Buildings are opt-in: flip the Buildings filter in the panel's Selection card when you want them.
 
 ## Transparency
 AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. Bug reports are read and fixed by a human.
@@ -42,19 +49,52 @@ Copaste started as a personal tool and grew into this release. It was written fr
 ### Special thanks
 A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNerd**, simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing!</LongDescription>
   <Thumbnail Value="Properties/Thumbnail.png" />
-  <Screenshot Value="Properties/Screenshots/v1.jpg" />
-  <Screenshot Value="Properties/Screenshots/v2.jpg" />
-  <Screenshot Value="Properties/Screenshots/n0.jpg" />
-  <Screenshot Value="Properties/Screenshots/n1.jpg" />
-  <Screenshot Value="Properties/Screenshots/n2.jpg" />
-  <Screenshot Value="Properties/Screenshots/n3.jpg" />
-  <Screenshot Value="Properties/Screenshots/n4.jpg" />
-  <Screenshot Value="Properties/Screenshots/n5.jpg" />
+  <Screenshot Value="Properties/Screenshots/s1.jpg" />
+  <Screenshot Value="Properties/Screenshots/s2.jpg" />
+  <Screenshot Value="Properties/Screenshots/s3.jpg" />
+  <Screenshot Value="Properties/Screenshots/s4.jpg" />
+  <Screenshot Value="Properties/Screenshots/s5.jpg" />
+  <Screenshot Value="Properties/Screenshots/s6.jpg" />
+  <Screenshot Value="Properties/Screenshots/s7.jpg" />
+  <Screenshot Value="Properties/Screenshots/s8.jpg" />
+  <Screenshot Value="Properties/Screenshots/s9.jpg" />
+  <Screenshot Value="Properties/Screenshots/s10.jpg" />
+  <Screenshot Value="Properties/Screenshots/s11.jpg" />
+  <Screenshot Value="Properties/Screenshots/s12.jpg" />
+  <Screenshot Value="Properties/Screenshots/s13.jpg" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
-  <ModVersion Value="1.0.6" />
+  <ModVersion Value="1.1.0" />
   <GameVersion Value="1.6.*" />
-  <ChangeLog>Panel redesign and quality-of-life update. Hand tested in game before publishing - that's the routine for every Copaste release.
+  <ChangeLog>Buildings update. Hand tested in game before publishing - that's the routine for every Copaste release.
+
+Buildings
+- Buildings can be selected, copied and pasted in groups - service buildings, unique ones and grown homes alike. Pasted buildings finish construction instantly, complete with pavements, driveways and attached props
+- Buildings move like props: drag them, rotate with right drag, nudge with Ctrl+arrows, spin with Alt+wheel. Driveways, pavements and installed upgrades travel along and the game reconnects everything to the road
+- New Relocate button (keybind: Tab, rebindable): the selected building follows your cursor and snaps to the nearest road like normal plopping. Click places it, Tab or right click cancels
+- Road snap for pasting too: with the switch on, a pasted building glides along the nearest road and faces it. The rest of the group follows
+- Delete works on buildings exactly like the bulldozer. Undo rebuilds the deleted building, as a fresh one though - residents don't come back
+- Props you rearranged or deleted on a building stay that way when the building moves
+- Selected buildings show their lot rectangle instead of a circle
+
+Selection
+- New Selection card with five independent filters: Props, Trees, Decals, Surfaces, Buildings. Any mix works. Right-click a filter to solo it, right-click again to restore all. Buildings are off by default so the classic prop workflow stays untouched
+- Building elements switch: when on, selection also reaches things owned by buildings - props, trees, decals and lot surfaces, each following its filter. When off, nothing building-owned can be selected, not even by click
+- Deleting a building's lot decoration surface (with undo) also removes whatever it keeps spawning there - permanently, with nothing written into the save
+- Paste look "Original" now applies to lots too: the pasted building's lot surfaces are exact copies of the source's - same paths, same front walkway, deleted surfaces stay deleted - instead of a fresh random factory roll. Undo/redo of a deleted building restores its lot exactly, and blueprints carry the lot as well
+- Painted surfaces: box select outlines them, plain click selects them too. They copy, move, nudge, rotate and delete with the group, undo repaints them, and they stay fully editable
+- Blueprints can store mini neighborhoods: buildings, props and painted surfaces together
+- The marquee type filter is now an always-visible row with its own button in the panel
+
+Editing
+- Redo (Ctrl+Y) brings back the last undone action - moves, rotations, aligns, heights, deletes and pastes alike
+- A Clear button next to the Clipboard counter empties the clipboard
+
+Panel
+- New COPASTE logo, bigger text everywhere, version tucked to the right, refreshed layout: Paste look and Road snap live under Clipboard, Ground and Match H joined the Align card
+- The Selected props list now covers selections up to 50 (was 15)
+
+Previous release notes (1.0.6):
 
 Panel
 - Complete visual redesign: grouped cards, icons on every button, clear button states, readable counters

@@ -17,16 +17,23 @@ The tool relies on the game's `ToolRaycastSystem`, configured per frame in
 
 `GetRaycastResult(out entity, out hit)` returns **one** hit — the nearest
 surface. The hit entity is filtered through `IsCopyable` (see below); anything
-else (buildings, vehicles…) yields `hitEntity == Entity.Null` even though the
-raw `raycastEntity` may be a building.
+that fails it yields `hitEntity == Entity.Null` even though the raw
+`raycastEntity` may be something else (a vehicle, a lot decoration…).
 
 ### IsCopyable
 
-A prop can be selected iff it has `Object` + `Transform` + `PrefabRef` and none
-of: `Building`, `Extension`, `Vehicle`, `Moving`, `Temp`, `Deleted`. The same
-exclusion set (plus `Owner`, which excludes building sub-props) is baked into
-`m_PropQuery`, the query used by marquee scans, cycle picking and the
-post-paste fix.
+An entity can be selected iff it has `Object` + `Transform` + `PrefabRef` and
+passes every gate: not an invisible spawn point (`SpawnLocation` with an empty
+prefab `SubMesh` buffer — benches/chairs carry `SpawnLocation` too and stay
+selectable), no `Marker`/`UtilityObject`/`Placeholder`, not a regenerating
+deep-owned sub-element, its category chip is on (`IsCategoryEnabled` — this is
+also how buildings are admitted behind the Buildings chip), no
+`Extension`/`Vehicle`/`Moving`/`Creature`, building-owned only while
+**Building elements** is on, and no `Temp`/`Deleted`. Marquee scans and cycle
+picking draw from three queries — `m_PropQuery` (free-standing),
+`m_OwnedPropQuery` (behind Building elements) and `m_BuildingQuery` (behind
+the Buildings chip) — with the per-entity gates applied in the scan; see
+[buildings-and-surfaces.md](buildings-and-surfaces.md).
 
 ## The click chain
 
@@ -154,7 +161,7 @@ display name is resolved once per change (not per frame).
 
 ## The "Selected props" panel list
 
-For small selections (2–15, `kSelectionListMax`) `GetSelectionList()` emits
+For small selections (2–50, `kSelectionListMax`) `GetSelectionList()` emits
 `entityIndex:entityVersion:prefabName` lines for the panel. Hovering a row sets
 `m_ListFocusEntity`, which `DrawSelectOverlays` rings in green so identical
 props can be told apart; clicking a row calls `SelectOnly(index, version)` which

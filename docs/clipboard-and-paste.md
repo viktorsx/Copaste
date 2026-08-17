@@ -17,8 +17,8 @@
 | `m_PreviewSeed` | a random-but-fixed seed for stable preview colors (see below) |
 
 The clipboard is replaced wholesale by every copy (and by loading a blueprint).
-There is deliberately no "clear clipboard" action — nothing happens until the
-user pastes.
+The panel's Clear button next to the Clipboard counter (`clearClipboard`
+trigger) empties it.
 
 ## Entering paste mode
 

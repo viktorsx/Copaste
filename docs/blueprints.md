@@ -32,6 +32,22 @@ Line 1 is the magic header `COPASTE1`. Every following line is one prop,
 their defaults. The writer always emits the newest format. Names containing
 `|` are skipped at save time.
 
+**Painted surfaces (v1.1.0):** serialized as their own line type,
+`AREA|prefabType|prefabName|x,z;x,z;...` — the polygon as centroid-relative
+XZ pairs (`;`-separated, invariant culture). Loaders older than 1.1.0 skip
+these lines because the field count doesn't match any object format.
+
+**Building lot surfaces (v1.1.0):** a building line may be followed by
+`BLOT|n` and then `n` lines of `BSURF|prefabType|prefabName|x,z;x,z;...` —
+one per lot surface of the source building, the polygon in building-local
+XZ. They apply to the most recently parsed item. With *Paste look:
+Original*, after paste construction the factory lot surfaces are replaced
+by exact copies of these, so the copy's lot looks like the source's
+(deleted surfaces stay deleted, reshapes carry over). `BLOT|0` with no
+BSURF lines means the source had none left — the copy's factory surfaces
+are all removed. Old loaders skip both line types (field counts and type
+tags match no known format).
+
 ## Saving
 
 `SaveBlueprint()` snapshots **the current selection** (falling back to the

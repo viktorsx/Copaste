@@ -44,22 +44,32 @@ Value bindings (C# → UI), group `copaste`:
 | `version` | string | assembly version for the header |
 | `toolActive` | bool | panel visibility |
 | `pasteMode` | bool | Paste button glow + hint text |
-| `selectedCount`, `clipboardCount`, `undoCount` | int | counters / enablement |
+| `selectedCount`, `clipboardCount`, `undoCount`, `redoCount` | int | counters / enablement |
+| `propCount` | int | selected non-building objects — gates align buttons |
+| `heightCount` | int | selected height targets (props + finished buildings) — gates height buttons |
 | `blueprints` | string | newline-separated names |
 | `sameFilter` | string | active type filter name ("" = off) |
 | `heightPickArmed`, `alignPickArmed` | bool | pick-mode glow + hints |
-| `selectedName` | string | prop name when exactly one prop is click-selected |
+| `selectedName` | string | name when exactly one prop/surface is click-selected |
 | `panelX`, `panelY` | int | saved panel position (px; −1 = default) |
 | `randomVariation` | bool | Original/Random paste toggle |
+| `roadSnap` | bool | Road snap switch (row visible while Buildings filter on) |
+| `buildingProps` | bool | Building elements switch — selection may reach building-owned props/trees/decals/surfaces; off = not even click |
+| `selectionFilters` | int | bitmask: 1 Props, 2 Trees, 4 Decals, 8 Surfaces, 16 Buildings |
+| `relocateReady`, `relocating` | bool | Relocate button enable / lit state + hint |
 | `alignGapLive` | float | current session gap (−1 = no session) |
 | `alignSessionSource` | int | 0 none / 1 Line / 2 To prop / 3 Circle |
-| `selectionList` | string | `idx:ver:name` lines for selections of 2–15 |
+| `selectionList` | string | `idx:ver:name` lines for selections of 2–50 |
 
 Triggers (UI → C#): `toggleTool`, `actionCopy`, `actionPaste`, `actionDelete`,
-`actionUndo`, `actionSelectSame`, `actionSnapGround`, `actionMatchHeight`,
+`actionUndo`, `actionRedo`, `actionRelocate`, `clearClipboard`,
+`actionSelectSame`, `actionSnapGround`, `actionMatchHeight`,
 `actionRotate(int degrees)`, `actionHeight(int steps)`,
 `actionAlignLine(gap)`, `actionAlignRef(gap)`, `actionAlignCircle(gap)`,
 `adjustAlignGap(int dir)`, `setAlignGapLive(gap)`, `setRandomVariation(bool)`,
+`setRoadSnap(bool)`, `setBuildingProps(bool)`, `toggleSelectionFilter(int bit)`,
+`soloSelectionFilter(int bit)` (right-click solo: only that category, or all
+back if it was already alone),
 `saveBlueprint`, `loadBlueprint(name)`, `deleteBlueprint(name)`,
 `renameBlueprint("old\nnew")`, `setTyping(bool)`, `setPanelPos("x,y")`,
 `focusProp("idx:ver")`, `selectOnlyProp("idx:ver")`.

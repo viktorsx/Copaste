@@ -21,7 +21,7 @@ Copaste is built from four cooperating pieces:
 ```
 
 - **`Mod.cs`** implements `IMod`. `OnLoad` creates the settings, registers key
-  bindings, adds the EN/SR localization dictionaries, and locates the mod's
+  bindings, adds the EN/DE/FR/SR localization dictionaries, and locates the mod's
   install directory to register the `coui://copaste/` UI host for icons.
 - **`CopasteToolSystem`** derives from `Game.Tools.ToolBaseSystem`. It is the whole
   tool: selection, marquee, move/rotate/height editing, align tools, paste,
@@ -45,8 +45,10 @@ another tool takes over.
 `ResetToolState()` instead of letting the game's tool loop crash. This is a core
 safety rule — a bug in Copaste must degrade to "tool reset", never to a CTD.
 
-The tool has two modes (`Mode.Select` / `Mode.Paste`) with separate update
-paths: `UpdateSelectMode()` and `UpdatePasteMode()`.
+The tool has three modes (`Mode.Select` / `Mode.Paste` / `Mode.Relocate`)
+with separate update paths: `UpdateSelectMode()`, `UpdatePasteMode()` and
+`UpdateRelocateMode()` (see
+[buildings-and-surfaces.md](buildings-and-surfaces.md)).
 
 ## How props are placed (the definition pipeline)
 

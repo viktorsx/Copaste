@@ -27,6 +27,8 @@ namespace Copaste
         public const string kRaiseAction = "CopasteRaise";
         public const string kLowerAction = "CopasteLower";
         public const string kUndoAction = "CopasteUndo";
+        public const string kRedoAction = "CopasteRedo";
+        public const string kRelocateAction = "CopasteRelocate";
         public const string kSelectSameAction = "CopasteSelectSame";
         public const string kSnapGroundAction = "CopasteSnapGround";
         public const string kMatchHeightAction = "CopasteMatchHeight";
@@ -69,6 +71,14 @@ namespace Copaste
         [SettingsUIKeyboardBinding(BindingKeyboard.Z, kUndoAction, ctrl: true)]
         [SettingsUISection(kKeybindingsTab, kEditingGroup)]
         public ProxyBinding UndoBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.Y, kRedoAction, ctrl: true)]
+        [SettingsUISection(kKeybindingsTab, kEditingGroup)]
+        public ProxyBinding RedoBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.Tab, kRelocateAction)]
+        [SettingsUISection(kKeybindingsTab, kEditingGroup)]
+        public ProxyBinding RelocateBinding { get; set; }
 
         [SettingsUIKeyboardBinding(BindingKeyboard.T, kSelectSameAction)]
         [SettingsUISection(kKeybindingsTab, kEditingGroup)]
@@ -121,12 +131,48 @@ namespace Copaste
         [SettingsUIHidden]
         public bool RandomPasteVariation { get; set; } = false;
 
+        // Zgrade u selekciji (v1.1 "Buildings"): kad je uključeno, klik/marquee/Ctrl+klik
+        // biraju i zgrade — copy/paste/blueprint rade, transformacije ih preskaču (faza 2).
+        // Selection filteri (panel kartica "Selection"): svaka kategorija se
+        // pali/gasi nezavisno. Podrazumevano sve sem zgrada (siguran default).
+        [SettingsUIHidden]
+        public bool SelectProps { get; set; } = true;
+
+        [SettingsUIHidden]
+        public bool SelectTrees { get; set; } = true;
+
+        [SettingsUIHidden]
+        public bool SelectDecals { get; set; } = true;
+
+        [SettingsUIHidden]
+        public bool SelectSurfaces { get; set; } = true;
+
+        [SettingsUIHidden]
+        public bool SelectBuildings { get; set; } = false;
+
+        // Road snap pri paste-u zgrada: sidro-zgrada se lepi na najbližu ivicu
+        // puta kao kod običnog plopovanja, grupa prati.
+        [SettingsUIHidden]
+        public bool RoadSnapPaste { get; set; } = true;
+
+        // Marquee sme da hvata i propove koji pripadaju zgradama (klik ih
+        // uvek može izabrati, ovo otvara samo box select). Default isključeno.
+        [SettingsUIHidden]
+        public bool SelectBuildingProps { get; set; } = false;
+
         public override void SetDefaults()
         {
             AnarchyPaste = true;
             PanelX = -1;
             PanelY = -1;
             RandomPasteVariation = false;
+            SelectProps = true;
+            SelectTrees = true;
+            SelectDecals = true;
+            SelectSurfaces = true;
+            SelectBuildings = false;
+            RoadSnapPaste = true;
+            SelectBuildingProps = false;
         }
     }
 }
