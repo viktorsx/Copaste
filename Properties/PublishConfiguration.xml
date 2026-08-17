@@ -1,7 +1,7 @@
 <Publish>
   <ModId Value="154371" />
   <DisplayName Value="Copaste" />
-  <ShortDescription Value="Copy &amp; paste props and buildings — select, move, relocate, blueprint and stamp whole scenes" />
+  <ShortDescription Value="Copy &amp; paste props and buildings â€” select, move, relocate, blueprint and stamp whole scenes" />
   <LongDescription>## Copaste
 Copy and paste for props and buildings. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
 
@@ -40,10 +40,10 @@ Source code (MIT): https://github.com/viktorsx/Copaste
 ## Credits &amp; thanks
 Copaste started as a personal tool and grew into this release. It was written from scratch, but the patterns and APIs were learned from open-source mods whose MIT and Apache-2.0 licenses explicitly welcome that. Sincere thanks to:
 
-- **yenyang** — selection, highlighting and raycasting patterns learned from *Better Bulldozer*, *Anarchy*, *Tree Controller* and *Move It*; Anarchy's PreventOverride is integrated at runtime when present
-- **algernon** — the object placement approach (the game's definition pipeline) learned from *Line Tool*
-- **Bruceyboy24804** — *Node Controller* served as the reference for mod UI integration
-- **Colossal Order &amp; Paradox** — for Cities: Skylines II and the official modding documentation
+- **yenyang** â€” selection, highlighting and raycasting patterns learned from *Better Bulldozer*, *Anarchy*, *Tree Controller* and *Move It*; Anarchy's PreventOverride is integrated at runtime when present
+- **algernon** â€” the object placement approach (the game's definition pipeline) learned from *Line Tool*
+- **Bruceyboy24804** â€” *Node Controller* served as the reference for mod UI integration
+- **Colossal Order &amp; Paradox** â€” for Cities: Skylines II and the official modding documentation
 - The **CS2 modding community** for keeping their mods open source
 
 ### Special thanks
@@ -59,9 +59,6 @@ A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNe
   <Screenshot Value="Properties/Screenshots/s8.jpg" />
   <Screenshot Value="Properties/Screenshots/s9.jpg" />
   <Screenshot Value="Properties/Screenshots/s10.jpg" />
-  <Screenshot Value="Properties/Screenshots/s11.jpg" />
-  <Screenshot Value="Properties/Screenshots/s12.jpg" />
-  <Screenshot Value="Properties/Screenshots/s13.jpg" />
   <Tag Value="Code Mod" />
   <ForumLink Value="" />
   <ModVersion Value="1.1.0" />
@@ -92,31 +89,6 @@ Editing
 
 Panel
 - New COPASTE logo, bigger text everywhere, version tucked to the right, refreshed layout: Paste look and Road snap live under Clipboard, Ground and Match H joined the Align card
-- The Selected props list now covers selections up to 50 (was 15)
-
-Previous release notes (1.0.6):
-
-Panel
-- Complete visual redesign: grouped cards, icons on every button, clear button states, readable counters
-- The panel can now be dragged by its header and remembers its position between sessions
-- Single click-selected props show their name in the panel (marquee selections don't)
-- Small selections (up to 15 props) get a Selected props list in the panel: hovering an entry rings that prop in the world, clicking it keeps only that prop selected - handy when a prop is hard to click directly
-- Blueprint and selected props lists are paged: 5 per page with arrows in the section header
-
-Editing
-- Pasted props now keep the original's look by default - both the game's color variation and any custom color picked in the Customization tab. The Original/Random toggle in the panel restores the old random behavior
-- The paste preview shows the real colors too, instead of shuffling them while you move
-- Undo of a delete also restores the original colors now
-- New Align tools: Line makes a tidy row - straight line, equal gaps and all props rotated the same way; To prop does the same anchored to a reference prop you click (its position, facing and rotation); Circle arranges the selection evenly on a circle. The gap stepper sets exact meters; while an align button is lit, [ and ] keys (rebindable) or the stepper resize the layout live
-- Alt+drag moves a single prop out of the selection; Alt+mouse wheel spins every selected prop around its own axis (15 degree steps)
-- Ctrl+click cycles through props around the click point - picks up props partially buried in other objects or buildings that a normal click can never reach; click the same spot again to go to the next one
-- Move drag no longer jerks at the start - the selection follows the cursor smoothly from the first frame
-- Nudge (Ctrl+arrows) step halved for finer control
-
-Blueprints
-- Blueprints now store color variations and custom colors too; older blueprint files still load fine
-
-Options
-- Mod settings are now split into General and Key bindings tabs, with key bindings grouped by what they do</ChangeLog>
+- The Selected props list now covers selections up to 50 (was 15)</ChangeLog>
   <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
 </Publish>
