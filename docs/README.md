@@ -9,6 +9,7 @@ modding surface that shaped the design.
 
 | Document | Covers |
 |---|---|
+| [features.md](features.md) | **User-facing reference of every feature** - selection, buildings, surfaces, editing, blueprints, panel, languages, safety |
 | [architecture.md](architecture.md) | Big picture: systems, lifecycle, data flow, safety principles |
 | [tool-system.md](tool-system.md) | `CopasteToolSystem` select mode: raycast, selection, marquee, move drag, rotation, height, nudge, Ctrl+click cycle picking |
 | [clipboard-and-paste.md](clipboard-and-paste.md) | Clipboard model, the definition pipeline, paste preview, post-paste fix-up, color/variation preservation |

@@ -24,6 +24,9 @@ It was built by studying the source code of the excellent open-source mods credi
 
 ## ✨ Features
 
+The short version. The complete reference with every detail is in
+[docs/features.md](docs/features.md).
+
 - **Click & marquee selection** - click individual items, or drag a camera-aligned box on the ground to select whole groups at once (live highlight while dragging). Works on props, decals, trees, painted surfaces **and buildings**
 - **Selection filters** - five toggle chips in the panel (Props, Trees, Decals, Surfaces, Buildings) control what selection picks up; right-click a chip to solo it (right-click again to bring all back). Buildings are off by default
 - **Buildings** *(new in 1.1.0)* - move, rotate, raise/lower, copy, paste, blueprint and delete whole buildings **with everything they own**: driveways, pavements, purchased upgrades and attached props move as one piece. A **Relocate** mode walks the selected building to a new spot with live road snapping; **Road snap** also auto-faces pasted buildings to the nearest road. Buildings under construction can be deleted (with undo) but not moved
