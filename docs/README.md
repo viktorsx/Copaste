@@ -41,7 +41,31 @@ ui/
 
 ## Reading order
 
-If you are new to CS2 modding, read `architecture.md` first — it explains the ECS
-systems the mod plugs into and the rules the game imposes. Then follow whatever
-module you care about. Each document ends with a **Gotchas** section listing the
-mistakes we already made so you don't repeat them.
+**Players** need only two pages: [features.md](features.md) for what the mod
+can do, and [commands.md](commands.md) for every control.
+
+**Modders and contributors:**
+
+1. [architecture.md](architecture.md) - start here: the ECS systems the mod
+   plugs into and the rules the game imposes
+2. [tool-system.md](tool-system.md) - the select mode: raycast, selection,
+   marquee, move drag, rotation, height, nudge, cycle picking
+3. [clipboard-and-paste.md](clipboard-and-paste.md) - the clipboard model,
+   the definition pipeline, post-paste fix-up, color preservation
+4. [buildings-and-surfaces.md](buildings-and-surfaces.md) - everything about
+   buildings and painted surfaces: sub-tree moves, relocate, road snap, lot
+   transplant, the regeneration story
+5. [undo.md](undo.md) - undo and redo stacks, snapshots, recreating deleted
+   objects, history remapping
+6. [align.md](align.md) - align tools and the live gap session
+7. [blueprints.md](blueprints.md) - the blueprint file format (all versions)
+   and save/load
+8. [ui.md](ui.md) - the cohtml panel: bindings, triggers, Gameface engine
+   constraints
+9. [settings-and-input.md](settings-and-input.md) - settings, key bindings,
+   localization (four languages)
+10. [build-and-deploy.md](build-and-deploy.md) - building from source and
+    local deploy
+
+Each developer document ends with a **Gotchas** section listing the mistakes
+we already made so you don't repeat them.
