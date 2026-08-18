@@ -98,6 +98,20 @@ Available since 1.1.0, behind the Buildings filter chip.
 
 ## Editing
 
+- **Move**: drag any selected object and the whole selection follows the
+  mouse, layout and heights preserved.
+- **Group rotation**: hold the right mouse button and drag to rotate the
+  selection (or the paste preview) around its center; hold **Alt** while
+  dragging to snap to 45 degree steps. The panel also has 45 degree left and
+  right buttons.
+- **Alt + drag**: pulls a single object out of the selection and moves only
+  it - the rest stays put. Handy for nudging one prop of a group into place.
+- **Alt + mouse wheel**: spins every selected object around its own axis, 15
+  degrees per notch - great after a Line align to vary the facing.
+- **Height**: PgUp/PgDn raise and lower the selection (hold for continuous),
+  End drops it back to the terrain, Home arms height picking - the next
+  object you click sets the height for the whole selection.
+- **Nudge**: Ctrl+arrows fine-position the selection relative to the camera.
 - **Undo (Ctrl+Z)**: reverts the last action - move, rotate, align, height,
   nudge, delete, paste or relocate - up to 32 steps. Deleted trees come back
   with their growth stage and colors.
@@ -108,11 +122,13 @@ Available since 1.1.0, behind the Buildings filter chip.
   prop you click. **Circle** arranges the selection evenly on a circle.
   While an align button is lit, [ and ] keys or the panel stepper resize the
   layout live; the gap can be typed in exact meters.
-- **Per-prop touch-ups**: Alt+drag moves a single prop out of the selection;
-  Alt+mouse wheel spins every selected prop around its own axis (15 degrees
-  per notch).
-- **Nudge**: Ctrl+arrows fine-position the selection relative to the camera.
 - **Delete (Del)** removes the whole selection at once.
+
+## Controls
+
+Every mouse input, keyboard shortcut and panel control is listed with an
+explanation in [commands.md](commands.md). All keyboard shortcuts are
+rebindable in Options.
 
 ## Blueprints
 

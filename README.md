@@ -53,6 +53,9 @@ The short version. The complete reference with every detail is in
 
 ## 🎮 Controls (defaults)
 
+The quick table. Every command with a full explanation, panel controls
+included, is in [docs/commands.md](docs/commands.md).
+
 | Action | Input |
 |---|---|
 | Toggle tool | **Ctrl+Shift+C** or the toolbar button |
