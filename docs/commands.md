@@ -6,7 +6,7 @@ For what the features do in depth, see [features.md](features.md).
 
 ## Mouse
 
-| Input | What it does |
+| **Input** | What it does |
 |---|---|
 | **Left click on an object** | Selects it (white ring on hover, blue when selected) |
 | **Left click on empty ground** | Clears the selection |
@@ -21,7 +21,7 @@ For what the features do in depth, see [features.md](features.md).
 
 ## Keyboard (defaults)
 
-| Key | Command | What it does |
+| **Key** | Command | What it does |
 |---|---|---|
 | **Ctrl+Shift+C** | Toggle tool | Turns Copaste on or off (same as the toolbar button) |
 | **Ctrl+C** | Copy | Copies the selection to the clipboard with layout, heights and colors |
@@ -39,7 +39,7 @@ For what the features do in depth, see [features.md](features.md).
 
 ## Panel
 
-| Control | What it does |
+| **Control** | What it does |
 |---|---|
 | **Selection chips (Props, Trees, Decals, Surfaces, Buildings)** | Decide what selection grabs; any mix works. Right-click a chip to solo it, right-click the solo chip again to bring all back. Buildings are off by default |
 | **Building elements switch** | When on, selection also reaches things owned by buildings (their props, trees, decals and lot surfaces), each still following its chip. When off, nothing building-owned can be selected |
