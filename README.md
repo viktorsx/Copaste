@@ -94,6 +94,10 @@ Buildings are selectable since 1.1.0 behind the **Buildings** filter chip (off b
 
 To keep the game responsive, selection is capped at **1000 props** and selection circles are drawn for at most 400 at a time (everything selected is still highlighted). The tool guards its own update loop, so an unexpected error disables the current action instead of crashing the game.
 
+## 🐛 Bug reports & feedback
+
+Found a problem? [Open a bug report](https://github.com/viktorsx/Copaste/issues/new?template=bug_report.yml): the form asks for the few things needed to fix it, including the **Copaste.log** file (the form shows where it lives). Ideas go to a [feature request](https://github.com/viktorsx/Copaste/issues/new?template=feature_request.yml), questions to the [forum thread](https://forum.paradoxplaza.com/forum/threads/copaste-1-1-0-copy-paste-for-props-and-now-buildings.1938698/). Every report gets read.
+
 ## 📚 Developer documentation
 
 Detailed docs for every part of the code live in [`docs/`](docs/README.md) - 

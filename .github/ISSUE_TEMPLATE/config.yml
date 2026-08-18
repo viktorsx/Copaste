@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://forum.paradoxplaza.com/forum/threads/copaste-1-1-0-copy-paste-for-props-and-now-buildings.1938698/
+    about: Ask on the Paradox forum thread. Bug reports belong here on GitHub so the log can be attached.
+  - name: Paradox Mods page
+    url: https://mods.paradoxplaza.com/mods/154371/Windows
+    about: Download, screenshots and changelog.

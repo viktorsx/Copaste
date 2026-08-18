@@ -1,0 +1,87 @@
+name: Bug report
+description: Something in Copaste does not work as expected
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Every report is read, and the log file is what makes most of them fixable, so please attach it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, and what happened instead? Step by step is ideal.
+      placeholder: |
+        1. Selected a house with the Buildings filter on
+        2. Pressed Tab to relocate it
+        3. Expected it to follow the cursor, but ...
+    validations:
+      required: true
+
+  - type: input
+    id: mod-version
+    attributes:
+      label: Copaste version
+      description: Shown in the panel header (e.g. 1.1.0)
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version
+      description: Shown in the game's main menu (e.g. 1.6.2f1)
+      placeholder: "1.6.x"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen
+      options:
+        - Every time
+        - Sometimes
+        - Happened once
+    validations:
+      required: true
+
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods that might be involved
+      description: Especially Move It, Anarchy, Better Bulldozer, Line Tool or anything else that touches props or buildings.
+      placeholder: "Anarchy, Move It, ..."
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log files
+      description: |
+        Please attach **Copaste.log** (drag and drop the file into this box). If the game crashed, add **Player.log** too.
+        Location on Windows:
+        `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Copaste.log`
+        `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Player.log`
+        (Paste the first path into the Explorer address bar to jump straight to it.)
+      placeholder: Drag and drop Copaste.log here
+    validations:
+      required: true
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshot or video
+      description: Optional but very helpful, especially for selection and placement issues.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on the latest Copaste version from Paradox Mods
+          required: true
+        - label: I searched existing issues and did not find this one
+          required: true
