@@ -1,7 +1,7 @@
 <Publish>
  <ModId Value="154371" />
  <DisplayName Value="Copaste" />
- <ShortDescription Value="Copy &amp; paste props and buildings - select, move, relocate, blueprint and stamp whole scenes" />
+ <ShortDescription Value="Copy paste tool for props, trees, decals, surfaces and buildings: select, move, rotate, delete, relocate, blueprints, undo redo" />
  <LongDescription>## Copaste
 Copy and paste for props and buildings. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
 
