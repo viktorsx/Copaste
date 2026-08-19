@@ -7,6 +7,7 @@
 
 <p align="center">
  <a href="https://mods.paradoxplaza.com/mods/154371/Windows"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.paradox-interactive.com%2Fmods%3FmodId%3D154371%26os%3Dwindows&query=%24.modDetail.subscriptions&label=Paradox%20Mods&suffix=%20subscribers&color=45a06c" alt="Paradox Mods subscribers"></a>
+ <a href="https://mods.paradoxplaza.com/mods/154371/Windows"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.paradox-interactive.com%2Fmods%3FmodId%3D154371%26os%3Dwindows&query=%24.modDetail.rating&label=rating&suffix=%2F5&color=f1c40f" alt="Paradox Mods rating"></a>
  <a href="https://github.com/viktorsx/Copaste/releases/latest"><img src="https://img.shields.io/github/v/release/viktorsx/Copaste?label=version&color=3d7dca" alt="Latest release"></a>
  <img src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6.*-e8964a" alt="Game version">
  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8a67c0" alt="MIT license"></a>
