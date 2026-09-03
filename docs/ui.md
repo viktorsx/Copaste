@@ -18,17 +18,27 @@ The game imports the module and calls the default export with a
 
 ### Toolbar button
 
-Uses the vanilla `Button` from `cs2/ui` with `variant: "floating"` — the same
-pattern Traffic and Node Controller use. No custom classes: the game (or theme
-mods like Redesigned Top Buttons) fully controls its look. The icon is our SVG.
+Uses the vanilla `Button` from `cs2/ui` with `variant: "floating"`.
+No custom classes: the game (or theme
+mods) fully controls its look. The icon is our SVG.
 
 ### Panel
 
-A single `CopastePanel` component: header (drag handle), stats card
-(Selected/Clipboard counters + conditional Prop-name and Filter rows),
-"Selected props" paged list, Clipboard/Edit/Rotate&Align cards, Blueprints
-paged list, hint footer. All state arrives through value bindings; all actions
-leave through triggers.
+A single `CopastePanel` component: header (drag handle; the logo's tooltip
+carries the how-to hint), stats card (Selected/Clipboard counters, an
+Underground toggle button while the Networks chip is on, plus conditional
+Prop-name and Filter rows), "Selected props" paged list,
+Clipboard/Edit/Rotate&Align cards and the Blueprints paged list. All state
+arrives through value bindings; all actions leave through triggers.
+
+Two render paths, chosen by the **Panel theme** option: the Copaste theme
+draws the panel with the mod's own chrome, while **Vanilla** hosts the same
+body inside the game's `Panel` component from `cs2/ui` (game colors and
+header; dragging goes through the game's header). Without `ui.Panel`
+(older game builds) Vanilla falls back to a CSS variant driven by the
+game's `--panelColor*`/`--accentColor*` variables. **Text size** sets a
+`font-size` on the panel root — every inner text size is in `em`, so
+lettering scales without changing the panel's layout.
 
 The panel is draggable by its header: mouse deltas are applied to `top/left`
 in **pixels**, and the final position is persisted via the `setPanelPos`
@@ -45,6 +55,7 @@ Value bindings (C# → UI), group `copaste`:
 | `toolActive` | bool | panel visibility |
 | `pasteMode` | bool | Paste button glow + hint text |
 | `selectedCount`, `clipboardCount`, `undoCount`, `redoCount` | int | counters / enablement |
+| `copyableCount`, `deletableCount` | int | what Copy and Delete would act on — gate those buttons |
 | `propCount` | int | selected non-building objects — gates align buttons |
 | `heightCount` | int | selected height targets (props + finished buildings) — gates height buttons |
 | `blueprints` | string | newline-separated names |
@@ -55,7 +66,10 @@ Value bindings (C# → UI), group `copaste`:
 | `randomVariation` | bool | Original/Random paste toggle |
 | `roadSnap` | bool | Road snap switch (row visible while Buildings filter on) |
 | `buildingProps` | bool | Building elements switch — selection may reach building-owned props/trees/decals/surfaces; off = not even click |
-| `selectionFilters` | int | bitmask: 1 Props, 2 Trees, 4 Decals, 8 Surfaces, 16 Buildings |
+| `selectionFilters` | int | bitmask: 1 Props, 2 Trees, 4 Decals, 8 Surfaces, 16 Buildings, 32 Fences, 64 Networks |
+| `uiTheme` | int | 0 Copaste theme, 1 Vanilla (native game panel) |
+| `underground` | bool | underground view state (the stats-row button) |
+| `panelScale`, `textScale` | int | the Options sliders in %, panel chrome and text |
 | `relocateReady`, `relocating` | bool | Relocate button enable / lit state + hint |
 | `alignGapLive` | float | current session gap (−1 = no session) |
 | `alignSessionSource` | int | 0 none / 1 Line / 2 To prop / 3 Circle |
@@ -70,6 +84,7 @@ Triggers (UI → C#): `toggleTool`, `actionCopy`, `actionPaste`, `actionDelete`,
 `setRoadSnap(bool)`, `setBuildingProps(bool)`, `toggleSelectionFilter(int bit)`,
 `soloSelectionFilter(int bit)` (right-click solo: only that category, or all
 back if it was already alone),
+`toggleUnderground`,
 `saveBlueprint`, `loadBlueprint(name)`, `deleteBlueprint(name)`,
 `renameBlueprint("old\nnew")`, `setTyping(bool)`, `setPanelPos("x,y")`,
 `focusProp("idx:ver")`, `selectOnlyProp("idx:ver")`.

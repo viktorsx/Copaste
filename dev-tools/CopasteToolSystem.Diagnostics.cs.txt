@@ -1,0 +1,791 @@
+// Copaste — dijagnostika kopiranja mreža.
+//
+// Alat nema oči u igri: kad nalepljena raskrsnica "nije spojena" ili se
+// "trake pomere", jedini pouzdan opis je struktura pre i posle. Zato svaki
+// copy/paste puteva upiše kompletnu sliku u ModsData/Copaste/diagnostics.txt
+// (jedan fajl, prepisuje se): izvorni graf, tabela čvorova, nalepljeni graf i
+// direktno poređenje — koliko je spojeva očekivano, koliko ih se stvarno
+// napravilo i koliko je geometrija odlutala.
+//
+// Ovo je RAZVOJNI alat: piše se samo na copy/paste mreže (nikad po frejmu) i
+// sve je u try/catch — pad dijagnostike ne sme da obori alat.
+
+namespace Copaste
+{
+    using System.Collections.Generic;
+    using System.Globalization;
+    using System.Text;
+    using Colossal.Collections;
+    using Colossal.Entities;
+    using Colossal.Mathematics;
+    using Game.Common;
+    using Game.Prefabs;
+    using Unity.Collections;
+    using Unity.Entities;
+    using Unity.Jobs;
+    using Unity.Mathematics;
+
+    public partial class CopasteToolSystem
+    {
+        private static string DiagnosticsPath =>
+            System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "ModsData", "Copaste", "diagnostics.txt");
+
+        private static readonly CultureInfo kDiagCulture = CultureInfo.InvariantCulture;
+
+        // Snimak izvorne mreže u trenutku kopiranja — osnova za poređenje
+        // posle lepljenja (isti broj deonica? isti spojevi? iste dužine?).
+        private struct DiagSourceEdge
+        {
+            public string m_Prefab;
+            public int m_StartNode;
+            public int m_EndNode;
+            public float m_Length;
+            public float3 m_Start;
+            public float3 m_End;
+
+            // Pozicije cvorova na koje se deonica kaci. Igra pravi ivicu tako
+            // da su krajevi krive BAS te tacke (GenerateEdgesSystem), pa svako
+            // odstupanje ovde znaci da je nesto posle toga pomerilo krivu.
+            public float3 m_StartNodePos;
+            public float3 m_EndNodePos;
+
+            public bool m_HasUpgrade;
+            public CompositionFlags m_Upgrade;
+
+            public float3 m_B;
+            public float3 m_C;
+        }
+
+        private struct DiagNode
+        {
+            public float3 m_Position;
+            public bool m_HasUpgrade;
+            public CompositionFlags m_Upgrade;
+            public bool m_Roundabout;
+            public bool m_TrafficLights;
+        }
+
+        private readonly List<DiagSourceEdge> m_DiagSourceEdges = new List<DiagSourceEdge>();
+        private readonly List<DiagNode> m_DiagSourceNodes = new List<DiagNode>();
+        private int m_DiagSourceNodeCount;
+
+        // ---------- COPY ----------
+
+        partial void DiagCaptureSource(List<Entity> edges, Dictionary<Entity, int> nodeIndices)
+        {
+            // Pečat klipborda: izvor važi samo dok se klipbord ne zameni.
+            m_DiagSourceGeneration = m_ClipboardNetGeneration;
+
+            m_DiagSourceEdges.Clear();
+            m_DiagSourceNodeCount = nodeIndices.Count;
+
+            // Cvorovi po indeksu tabele: flagovi + izvedene komponente.
+            m_DiagSourceNodes.Clear();
+            for (int i = 0; i < nodeIndices.Count; i++)
+            {
+                m_DiagSourceNodes.Add(default);
+            }
+
+            foreach (KeyValuePair<Entity, int> pair in nodeIndices)
+            {
+                if (!EntityManager.TryGetComponent(pair.Key, out Game.Net.Node nodeData))
+                {
+                    continue;
+                }
+
+                bool nodeHasUpgrade = EntityManager.TryGetComponent(pair.Key, out Game.Net.Upgraded nodeUpgrade);
+                m_DiagSourceNodes[pair.Value] = new DiagNode
+                {
+                    m_Position = nodeData.m_Position,
+                    m_HasUpgrade = nodeHasUpgrade,
+                    m_Upgrade = nodeHasUpgrade ? nodeUpgrade.m_Flags : default,
+                    m_Roundabout = EntityManager.HasComponent<Game.Net.Roundabout>(pair.Key),
+                    m_TrafficLights = EntityManager.HasComponent<Game.Net.TrafficLights>(pair.Key),
+                };
+            }
+
+            foreach (Entity edge in edges)
+            {
+                if (!EntityManager.TryGetComponent(edge, out Game.Net.Curve curve) ||
+                    !EntityManager.TryGetComponent(edge, out Game.Net.Edge edgeData))
+                {
+                    continue;
+                }
+
+                EntityManager.TryGetComponent(edgeData.m_Start, out Game.Net.Node startNode);
+                EntityManager.TryGetComponent(edgeData.m_End, out Game.Net.Node endNode);
+                bool diagHasUpgrade = EntityManager.TryGetComponent(edge, out Game.Net.Upgraded diagUpgrade);
+                m_DiagSourceEdges.Add(new DiagSourceEdge
+                {
+                    m_HasUpgrade = diagHasUpgrade,
+                    m_Upgrade = diagHasUpgrade ? diagUpgrade.m_Flags : default,
+                    m_B = curve.m_Bezier.b,
+                    m_C = curve.m_Bezier.c,
+                    m_Prefab = DiagPrefabName(edge),
+                    m_StartNode = nodeIndices.TryGetValue(edgeData.m_Start, out int si) ? si : -1,
+                    m_EndNode = nodeIndices.TryGetValue(edgeData.m_End, out int ei) ? ei : -1,
+                    m_Length = MathUtils.Length(curve.m_Bezier),
+                    m_Start = curve.m_Bezier.a,
+                    m_End = curve.m_Bezier.d,
+                    m_StartNodePos = startNode.m_Position,
+                    m_EndNodePos = endNode.m_Position,
+                });
+            }
+        }
+
+        // ---------- PASTE ----------
+
+        partial void DiagWriteReport(List<PastedRecord> records)
+        {
+            try
+            {
+                StringBuilder text = new StringBuilder();
+                text.AppendLine("=== Copaste network diagnostics ===");
+                text.AppendLine();
+
+                // Svaki izveštaj računa SVOJE ishodište nalepljenih čvorova —
+                // keš iz prvog lepljenja je svako sledeće poredio prema
+                // pogrešnoj tački mape.
+                m_DiagPastedOriginValid = false;
+
+                // Snimak izvora postoji samo posle KOPIRANJA mreze. Kad se
+                // lepi ucitan blueprint, izvora nema — ranije se izvestaj
+                // tada uopste nije pisao, pa nije bilo sta da se gleda bas u
+                // slucaju koji se testira.
+                // Snimak izvora važi samo za klipbord od kog je nastao:
+                // paste blueprinta posle ranijeg copy-ja iz grada bi inače
+                // pisao COMPARISON prema nepovezanom snimku.
+                if (m_DiagSourceEdges.Count > 0 && m_DiagSourceGeneration == m_ClipboardNetGeneration)
+                {
+                    DiagWriteSource(text);
+                }
+                else
+                {
+                    text.AppendLine(m_DiagSourceEdges.Count > 0
+                        ? "SOURCE: snimak je od STARIJEG kopiranja (klipbord u međuvremenu zamenjen) — preskočeno"
+                        : "SOURCE: nema snimka (nalepljen blueprint, nije kopirano iz grada)");
+                    text.AppendLine();
+                }
+
+                DiagWriteNodeTable(text);
+                DiagWritePasted(text, records, out List<DiagSourceEdge> pasted, out int unresolved);
+                DiagWriteComparison(text, pasted, unresolved);
+                DiagWorldScan(text, records);
+
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(DiagnosticsPath));
+                System.IO.File.WriteAllText(DiagnosticsPath, text.ToString());
+                Mod.Log.Info($"Copaste: diagnostics written to {DiagnosticsPath}");
+            }
+            catch (System.Exception e)
+            {
+                Mod.Log.Warn($"Copaste: diagnostics failed: {e.Message}");
+            }
+        }
+
+        private void DiagWriteSource(StringBuilder text)
+        {
+            text.AppendLine($"SOURCE: {m_DiagSourceEdges.Count} edges over {m_DiagSourceNodeCount} nodes");
+            text.AppendLine($"  junctions expected (shared node ends): {(m_DiagSourceEdges.Count * 2) - m_DiagSourceNodeCount}");
+            text.AppendLine("  degree histogram: " + DiagDegrees(m_DiagSourceEdges));
+            text.AppendLine();
+
+            // Kljucna kolona: gapS/gapE = koliko je kraj krive udaljen od
+            // pozicije cvora. Igra to pravi kao nulu; sve preko toga objasnjava
+            // i krivudanje i spojeve koji se ne naprave.
+            text.AppendLine("  # | prefab | startNode | endNode | length | gapS | gapE | start xyz | end xyz");
+            float worstGap = 0f;
+            for (int i = 0; i < m_DiagSourceEdges.Count; i++)
+            {
+                DiagSourceEdge e = m_DiagSourceEdges[i];
+                float gapStart = math.distance(e.m_Start, e.m_StartNodePos);
+                float gapEnd = math.distance(e.m_End, e.m_EndNodePos);
+                worstGap = math.max(worstGap, math.max(gapStart, gapEnd));
+                text.AppendLine($"  {i,3} | {e.m_Prefab} | {e.m_StartNode,3} | {e.m_EndNode,3} | {e.m_Length,8:F2} | {gapStart,7:F3} | {gapEnd,7:F3} | {DiagPoint(e.m_Start)} | {DiagPoint(e.m_End)}");
+            }
+
+            text.AppendLine();
+            text.AppendLine($"  worst curve-end vs node gap: {worstGap:F3} m (game builds these equal, so anything large is our bug)");
+
+            // Da li dve deonice koje dele cvor imaju isti kraj krive?
+            Dictionary<int, float3> firstEnd = new Dictionary<int, float3>();
+            float worstShared = 0f;
+            int sharedPairs = 0;
+            foreach (DiagSourceEdge edge in m_DiagSourceEdges)
+            {
+                worstShared = math.max(worstShared, DiagShared(firstEnd, edge.m_StartNode, edge.m_Start, ref sharedPairs));
+                worstShared = math.max(worstShared, DiagShared(firstEnd, edge.m_EndNode, edge.m_End, ref sharedPairs));
+            }
+
+            text.AppendLine($"  shared-node endpoint spread: {worstShared:F3} m over {sharedPairs} shared end(s)");
+            text.AppendLine();
+
+            text.AppendLine("  SOURCE NODES: idx | flags g/l/r | roundabout | lights | xyz");
+            for (int i = 0; i < m_DiagSourceNodes.Count; i++)
+            {
+                DiagNode node = m_DiagSourceNodes[i];
+                text.AppendLine($"  {i,3} | {DiagFlags(node.m_HasUpgrade, node.m_Upgrade)} | {(node.m_Roundabout ? "RA" : "--")} | {(node.m_TrafficLights ? "TL" : "--")} | {DiagPoint(node.m_Position)}");
+            }
+
+            text.AppendLine();
+            text.AppendLine("  SOURCE EDGE UPGRADES: # | flags g/l/r");
+            for (int i = 0; i < m_DiagSourceEdges.Count; i++)
+            {
+                DiagSourceEdge edge = m_DiagSourceEdges[i];
+                if (edge.m_HasUpgrade)
+                {
+                    text.AppendLine($"  {i,3} | {DiagFlags(true, edge.m_Upgrade)}");
+                }
+            }
+
+            text.AppendLine();
+        }
+
+        private static string DiagFlags(bool has, CompositionFlags flags)
+        {
+            if (!has)
+            {
+                return "-";
+            }
+
+            return ((uint)flags.m_General).ToString(kDiagCulture) + "/" +
+                ((uint)flags.m_Left).ToString(kDiagCulture) + "/" +
+                ((uint)flags.m_Right).ToString(kDiagCulture) + " (" + flags.m_General.ToString() + ")";
+        }
+
+        private static float DiagShared(Dictionary<int, float3> firstEnd, int node, float3 point, ref int sharedPairs)
+        {
+            if (node < 0)
+            {
+                return 0f;
+            }
+
+            if (!firstEnd.TryGetValue(node, out float3 first))
+            {
+                firstEnd[node] = point;
+                return 0f;
+            }
+
+            sharedPairs++;
+            return math.distance(first, point);
+        }
+
+        private void DiagWriteNodeTable(StringBuilder text)
+        {
+            text.AppendLine($"CLIPBOARD NODE TABLE: {ClipboardNetNodeCount} entries (offset from centroid + height over terrain)");
+            for (int i = 0; i < ClipboardNetNodeCount; i++)
+            {
+                GetClipboardNetNode(i, out float2 offset, out float height);
+                text.AppendLine($"  {i,3} | {offset.x,10:F3} {offset.y,10:F3} | h {height,8:F3}");
+            }
+
+            text.AppendLine();
+        }
+
+        private void DiagWritePasted(StringBuilder text, List<PastedRecord> records, out List<DiagSourceEdge> pasted, out int unresolved)
+        {
+            pasted = new List<DiagSourceEdge>();
+            unresolved = 0;
+
+            // Čvorovi nalepljene mreže se numerišu redom pojavljivanja, da bi
+            // se graf mogao porediti sa izvornim bez obzira na ID-jeve.
+            Dictionary<Entity, int> nodeNumbers = new Dictionary<Entity, int>();
+            if (records != null)
+            {
+                foreach (PastedRecord record in records)
+                {
+                    if (!record.m_IsNetEdge)
+                    {
+                        continue;
+                    }
+
+                    if (record.m_Resolved == Entity.Null ||
+                        !EntityManager.TryGetComponent(record.m_Resolved, out Game.Net.Curve curve) ||
+                        !EntityManager.TryGetComponent(record.m_Resolved, out Game.Net.Edge edgeData))
+                    {
+                        unresolved++;
+                        continue;
+                    }
+
+                    pasted.Add(new DiagSourceEdge
+                    {
+                        m_B = curve.m_Bezier.b,
+                        m_C = curve.m_Bezier.c,
+                        m_Prefab = DiagPrefabName(record.m_Resolved),
+                        m_StartNode = DiagNodeNumber(nodeNumbers, edgeData.m_Start),
+                        m_EndNode = DiagNodeNumber(nodeNumbers, edgeData.m_End),
+                        m_Length = MathUtils.Length(curve.m_Bezier),
+                        m_Start = curve.m_Bezier.a,
+                        m_End = curve.m_Bezier.d,
+                    });
+                }
+            }
+
+            text.AppendLine($"PASTED: {pasted.Count} edges over {nodeNumbers.Count} nodes ({unresolved} unresolved)");
+            text.AppendLine($"  junctions formed: {(pasted.Count * 2) - nodeNumbers.Count}");
+            text.AppendLine("  degree histogram: " + DiagDegrees(pasted));
+            text.AppendLine();
+
+            text.AppendLine("  # | prefab | startNode | endNode | length | start xyz | end xyz");
+            for (int i = 0; i < pasted.Count; i++)
+            {
+                DiagSourceEdge e = pasted[i];
+                text.AppendLine($"  {i,3} | {e.m_Prefab} | {e.m_StartNode,3} | {e.m_EndNode,3} | {e.m_Length,8:F2} | {DiagPoint(e.m_Start)} | {DiagPoint(e.m_End)}");
+            }
+
+            text.AppendLine();
+        }
+
+        private void DiagWriteComparison(StringBuilder text, List<DiagSourceEdge> pasted, int unresolved)
+        {
+            int sourceJunctions = (m_DiagSourceEdges.Count * 2) - m_DiagSourceNodeCount;
+            int pastedNodes = DiagCountNodes(pasted);
+            int pastedJunctions = (pasted.Count * 2) - pastedNodes;
+
+            if (m_DiagSourceEdges.Count == 0)
+            {
+                // Bez izvora nema sta da se poredi — poredjenje po REDNOM
+                // BROJU je ionako varljivo cim neki zapis ostane nerazresen
+                // (ostatak se pomeri za jedno mesto pa "odstupanje duzine"
+                // pokaze desetine metara kojih nema).
+                text.AppendLine("COMPARISON: preskoceno (nema snimka izvora)");
+                return;
+            }
+
+            text.AppendLine("COMPARISON");
+            text.AppendLine($"  edges     : source {m_DiagSourceEdges.Count} -> pasted {pasted.Count} ({unresolved} unresolved)");
+            text.AppendLine($"  nodes     : source {m_DiagSourceNodeCount} -> pasted {pastedNodes}");
+            text.AppendLine($"  junctions : source {sourceJunctions} -> pasted {pastedJunctions}" +
+                (pastedJunctions < sourceJunctions ? $"   *** {sourceJunctions - pastedJunctions} MISSING ***" : "   (ok)"));
+
+            // Dužine po deonici: kad se "trake pomere", ovde se vidi koliko.
+            float maxDelta = 0f;
+            int worst = -1;
+            int comparable = math.min(m_DiagSourceEdges.Count, pasted.Count);
+            for (int i = 0; i < comparable; i++)
+            {
+                float delta = math.abs(m_DiagSourceEdges[i].m_Length - pasted[i].m_Length);
+                if (delta > maxDelta)
+                {
+                    maxDelta = delta;
+                    worst = i;
+                }
+            }
+
+            text.AppendLine($"  length    : max deviation {maxDelta:F3} m" + (worst >= 0 ? $" (edge #{worst})" : string.Empty));
+
+            // Tangente po kraju ivice (ugao ose u stepenima, xz ravan) i pomak
+            // kontrolnih tacaka u LOKALNOM prostoru - direktan dokaz da li je
+            // oblik ose identican originalu na spoju traka.
+            if (comparable > 0 && m_DiagSourceEdges.Count == pasted.Count)
+            {
+                text.AppendLine("  axis      : # | srcTanA->pasteTanA | srcTanD->pasteTanD | dB local | dC local (deg / m)");
+                for (int i = 0; i < comparable; i++)
+                {
+                    DiagSourceEdge src = m_DiagSourceEdges[i];
+                    DiagSourceEdge dst = pasted[i];
+                    float srcTanA = DiagAngle(src.m_B - src.m_Start);
+                    float dstTanA = DiagAngle(dst.m_B - dst.m_Start);
+                    float srcTanD = DiagAngle(src.m_End - src.m_C);
+                    float dstTanD = DiagAngle(dst.m_End - dst.m_C);
+                    float2 shift = dst.m_Start.xz - src.m_Start.xz;
+                    float dB = math.distance(dst.m_B.xz - shift, src.m_B.xz);
+                    float dC = math.distance(dst.m_C.xz - shift, src.m_C.xz);
+                    text.AppendLine($"  axis      : {i,3} | {srcTanA,7:F2} -> {dstTanA,7:F2} | {srcTanD,7:F2} -> {dstTanD,7:F2} | {dB,6:F2} | {dC,6:F2}");
+                }
+            }
+
+            // Flagovi cvorova: izvorni cvor sa nadogradnjama -> najblizi
+            // nalepljeni cvor (po xz, do 4 m) -> flagovi jedan pored drugog.
+            if (m_DiagSourceNodes.Count > 0)
+            {
+                HashSet<Entity> pastedNodeSet = new HashSet<Entity>();
+                foreach (PastedRecord record in m_PostPasteFix ?? new List<PastedRecord>())
+                {
+                    if (record.m_IsNetEdge && record.m_Resolved != Entity.Null &&
+                        EntityManager.TryGetComponent(record.m_Resolved, out Game.Net.Edge pastedEdgeData))
+                    {
+                        pastedNodeSet.Add(pastedEdgeData.m_Start);
+                        pastedNodeSet.Add(pastedEdgeData.m_End);
+                    }
+                }
+
+                // Pomeraj kopije u odnosu na original (prvi par) da poredjenje
+                // radi u lokalnom prostoru.
+                foreach (DiagNode source in m_DiagSourceNodes)
+                {
+                    if (!source.m_HasUpgrade && !source.m_Roundabout && !source.m_TrafficLights)
+                    {
+                        continue;
+                    }
+
+                    Entity best = Entity.Null;
+                    float bestDistance = float.MaxValue;
+                    foreach (Entity candidate in pastedNodeSet)
+                    {
+                        if (!EntityManager.TryGetComponent(candidate, out Game.Net.Node candidateNode))
+                        {
+                            continue;
+                        }
+
+                        // Poredjenje po OFSETU od prvog cvora obe grupe.
+                        float distance = math.distance(
+                            candidateNode.m_Position.xz - DiagPastedOrigin(pastedNodeSet),
+                            source.m_Position.xz - m_DiagSourceNodes[0].m_Position.xz);
+                        if (distance < bestDistance)
+                        {
+                            bestDistance = distance;
+                            best = candidate;
+                        }
+                    }
+
+                    string sourceText = DiagFlags(source.m_HasUpgrade, source.m_Upgrade) +
+                        (source.m_Roundabout ? " RA" : string.Empty) + (source.m_TrafficLights ? " TL" : string.Empty);
+                    if (best == Entity.Null)
+                    {
+                        text.AppendLine($"  node flags: source [{sourceText}] -> NO pasted node nearby");
+                        continue;
+                    }
+
+                    bool pastedHas = EntityManager.TryGetComponent(best, out Game.Net.Upgraded pastedUpgrade);
+                    string pastedText = DiagFlags(pastedHas, pastedHas ? pastedUpgrade.m_Flags : default) +
+                        (EntityManager.HasComponent<Game.Net.Roundabout>(best) ? " RA" : string.Empty) +
+                        (EntityManager.HasComponent<Game.Net.TrafficLights>(best) ? " TL" : string.Empty);
+                    text.AppendLine($"  node flags: source [{sourceText}] -> pasted [{pastedText}] at {bestDistance:F2} m offset error");
+                }
+            }
+
+            if (comparable > 0 && m_DiagSourceEdges.Count == pasted.Count)
+            {
+                bool sameGraph = true;
+                for (int i = 0; i < comparable; i++)
+                {
+                    if (m_DiagSourceEdges[i].m_StartNode != pasted[i].m_StartNode ||
+                        m_DiagSourceEdges[i].m_EndNode != pasted[i].m_EndNode)
+                    {
+                        sameGraph = false;
+                        text.AppendLine($"  topology  : edge #{i} source ({m_DiagSourceEdges[i].m_StartNode},{m_DiagSourceEdges[i].m_EndNode}) -> pasted ({pasted[i].m_StartNode},{pasted[i].m_EndNode})");
+                    }
+                }
+
+                if (sameGraph)
+                {
+                    text.AppendLine("  topology  : identical (every segment joins the same neighbours)");
+                }
+            }
+
+            text.AppendLine();
+        }
+
+        private int m_DiagSourceGeneration = -1;
+
+        private float2 m_DiagPastedOriginCache;
+        private bool m_DiagPastedOriginValid;
+
+        private float2 DiagPastedOrigin(HashSet<Entity> pastedNodes)
+        {
+            if (m_DiagPastedOriginValid)
+            {
+                return m_DiagPastedOriginCache;
+            }
+
+            foreach (Entity node in pastedNodes)
+            {
+                if (EntityManager.TryGetComponent(node, out Game.Net.Node nodeData))
+                {
+                    m_DiagPastedOriginCache = nodeData.m_Position.xz;
+                    m_DiagPastedOriginValid = true;
+                    break;
+                }
+            }
+
+            return m_DiagPastedOriginCache;
+        }
+
+        // ---------- pomoćno ----------
+
+        private static int DiagNodeNumber(Dictionary<Entity, int> numbers, Entity node)
+        {
+            if (node == Entity.Null)
+            {
+                return -1;
+            }
+
+            if (numbers.TryGetValue(node, out int existing))
+            {
+                return existing;
+            }
+
+            int number = numbers.Count;
+            numbers[node] = number;
+            return number;
+        }
+
+        private static int DiagCountNodes(List<DiagSourceEdge> edges)
+        {
+            HashSet<int> nodes = new HashSet<int>();
+            foreach (DiagSourceEdge edge in edges)
+            {
+                nodes.Add(edge.m_StartNode);
+                nodes.Add(edge.m_EndNode);
+            }
+
+            return nodes.Count;
+        }
+
+        // Koliko čvorova ima 1, 2, 3... priključka — najbrži pogled na to da li
+        // je raskrsnica ostala raskrsnica ili se raspala na slepe krajeve.
+        private static string DiagDegrees(List<DiagSourceEdge> edges)
+        {
+            Dictionary<int, int> degree = new Dictionary<int, int>();
+            foreach (DiagSourceEdge edge in edges)
+            {
+                DiagBump(degree, edge.m_StartNode);
+                DiagBump(degree, edge.m_EndNode);
+            }
+
+            Dictionary<int, int> histogram = new Dictionary<int, int>();
+            foreach (KeyValuePair<int, int> pair in degree)
+            {
+                histogram.TryGetValue(pair.Value, out int count);
+                histogram[pair.Value] = count + 1;
+            }
+
+            StringBuilder text = new StringBuilder();
+            for (int d = 1; d <= 8; d++)
+            {
+                if (histogram.TryGetValue(d, out int count))
+                {
+                    if (text.Length > 0)
+                    {
+                        text.Append(", ");
+                    }
+
+                    text.Append($"{count} node(s) with {d} arm(s)");
+                }
+            }
+
+            return text.Length > 0 ? text.ToString() : "(none)";
+        }
+
+        private static void DiagBump(Dictionary<int, int> degree, int node)
+        {
+            if (node < 0)
+            {
+                return;
+            }
+
+            degree.TryGetValue(node, out int count);
+            degree[node] = count + 1;
+        }
+
+        // PUN POPIS SVETA u granicama stampa: i nerazrešene ivice (parčad
+        // podele, zatečeni putevi), sa ID-jevima čvorova — pa se golim okom
+        // vidi šta postoji, šta deli čvor sa čim, i gde je šav pukao (dva
+        // različita čvora na skoro istom mestu).
+        private void DiagWorldScan(StringBuilder text, List<PastedRecord> records)
+        {
+            float3 boundsMin = new float3(float.MaxValue);
+            float3 boundsMax = new float3(float.MinValue);
+            bool anyNet = false;
+            foreach (PastedRecord record in records)
+            {
+                if (!record.m_IsNetEdge)
+                {
+                    continue;
+                }
+
+                anyNet = true;
+                boundsMin = math.min(boundsMin, math.min(record.m_Position, math.min(record.m_StartNodeWorld, record.m_EndNodeWorld)));
+                boundsMax = math.max(boundsMax, math.max(record.m_Position, math.max(record.m_StartNodeWorld, record.m_EndNodeWorld)));
+            }
+
+            if (!anyNet)
+            {
+                return;
+            }
+
+            if (m_NetSearchSystem == null)
+            {
+                m_NetSearchSystem = World.GetOrCreateSystemManaged<Game.Net.SearchSystem>();
+            }
+
+            NativeQuadTree<Entity, QuadTreeBoundsXZ> tree = m_NetSearchSystem.GetNetSearchTree(true, out JobHandle dependencies);
+            dependencies.Complete();
+
+            RoadIterator iterator = new RoadIterator
+            {
+                m_Bounds = new Bounds3(
+                    new float3(boundsMin.x - 8f, -1000f, boundsMin.z - 8f),
+                    new float3(boundsMax.x + 8f, 1000f, boundsMax.z + 8f)),
+                m_Results = new NativeList<Entity>(64, Allocator.Temp),
+            };
+            tree.Iterate(ref iterator, 0);
+
+            text.AppendLine();
+            text.AppendLine("WORLD SCAN: sve net ivice u granicama stampa (i nerazrešene)");
+            text.AppendLine("  entitet | prefab | rec | startNode @ xyz | endNode @ xyz | len");
+
+            Dictionary<Entity, float3> nodePositions = new Dictionary<Entity, float3>();
+            List<Bezier4x3> liveCurves = new List<Bezier4x3>();
+            int listed = 0;
+            for (int i = 0; i < iterator.m_Results.Length; i++)
+            {
+                Entity candidate = iterator.m_Results[i];
+                if (!EntityManager.HasComponent<Game.Net.Edge>(candidate) ||
+                    EntityManager.HasComponent<Game.Tools.EditorContainer>(candidate) ||
+                    EntityManager.HasComponent<Owner>(candidate) ||
+                    EntityManager.HasComponent<Game.Tools.Temp>(candidate) ||
+                    EntityManager.HasComponent<Deleted>(candidate) ||
+                    !EntityManager.TryGetComponent(candidate, out Game.Net.Curve curve) ||
+                    !EntityManager.TryGetComponent(candidate, out Game.Net.Edge edgeData) ||
+                    !EntityManager.TryGetComponent(candidate, out PrefabRef prefabRef))
+                {
+                    continue;
+                }
+
+                int recordIndex = -1;
+                for (int j = 0; j < records.Count; j++)
+                {
+                    if (records[j].m_Resolved == candidate)
+                    {
+                        recordIndex = j;
+                        break;
+                    }
+                }
+
+                string startText = "?";
+                if (EntityManager.TryGetComponent(edgeData.m_Start, out Game.Net.Node startNode))
+                {
+                    nodePositions[edgeData.m_Start] = startNode.m_Position;
+                    startText = $"e{edgeData.m_Start.Index} @ {DiagPoint(startNode.m_Position)}";
+                }
+
+                string endText = "?";
+                if (EntityManager.TryGetComponent(edgeData.m_End, out Game.Net.Node endNode))
+                {
+                    nodePositions[edgeData.m_End] = endNode.m_Position;
+                    endText = $"e{edgeData.m_End.Index} @ {DiagPoint(endNode.m_Position)}";
+                }
+
+                listed++;
+                liveCurves.Add(curve.m_Bezier);
+                text.AppendLine(string.Format(kDiagCulture, "  e{0} | {1} | {2} | {3} | {4} | {5:F2}",
+                    candidate.Index, DiagPrefabName(prefabRef.m_Prefab),
+                    recordIndex >= 0 ? ("#" + recordIndex) : "-",
+                    startText, endText, curve.m_Length));
+            }
+
+            iterator.m_Results.Dispose();
+
+            // Klasteri: dva RAZLIČITA čvora na manje od 3 m = kandidat za
+            // pukao šav.
+            text.AppendLine();
+            text.AppendLine($"  ukupno ivica u granicama: {listed}, čvorova: {nodePositions.Count}");
+            List<Entity> nodeList = new List<Entity>(nodePositions.Keys);
+            int suspects = 0;
+            for (int a = 0; a < nodeList.Count; a++)
+            {
+                for (int b = a + 1; b < nodeList.Count; b++)
+                {
+                    float distance = math.distance(nodePositions[nodeList[a]], nodePositions[nodeList[b]]);
+                    if (distance < 3f)
+                    {
+                        suspects++;
+                        text.AppendLine(string.Format(kDiagCulture,
+                            "  WELD? e{0} i e{1} na {2:F3} m — {3}",
+                            nodeList[a].Index, nodeList[b].Index, distance, DiagPoint(nodePositions[nodeList[a]])));
+                    }
+                }
+            }
+
+            if (suspects == 0)
+            {
+                text.AppendLine("  bez duplih čvorova (to NE garantuje da ništa ne fali — vidi POKRIVENOST)");
+            }
+
+            // POKRIVENOST: da li je SVAKI zapis stvarno pokriven živim
+            // ivicama duž cele svoje krive. Ovo hvata "pola deonice fali
+            // posle undo/redo" — slučaj koji provera duplih čvorova ne vidi.
+            int gaps = 0;
+            for (int j = 0; j < records.Count; j++)
+            {
+                PastedRecord record = records[j];
+                if (!record.m_IsNetEdge || record.m_NetCurve.a.Equals(record.m_NetCurve.d))
+                {
+                    continue;
+                }
+
+                float worst = 0f;
+                float worstT = 0f;
+                for (int step = 0; step <= 10; step++)
+                {
+                    float t = step / 10f;
+                    float2 sample = MathUtils.Position(record.m_NetCurve, t).xz;
+                    float nearest = float.MaxValue;
+                    foreach (Bezier4x3 liveCurve in liveCurves)
+                    {
+                        nearest = math.min(nearest, DistanceToRecordCurve(liveCurve, sample));
+                        if (nearest < 1f)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (nearest > worst)
+                    {
+                        worst = nearest;
+                        worstT = t;
+                    }
+                }
+
+                if (worst > 3f && gaps < 12)
+                {
+                    gaps++;
+                    text.AppendLine(string.Format(kDiagCulture,
+                        "  RUPA: zapis #{0} nepokriven kod t={1:F1} (najbliža živa ivica {2:F1} m)",
+                        j, worstT, worst));
+                }
+            }
+
+            text.AppendLine(gaps == 0
+                ? "  POKRIVENOST: svaki zapis pokriven živim ivicama celom dužinom"
+                : string.Format(kDiagCulture, "  POKRIVENOST: {0} zapisa ima rupe — NEŠTO FALI NA MAPI", gaps));
+        }
+
+        private string DiagPrefabName(Entity entity)
+        {
+            if (EntityManager.TryGetComponent(entity, out Game.Prefabs.PrefabRef prefabRef) &&
+                m_PrefabSystem.TryGetPrefab(prefabRef.m_Prefab, out Game.Prefabs.PrefabBase prefab) &&
+                prefab != null)
+            {
+                return prefab.name;
+            }
+
+            return "?";
+        }
+
+        // Sazeci redovi u log — bili su u produkcijskom kodu, pa su isli
+        // korisniku u Copaste.log i posle brisanja ovog fajla.
+        partial void DiagCaptureLog(int edgeCount, int nodeCount, int distinctCurveEnds, float maxShift)
+        {
+            Mod.Log.Info($"Copaste DIAG: capture {edgeCount} edges -> {nodeCount} source nodes, {distinctCurveEnds} distinct curve ends, max endpoint shift {maxShift:F3} m");
+        }
+
+        partial void DiagPastedTopologyLog(int edges, int unresolved, int sharedNodes)
+        {
+            Mod.Log.Info($"Copaste DIAG: pasted {edges} road edges ({unresolved} unresolved) sharing {sharedNodes} nodes (fully separate would be {(edges - unresolved) * 2})");
+        }
+
+        private static float DiagAngle(float3 direction)
+        {
+            return math.degrees(math.atan2(direction.z, direction.x));
+        }
+
+        private static string DiagPoint(float3 point)
+        {
+            return point.x.ToString("F3", kDiagCulture) + " " +
+                point.y.ToString("F3", kDiagCulture) + " " +
+                point.z.ToString("F3", kDiagCulture);
+        }
+    }
+}

@@ -1,0 +1,493 @@
+// Copaste — self-test (razvojni alat, briše se pred objavu kao i dijagnostika).
+//
+// Mod sam testira sebe u živoj igri: na Ctrl+Shift+F9 (dok je alat otvoren i
+// kursor na praznom terenu) napravi mali kraki put, pa nad njim izvede
+// operacije koje su ranije tražile ručno testiranje — pravljenje i šav,
+// brisanje, undo brisanja, ALT-ravnanje sa bočnim ofsetima, čišćenje
+// selekcije pri gašenju filtera, pražnjenje istorije — i svaki korak oceni
+// PASS/FAIL u ModsData/Copaste/selftest.txt. Posle sebe počisti sve.
+//
+// Sve je u try/catch: pad self-testa ne sme da obori alat.
+
+namespace Copaste
+{
+    using System.Collections.Generic;
+    using System.Globalization;
+    using System.Text;
+    using Colossal.Collections;
+    using Colossal.Entities;
+    using Colossal.Mathematics;
+    using Game.Common;
+    using Game.Prefabs;
+    using Game.Simulation;
+    using Unity.Collections;
+    using Unity.Entities;
+    using Unity.Jobs;
+    using Unity.Mathematics;
+
+    public partial class CopasteToolSystem
+    {
+        private static string SelfTestPath =>
+            System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "ModsData", "Copaste", "selftest.txt");
+
+        // Prefab za probni put: prvi sa liste koji postoji u igri. Autoput
+        // namerno — nema zoniranje, pa test ne ostavlja trag u zonama.
+        private static readonly PrefabID[] kSelfTestPrefabs =
+        {
+            new PrefabID("RoadPrefab", "Highway Oneway - 2 lanes"),
+            new PrefabID("RoadPrefab", "Highway Oneway - 1 lane"),
+            new PrefabID("RoadPrefab", "Small Road"),
+        };
+
+        private int m_SelfTestPhase;
+        private int m_SelfTestWait;
+        private int m_SelfTestFailures;
+        private StringBuilder m_SelfTestReport;
+        private float3 m_SelfTestA;
+        private float3 m_SelfTestB;
+        private float3 m_SelfTestC;
+        private Entity m_SelfTestPrefab;
+        private Entity m_SelfTestEdge1;
+        private Entity m_SelfTestEdge2;
+        private Entity m_SelfTestNodeB;
+        private bool m_SelfTestNetworksWas;
+
+        // Korisnikova istorija od PRE testa — test istorije prazni stekove,
+        // ali korisnikov Ctrl+Z ne sme da strada zbog naseg testiranja.
+        private List<UndoRecord> m_SelfTestUndoBackup;
+        private List<UndoRecord> m_SelfTestRedoBackup;
+
+        partial void SelfTestTick()
+        {
+            try
+            {
+                SelfTestTickCore();
+            }
+            catch (System.Exception e)
+            {
+                if (m_SelfTestReport != null)
+                {
+                    m_SelfTestReport.AppendLine($"FAIL | izuzetak u fazi {m_SelfTestPhase}: {e.Message}");
+                    SelfTestFinish();
+                }
+
+                m_SelfTestPhase = 0;
+            }
+        }
+
+        private void SelfTestTickCore()
+        {
+            if (m_SelfTestPhase == 0)
+            {
+                UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
+                if (keyboard == null || m_Mode != Mode.Select || m_HandleDragging ||
+                    !keyboard.ctrlKey.isPressed || !keyboard.shiftKey.isPressed ||
+                    !keyboard.f9Key.wasPressedThisFrame)
+                {
+                    return;
+                }
+
+                SelfTestStart();
+                return;
+            }
+
+            if (m_SelfTestWait > 0)
+            {
+                m_SelfTestWait--;
+                return;
+            }
+
+            switch (m_SelfTestPhase)
+            {
+                case 1: SelfTestPhaseFind(); break;
+                case 2: SelfTestPhaseDelete(); break;
+                case 3: SelfTestPhaseAssertDeleteAndUndo(); break;
+                case 4: SelfTestPhaseAssertUndo(); break;
+                case 5: SelfTestPhaseStraighten(); break;
+                case 6: SelfTestPhaseAssertStraighten(); break;
+                case 7: SelfTestPhaseFilterAndHistory(); break;
+                case 8: SelfTestPhaseCleanup(); break;
+                case 9: SelfTestPhaseVerifyCleanup(); break;
+                default: m_SelfTestPhase = 0; break;
+            }
+        }
+
+        private void SelfTestStart()
+        {
+            if (!GetRaycastResult(out Entity _, out Game.Common.RaycastHit hit))
+            {
+                Mod.Log.Info("Copaste self-test: uperi kursor u prazan teren pa Ctrl+Shift+F9");
+                return;
+            }
+
+            m_SelfTestPrefab = Entity.Null;
+            foreach (PrefabID candidate in kSelfTestPrefabs)
+            {
+                if (m_PrefabSystem.TryGetPrefab(candidate, out PrefabBase prefabBase) && prefabBase != null)
+                {
+                    m_SelfTestPrefab = m_PrefabSystem.GetEntity(prefabBase);
+                    break;
+                }
+            }
+
+            if (m_SelfTestPrefab == Entity.Null)
+            {
+                Mod.Log.Warn("Copaste self-test: nijedan probni prefab nije nađen");
+                return;
+            }
+
+            m_SelfTestReport = new StringBuilder();
+            m_SelfTestReport.AppendLine("=== Copaste self-test ===");
+            m_SelfTestFailures = 0;
+            m_SelfTestNetworksWas = Mod.Settings != null && Mod.Settings.SelectNetworks;
+            if (Mod.Settings != null)
+            {
+                Mod.Settings.SelectNetworks = true;
+            }
+
+            ClearSelection();
+            m_SelfTestUndoBackup = new List<UndoRecord>(m_UndoStack);
+            m_SelfTestRedoBackup = new List<UndoRecord>(m_RedoStack);
+
+            // Kraki put: A---B---C, B namerno 12 m VAN prave A–C (za ravnanje).
+            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
+            float3 origin = hit.m_HitPosition;
+            m_SelfTestA = new float3(origin.x - 30f, 0f, origin.z);
+            m_SelfTestB = new float3(origin.x, 0f, origin.z + 12f);
+            m_SelfTestC = new float3(origin.x + 30f, 0f, origin.z);
+            m_SelfTestA.y = TerrainUtils.SampleHeight(ref heightData, m_SelfTestA);
+            m_SelfTestB.y = TerrainUtils.SampleHeight(ref heightData, m_SelfTestB);
+            m_SelfTestC.y = TerrainUtils.SampleHeight(ref heightData, m_SelfTestC);
+
+            List<NetEdgeSnapshot> snapshots = new List<NetEdgeSnapshot>
+            {
+                SelfTestSnapshot(m_SelfTestA, m_SelfTestB),
+                SelfTestSnapshot(m_SelfTestB, m_SelfTestC),
+            };
+
+            RecreateNetEdges(snapshots);
+            Mod.Log.Info("Copaste self-test: start");
+            m_SelfTestPhase = 1;
+            m_SelfTestWait = 10;
+        }
+
+        private NetEdgeSnapshot SelfTestSnapshot(float3 from, float3 to)
+        {
+            Bezier4x3 curve = new Bezier4x3(from, math.lerp(from, to, 1f / 3f), math.lerp(from, to, 2f / 3f), to);
+            return new NetEdgeSnapshot
+            {
+                m_Entity = Entity.Null,
+                m_Curve = curve,
+                m_Prefab = m_SelfTestPrefab,
+                m_StartNode = Entity.Null,
+                m_EndNode = Entity.Null,
+                m_HasNodePositions = true,
+                m_StartNodePos = from,
+                m_EndNodePos = to,
+            };
+        }
+
+        private void SelfTestCheck(bool ok, string name, string detail)
+        {
+            if (!ok)
+            {
+                m_SelfTestFailures++;
+            }
+
+            string suffix = string.IsNullOrEmpty(detail) ? string.Empty : " | " + detail;
+            m_SelfTestReport.AppendLine((ok ? "PASS" : "FAIL") + " | " + name + suffix);
+        }
+
+        // Sve probne ivice u krugu od 80 m oko sredine testa.
+        private List<Entity> SelfTestScan()
+        {
+            List<Entity> found = new List<Entity>();
+            if (m_NetSearchSystem == null)
+            {
+                m_NetSearchSystem = World.GetOrCreateSystemManaged<Game.Net.SearchSystem>();
+            }
+
+            NativeQuadTree<Entity, QuadTreeBoundsXZ> tree = m_NetSearchSystem.GetNetSearchTree(true, out JobHandle dependencies);
+            dependencies.Complete();
+
+            float3 center = (m_SelfTestA + m_SelfTestC) * 0.5f;
+            RoadIterator iterator = new RoadIterator
+            {
+                m_Bounds = new Bounds3(center - new float3(80f, 1000f, 80f), center + new float3(80f, 1000f, 80f)),
+                m_Results = new NativeList<Entity>(16, Allocator.Temp),
+            };
+            tree.Iterate(ref iterator, 0);
+
+            for (int i = 0; i < iterator.m_Results.Length; i++)
+            {
+                Entity candidate = iterator.m_Results[i];
+                if (EntityManager.HasComponent<Game.Net.Edge>(candidate) &&
+                    !EntityManager.HasComponent<Owner>(candidate) &&
+                    !EntityManager.HasComponent<Game.Tools.Temp>(candidate) &&
+                    !EntityManager.HasComponent<Deleted>(candidate) &&
+                    EntityManager.TryGetComponent(candidate, out PrefabRef prefabRef) &&
+                    prefabRef.m_Prefab == m_SelfTestPrefab)
+                {
+                    found.Add(candidate);
+                }
+            }
+
+            iterator.m_Results.Dispose();
+            return found;
+        }
+
+        // Zajednički čvor dve ivice na tački B — srce testa šava.
+        private Entity SelfTestSharedNode(List<Entity> edges)
+        {
+            Dictionary<Entity, int> counts = new Dictionary<Entity, int>();
+            foreach (Entity edge in edges)
+            {
+                if (!EntityManager.TryGetComponent(edge, out Game.Net.Edge edgeData))
+                {
+                    continue;
+                }
+
+                foreach (Entity node in new[] { edgeData.m_Start, edgeData.m_End })
+                {
+                    if (EntityManager.TryGetComponent(node, out Game.Net.Node nodeData) &&
+                        math.distance(nodeData.m_Position.xz, m_SelfTestB.xz) < 3f)
+                    {
+                        counts.TryGetValue(node, out int count);
+                        counts[node] = count + 1;
+                    }
+                }
+            }
+
+            foreach (KeyValuePair<Entity, int> pair in counts)
+            {
+                if (pair.Value >= 2)
+                {
+                    return pair.Key;
+                }
+            }
+
+            return Entity.Null;
+        }
+
+        private void SelfTestPhaseFind()
+        {
+            List<Entity> edges = SelfTestScan();
+            SelfTestCheck(edges.Count == 2, "PRAVLJENJE: dve deonice nastale", "nađeno " + edges.Count);
+            m_SelfTestNodeB = SelfTestSharedNode(edges);
+            SelfTestCheck(m_SelfTestNodeB != Entity.Null, "ŠAV: deonice dele čvor B", string.Empty);
+            if (edges.Count != 2 || m_SelfTestNodeB == Entity.Null)
+            {
+                m_SelfTestPhase = 8;
+                m_SelfTestWait = 2;
+                return;
+            }
+
+            // Ivica 1 = ona čija je sredina bliža sredini A–B.
+            float3 midAB = (m_SelfTestA + m_SelfTestB) * 0.5f;
+            EntityManager.TryGetComponent(edges[0], out Game.Net.Curve curve0);
+            float d0 = math.distance(LaneMidpoint(curve0.m_Bezier).xz, midAB.xz);
+            EntityManager.TryGetComponent(edges[1], out Game.Net.Curve curve1);
+            float d1 = math.distance(LaneMidpoint(curve1.m_Bezier).xz, midAB.xz);
+            m_SelfTestEdge1 = d0 <= d1 ? edges[0] : edges[1];
+            m_SelfTestEdge2 = d0 <= d1 ? edges[1] : edges[0];
+            m_SelfTestPhase = 2;
+            m_SelfTestWait = 2;
+        }
+
+        private void SelfTestPhaseDelete()
+        {
+            ClearSelection();
+            m_SelectedNetEdges.Add(m_SelfTestEdge1);
+            DeleteSelection();
+            m_SelfTestPhase = 3;
+            m_SelfTestWait = 6;
+        }
+
+        private void SelfTestPhaseAssertDeleteAndUndo()
+        {
+            bool edge1Gone = !EntityManager.Exists(m_SelfTestEdge1) || EntityManager.HasComponent<Deleted>(m_SelfTestEdge1);
+            bool edge2Alive = EntityManager.Exists(m_SelfTestEdge2) && !EntityManager.HasComponent<Deleted>(m_SelfTestEdge2);
+            SelfTestCheck(edge1Gone, "BRISANJE: obrisana deonica nestala", string.Empty);
+            SelfTestCheck(edge2Alive, "BRISANJE: susedna deonica netaknuta", string.Empty);
+            Undo();
+            m_SelfTestPhase = 4;
+            m_SelfTestWait = 14;
+        }
+
+        private void SelfTestPhaseAssertUndo()
+        {
+            List<Entity> edges = SelfTestScan();
+            SelfTestCheck(edges.Count == 2, "UNDO BRISANJA: deonica se vratila", "nađeno " + edges.Count);
+            m_SelfTestNodeB = SelfTestSharedNode(edges);
+            SelfTestCheck(m_SelfTestNodeB != Entity.Null, "UNDO BRISANJA: šav ponovo ceo (dele čvor)", string.Empty);
+            if (edges.Count == 2 && m_SelfTestNodeB != Entity.Null)
+            {
+                float3 midAB = (m_SelfTestA + m_SelfTestB) * 0.5f;
+                EntityManager.TryGetComponent(edges[0], out Game.Net.Curve curve0);
+                float d0 = math.distance(LaneMidpoint(curve0.m_Bezier).xz, midAB.xz);
+                m_SelfTestEdge1 = d0 <= 15f ? edges[0] : edges[1];
+                m_SelfTestEdge2 = d0 <= 15f ? edges[1] : edges[0];
+                m_SelfTestPhase = 5;
+            }
+            else
+            {
+                m_SelfTestPhase = 8;
+            }
+
+            m_SelfTestWait = 4;
+        }
+
+        private void SelfTestPhaseStraighten()
+        {
+            // Bočni ofset krajeva OD čvora B — u njemu živi poravnanje traka;
+            // ravnanje mora da ga SAČUVA (rotira), ne da ga obriše.
+            SelfTestOffsetEndAt(m_SelfTestEdge1, 2f);
+            SelfTestOffsetEndAt(m_SelfTestEdge2, -2f);
+
+            ClearSelection();
+            m_SelectedNodes.Add(m_SelfTestNodeB);
+            bool straightened = StraightenSelectedNetNodes();
+            SelfTestCheck(straightened, "RAVNANJE: ALT prihvatio čvor", string.Empty);
+            m_SelfTestPhase = 6;
+            m_SelfTestWait = 6;
+        }
+
+        private void SelfTestOffsetEndAt(Entity edge, float offset)
+        {
+            if (!EntityManager.TryGetComponent(edge, out Game.Net.Curve curve) ||
+                !EntityManager.TryGetComponent(m_SelfTestNodeB, out Game.Net.Node nodeB))
+            {
+                return;
+            }
+
+            bool endAtB = math.distance(curve.m_Bezier.d.xz, nodeB.m_Position.xz) <=
+                math.distance(curve.m_Bezier.a.xz, nodeB.m_Position.xz);
+            if (endAtB)
+            {
+                curve.m_Bezier.d.z += offset;
+            }
+            else
+            {
+                curve.m_Bezier.a.z += offset;
+            }
+
+            float3 a = curve.m_Bezier.a;
+            float3 d = curve.m_Bezier.d;
+            curve.m_Bezier = new Bezier4x3(a, math.lerp(a, d, 1f / 3f), math.lerp(a, d, 2f / 3f), d);
+            curve.m_Length = MathUtils.Length(curve.m_Bezier);
+            EntityManager.SetComponentData(edge, curve);
+            EntityManager.AddComponent<Updated>(edge);
+        }
+
+        private void SelfTestPhaseAssertStraighten()
+        {
+            bool haveNode = EntityManager.TryGetComponent(m_SelfTestNodeB, out Game.Net.Node nodeB);
+            bool onLine = haveNode && math.abs(nodeB.m_Position.z - m_SelfTestA.z) < 1.5f;
+            SelfTestCheck(onLine, "RAVNANJE: čvor legao na pravu A–C",
+                haveNode ? string.Format(CultureInfo.InvariantCulture, "otklon {0:F2} m", math.abs(nodeB.m_Position.z - m_SelfTestA.z)) : "čvor mrtav");
+
+            if (haveNode)
+            {
+                float offset1 = SelfTestEndOffset(m_SelfTestEdge1, nodeB.m_Position);
+                float offset2 = SelfTestEndOffset(m_SelfTestEdge2, nodeB.m_Position);
+                SelfTestCheck(offset1 > 1.2f && offset1 < 2.8f && offset2 > 1.2f && offset2 < 2.8f,
+                    "RAVNANJE: bočni ofset (poravnanje traka) sačuvan",
+                    string.Format(CultureInfo.InvariantCulture, "ofseti {0:F2} m i {1:F2} m (očekivano ~2)", offset1, offset2));
+            }
+
+            m_SelfTestPhase = 7;
+            m_SelfTestWait = 2;
+        }
+
+        private float SelfTestEndOffset(Entity edge, float3 nodePosition)
+        {
+            if (!EntityManager.TryGetComponent(edge, out Game.Net.Curve curve))
+            {
+                return -1f;
+            }
+
+            float toStart = math.distance(curve.m_Bezier.a.xz, nodePosition.xz);
+            float toEnd = math.distance(curve.m_Bezier.d.xz, nodePosition.xz);
+            return math.min(toStart, toEnd);
+        }
+
+        private void SelfTestPhaseFilterAndHistory()
+        {
+            // Gašenje čipa mora da izbaci već selektovane deonice.
+            ClearSelection();
+            m_SelectedNetEdges.Add(m_SelfTestEdge1);
+            m_SelectedNetEdges.Add(m_SelfTestEdge2);
+            if (Mod.Settings != null)
+            {
+                Mod.Settings.SelectNetworks = false;
+            }
+
+            PurgeSelectionForDisabledFilters();
+            SelfTestCheck(m_SelectedNetEdges.Count == 0 && m_SelectedNodes.Count == 0,
+                "FILTER: gašenje čipa čisti selekciju", "ostalo " + m_SelectedNetEdges.Count);
+            if (Mod.Settings != null)
+            {
+                Mod.Settings.SelectNetworks = true;
+            }
+
+            PurgeSelectionForDisabledFilters();
+
+            // Učitavanje drugog grada mora da isprazni istoriju.
+            SelfTestCheck(m_UndoStack.Count > 0, "ISTORIJA: undo stek pun pre pražnjenja", "koraka " + m_UndoStack.Count);
+            DiscardWorldBoundState();
+            SelfTestCheck(m_UndoStack.Count == 0 && m_RedoStack.Count == 0,
+                "ISTORIJA: pražnjenje pri učitavanju grada", string.Empty);
+
+            m_SelfTestPhase = 8;
+            m_SelfTestWait = 2;
+        }
+
+        private void SelfTestPhaseCleanup()
+        {
+            foreach (Entity edge in SelfTestScan())
+            {
+                DeleteNetEdgeWithNodes(edge);
+            }
+
+            m_SelfTestPhase = 9;
+            m_SelfTestWait = 8;
+        }
+
+        private void SelfTestPhaseVerifyCleanup()
+        {
+            List<Entity> leftovers = SelfTestScan();
+            SelfTestCheck(leftovers.Count == 0, "ČIŠĆENJE: ništa nije ostalo na mapi", "ostalo " + leftovers.Count);
+            if (Mod.Settings != null)
+            {
+                Mod.Settings.SelectNetworks = m_SelfTestNetworksWas;
+            }
+
+            ClearSelection();
+
+            // Vrati korisnikovu istoriju od pre testa (testovi su je ispraznili;
+            // zapisi samog testa se NE vracaju — njihovi entiteti su pociscen).
+            if (m_SelfTestUndoBackup != null)
+            {
+                m_UndoStack.Clear();
+                m_UndoStack.AddRange(m_SelfTestUndoBackup);
+                m_RedoStack.Clear();
+                m_RedoStack.AddRange(m_SelfTestRedoBackup);
+                m_SelfTestUndoBackup = null;
+                m_SelfTestRedoBackup = null;
+            }
+
+            SelfTestFinish();
+            m_SelfTestPhase = 0;
+        }
+
+        private void SelfTestFinish()
+        {
+            m_SelfTestReport.AppendLine();
+            m_SelfTestReport.AppendLine(m_SelfTestFailures == 0 ? "SVE PROŠLO" : "PALO: " + m_SelfTestFailures);
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(SelfTestPath));
+            System.IO.File.WriteAllText(SelfTestPath, m_SelfTestReport.ToString());
+            Mod.Log.Info("Copaste self-test: " + (m_SelfTestFailures == 0 ? "SVE PROŠLO" : "PALO " + m_SelfTestFailures) + " — " + SelfTestPath);
+            m_SelfTestReport = null;
+        }
+    }
+}

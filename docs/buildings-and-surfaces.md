@@ -1,7 +1,7 @@
 # Buildings & Painted Surfaces
 
-Added in 1.1.0, gated behind the panel's **Selection filters** (five hidden
-settings: `SelectProps/Trees/Decals/Surfaces/Buildings`). With the Buildings
+Added in 1.1.0, gated behind the panel's **Selection filters** (seven hidden
+settings: `SelectProps/Trees/Decals/Surfaces/Buildings/Fences/Networks`). With the Buildings
 filter off the tool behaves exactly like the props-only versions.
 
 ## Selection
@@ -41,21 +41,39 @@ but they CAN be deleted, and delete-undo snapshots them too.
 
 ## Selection filters
 
-Five independent hidden settings (`SelectProps/Trees/Decals/Surfaces/
+Seven independent hidden settings (`SelectProps/Trees/Decals/Surfaces/
 Buildings`) drive the panel's Selection card (bitmask binding
 `selectionFilters`, triggers `toggleSelectionFilter` and
 `soloSelectionFilter` — the latter is right-click solo). Category detection
 is runtime-component based: `Building`; `Tree`/`Plant` = vegetation; an
-object without `Game.Objects.Surface` (no collision surface) is a decal —
-the same rule Move It uses; everything else is a prop. `IsCategoryEnabled`
+object without `Game.Objects.Surface` (no collision surface) is a decal;
+everything else is a prop. `IsCategoryEnabled`
 gates `IsCopyable`, so click, marquee and Ctrl+click all honor the filters.
 
 ## Road snap and Relocate
 
+> **Overlap warning.** Relocate moves the real building, so dropping it into
+> another building creates a genuine overlap. The game's own override rules
+> then decide the conflict and may silently remove one of the buildings —
+> this happens inside the game, outside the mod's undo. The "Ignore placement
+> errors when pasting" option does not apply here (it only affects the paste
+> stamp). The Anarchy mod's protection is what keeps overlapped buildings
+> alive; keep it enabled when overlapping on purpose.
+
 `TryFindNearestRoad` queries the game's net search quad tree
-(`Game.Net.SearchSystem.GetNetSearchTree`) in a 30 m radius around the
-cursor (cached until the cursor moves 0.5 m; a cached edge that died — the
-game splits/rejoins road edges around building changes — resets the cache).
+(`Game.Net.SearchSystem.GetNetSearchTree`) around the cursor, in a radius
+of 30 m plus the building's lot half-depth (a deep lot keeps its correctly
+snapped center far from the road, so a fixed radius rejected exactly the
+buildings that need snapping most). The result is cached until the cursor
+moves 0.5 m; a cached edge that died — the game splits/rejoins road edges
+around building changes — resets the cache.
+
+While relocating, the cursor ray can hit the building being carried (tall
+buildings especially). `RelocateRayHitSelf` walks the hit entity's owner
+chain, and when it lands on the relocated building the pointer is projected
+onto the terrain plane at the building's height instead — otherwise the
+building chased its own roof, jumping tens of meters per frame, and road
+snap searched in the wrong place.
 `TryComputeRoadSnap` picks the closest point on the edge's bezier, offsets
 by road half-width + lot half-depth to the cursor's side, and yields a yaw
 facing the road (building local +z toward it).
@@ -79,7 +97,7 @@ facing the road (building local +z toward it).
 
 Delete adds vanilla `Deleted` (what the bulldozer does). Undo recreates the
 building from the prefab archetype (`RecreateProp`) plus the
-`UnderConstruction` kick so pavements and driveways regenerate, and a
+`UnderConstruction` kick so sidewalks and driveways regenerate, and a
 delayed settle re-runs the road connection. Limitation, by design: the
 restored building is a fresh instance — households and workers are gone,
 because simulation state cannot be faithfully restored.
@@ -94,7 +112,7 @@ warning icon survives. `RunDelayedSettles` re-marks the building and its
 
 ## Moving buildings (`CopasteToolSystem.Buildings.cs`)
 
-The approach follows Move It (MIT, github.com/Quboid/CS2-MoveIt): transform
+The approach: transform
 the building and its **world-space sub-tree by the same delta with direct
 component writes**, mark everything `Updated`, and let the game regenerate
 geometry, lanes and road connections. Only vanilla components are written, so
@@ -192,9 +210,9 @@ update — including updates the simulation triggers by itself (tenant
 turnover re-decorates the lot). A position signature cannot pin them down,
 so `IsRegeneratingSubElement` (deep-ownership test: owner chain leads to a
 building but the direct owner is neither the building nor an extension)
-excludes them from selection and deletion entirely. Better Bulldozer
-achieves real permanence here only by serializing per-prefab removal
-records into the save file; Copaste deliberately does not write mod data
+excludes them from selection and deletion entirely. Real permanence here
+is only possible by serializing per-prefab removal records into the save
+file; Copaste deliberately does not write mod data
 into saves, so per-instance deletion stays out of scope.
 
 **The supported path instead: delete the spawner.** The decorations are
@@ -247,7 +265,7 @@ whose owner chain is dead (`HasDeadOwnerChain`) around the departure point
 
 ## The construction trick (why pasted buildings are complete)
 
-A building's pavement sub-areas and driveway sub-nets are **not** created by
+A building's sidewalk sub-areas and driveway sub-nets are **not** created by
 the object definition pipeline. They are built by
 `Game.Simulation.BuildingConstructionSystem` (`CreateAreas` / `CreateNets`)
 as construction finishes. A directly-created building skips construction and
@@ -260,13 +278,13 @@ vanilla component:
 new Game.Objects.UnderConstruction { m_NewPrefab = prefab, m_Progress = 250, m_Speed = 200 }
 ```
 
-Construction completes within a tick and the game itself builds the pavement,
+Construction completes within a tick and the game itself builds the sidewalk,
 driveways and attached props — identical to a hand-placed building. This is
 done exactly once, at resolution time (never in the repeated fix-up pass, which
 would loop construction forever).
 
 Notes from testing: grown (zoned) buildings pasted outside zoning persist;
-signature/unique buildings paste when *Anarchy while pasting* is on (the
+signature/unique buildings paste when *Ignore placement errors when pasting* is on (the
 placement error for duplicates is ignored). Households and workers are not
 copied — the simulation moves people in, which is the desired behavior.
 
@@ -308,8 +326,8 @@ Older mod versions skip these lines harmlessly.
 - **Never delete freshly `Created` entities from a standing system in the
   same frame** — it corrupts the game's creation pipeline and crashes to
   desktop. If something regenerated must go, defer the deletion until the
-  owner has settled (Better Bulldozer waits 30 quiet frames and goes through
-  a command-buffer barrier).
+  owner has settled (the proven pattern is ~30 quiet frames and a pass
+  through a command-buffer barrier).
 - Sweeps must only act on **positive identification** (registry signature,
   dead owner chain). Distance/"looks wrong" heuristics escalate into a fight
   with the game's own rebuilds.

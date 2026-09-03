@@ -1,6 +1,6 @@
 // Copaste — copy/paste tool for props in Cities: Skylines II.
 // Selection/highlight patterns based on MIT-licensed mods by yenyang;
-// placement via the game's definition pipeline as used by Line Tool (Apache-2.0, algernon).
+// placement via the game's own definition pipeline (Apache-2.0 patterns, credited in README).
 
 namespace Copaste
 {
@@ -19,12 +19,15 @@ namespace Copaste
     using Unity.Jobs;
     using Unity.Mathematics;
     using UnityEngine.InputSystem;
+    using UnityEngine.InputSystem.Controls;
 
     public partial class CopasteToolSystem : ToolBaseSystem
     {
-        // Zaštitni limiti — velike selekcije guše igru (definicije/overlay po frejmu).
-        private const int kMaxSelection = 1000;
-        private const int kMaxOverlayCircles = 400;
+        // Zaštitni limiti — velike selekcije guše igru (definicije/overlay po
+        // frejmu). Od 1.2.0 podesivi u Options; defaulti su stare konstante.
+        private static int kMaxSelection => Mod.Settings != null ? Mod.Settings.MaxSelection : 1000;
+
+        private static int kMaxOverlayCircles => Mod.Settings != null ? Mod.Settings.MaxOverlayShapes : 400;
 
         private static readonly UnityEngine.Color kHoverColor = new UnityEngine.Color(1f, 1f, 1f, 0.7f);
         private static readonly UnityEngine.Color kSelectedColor = new UnityEngine.Color(0.2f, 0.85f, 1f, 1f);
@@ -81,7 +84,17 @@ namespace Copaste
         // ono što je ocrtano — to se i kopira).
         private readonly List<Entity> m_SelectedSurfaces = new List<Entity>();
 
-        public int SelectedCount => m_Selected.Count + m_SelectedSurfaces.Count;
+        public int SelectedCount => m_Selected.Count + m_SelectedSurfaces.Count + m_SelectedLanes.Count + m_SelectedNodes.Count + m_SelectedNetEdges.Count;
+
+        // Vrste koje COPY stvarno obrađuje. Za mreže se broje IVICE koje bi
+        // kopija stvarno ponela: selektovane + one čija su oba kraja u
+        // selekciji (dva susedna čvora nose svoj segment). Goli čvor bez
+        // takve ivice ne pali Copy.
+        public int CopyableSelectedCount => m_Selected.Count + m_SelectedSurfaces.Count + m_SelectedLanes.Count + CopyableNetEdgeCount();
+
+        // Vrste koje DELETE sme da obriše. Selektovan čvor mreže broji se jer
+        // briše svoje krake.
+        public int DeletableSelectedCount => m_Selected.Count + m_SelectedSurfaces.Count + m_SelectedLanes.Count + m_SelectedNodes.Count + m_SelectedNetEdges.Count;
 
         // Broj selektovanih NE-zgrada sa transformom — visinske i align
         // operacije deluju samo na njih, pa UI dugmad gate-uju na ovo
@@ -90,22 +103,87 @@ namespace Copaste
         {
             get
             {
-                int count = 0;
-                foreach (Entity entity in m_Selected)
-                {
-                    if (!IsBuilding(entity) &&
-                        EntityManager.Exists(entity) &&
-                        EntityManager.HasComponent<Game.Objects.Transform>(entity))
-                    {
-                        count++;
-                    }
-                }
-
-                return count;
+                EnsureDerivedSelectionData();
+                return m_CachedPropTargetCount;
             }
         }
 
-        public int ClipboardCount => m_Clipboard.Count + m_ClipboardAreas.Count;
+        private int ComputePropTargetCount()
+        {
+            int count = 0;
+            foreach (Entity entity in m_Selected)
+            {
+                if (!IsBuilding(entity) &&
+                    EntityManager.Exists(entity) &&
+                    EntityManager.HasComponent<Game.Objects.Transform>(entity))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        // ---------- Keš izvedenih podataka o selekciji ----------
+        //
+        // UI sistem radi SVAKI frejm i čita ove brojke; računanje je prolaz
+        // kroz celu selekciju sa 2-3 ECS upita po objektu — izmereno 651 us
+        // po frejmu na velikoj selekciji (39% budžeta pri 60 fps je odlazilo
+        // na osvežavanje brojeva koji se menjaju samo kad se selekcija
+        // promeni). Zato: potpis selekcije je JEFTIN prolaz bez ijednog ECS
+        // upita (samo indeksi iz liste), pa se skupo računa tek kad se
+        // potpis promeni. Entiteti umeju da nestanu i bez promene selekcije
+        // (igra ih obriše), zato i osvežavanje na svakih 30 frejmova.
+        private const int kDerivedRefreshFrames = 30;
+
+        private int m_DerivedSignature;
+        private int m_DerivedFrame = int.MinValue;
+        private int m_CachedPropTargetCount;
+        private int m_CachedHeightTargetCount;
+        private string m_CachedSelectionList = string.Empty;
+
+        private int SelectionSignature()
+        {
+            // Kombinovanje je nezavisno od redosleda (zbir + xor) — liste se
+            // pune iz raznih putanja, a potpis ne sme da "zvoni" bez promene.
+            int sum = m_Selected.Count + (m_SelectedSurfaces.Count << 4) + (m_SelectedLanes.Count << 8) +
+                (m_SelectedNodes.Count << 12) + (m_SelectedNetEdges.Count << 16) + ((int)m_Mode << 24);
+            int xor = m_ListFocusEntity.Index;
+            AccumulateSignature(m_Selected, ref sum, ref xor);
+            AccumulateSignature(m_SelectedSurfaces, ref sum, ref xor);
+            AccumulateSignature(m_SelectedLanes, ref sum, ref xor);
+            AccumulateSignature(m_SelectedNodes, ref sum, ref xor);
+            AccumulateSignature(m_SelectedNetEdges, ref sum, ref xor);
+            return sum ^ (xor * 397);
+        }
+
+        private static void AccumulateSignature(List<Entity> entities, ref int sum, ref int xor)
+        {
+            for (int i = 0; i < entities.Count; i++)
+            {
+                Entity entity = entities[i];
+                sum += entity.Index;
+                xor ^= entity.Index * 31;
+            }
+        }
+
+        private void EnsureDerivedSelectionData()
+        {
+            int frame = UnityEngine.Time.frameCount;
+            int signature = SelectionSignature();
+            if (signature == m_DerivedSignature && frame - m_DerivedFrame < kDerivedRefreshFrames)
+            {
+                return;
+            }
+
+            m_DerivedSignature = signature;
+            m_DerivedFrame = frame;
+            m_CachedPropTargetCount = ComputePropTargetCount();
+            m_CachedHeightTargetCount = ComputeHeightTargetCount();
+            m_CachedSelectionList = ComputeSelectionList();
+        }
+
+        public int ClipboardCount => m_Clipboard.Count + m_ClipboardAreas.Count + m_ClipboardLanes.Count + m_ClipboardNetEdges.Count;
 
         public bool IsPasteMode => m_Mode == Mode.Paste;
 
@@ -134,6 +212,23 @@ namespace Copaste
         private bool m_AlignPickArmed;
         private float m_AlignPickGap = -1f;
         private float m_LastAltSpinTime;
+
+        // Uz vreme se pamti i NAD ČIM se okretalo: nalet mora da se prekine kad
+        // se promeni selekcija, inače drugi objekat u roku od sekunde uđe u
+        // TUĐI undo zapis i njegovo okretanje ostane nepovratno. Pečat je XOR
+        // svih članova — sidro+broj je propuštao zamenu ne-prvog člana.
+        private int m_LastAltSpinStamp;
+
+        private int AltSpinSelectionStamp()
+        {
+            int stamp = 17;
+            foreach (Entity entity in m_Selected)
+            {
+                stamp = (stamp * 31) ^ entity.Index;
+            }
+
+            return stamp;
+        }
         private bool m_LeftPressAlt;
 
         // Ctrl+klik ciklus: biranje propova "zakopanih" u druge objekte.
@@ -190,6 +285,23 @@ namespace Copaste
 
             // Farbane površine (poligoni) — samo za Transforms zapise.
             public List<SurfaceSnapshot> m_Surfaces;
+
+            // Samostalne ograde (krive) — paralelna lista, kao površine.
+            public List<LaneSnapshot> m_Lanes;
+
+            // Mreže (samo Transforms zapisi): čvorovi + krive svih njihovih ivica.
+            public List<NetNodeSnapshot> m_NetNodes;
+            public List<NetEdgeSnapshot> m_NetEdges;
+
+            // Paste zapisi: entiteti koji su POSTOJALI pri stampu i liče na
+            // nalepljene — undo ih nikad ne sme obrisati (twin zaštita traje
+            // i posle isteka rezolucionog prozora).
+            public HashSet<Entity> m_PastedExclude;
+
+            // Krive puteva koji su POSTOJALI pri stampu. ID-jevi iznad ne
+            // prezive kad igra podeli zatecen put na nalepljenim cvorovima
+            // (parcad su NOVI entiteti), pa se cuva i geometrija.
+            public List<PreStampNetCurve> m_PastedPreCurves;
         }
 
         private const int kMaxUndo = 32;
@@ -297,7 +409,7 @@ namespace Copaste
         }
 
         // Kategorija po runtime komponentama: vegetacija ima Tree/Plant, dekal
-        // je objekat BEZ Game.Objects.Surface (kolizione površine — MoveIt
+        // je objekat BEZ Game.Objects.Surface (kolizione površine kao
         // pravilo), sve ostalo je običan prop.
         private bool IsCategoryEnabled(Entity entity)
         {
@@ -336,6 +448,35 @@ namespace Copaste
             // Ovaj zapis je farbana površina (poligon), ne objekat.
             public bool m_IsArea;
 
+            // Ovaj zapis je samostalna ograda (container ivica) — pozicija
+            // je sredina krive.
+            public bool m_IsLane;
+
+            // Ovaj zapis je SEGMENT PUTA — pozicija je sredina krive, a uz
+            // njega idu i nadogradnje (drvoredi, ivičnjaci...).
+            public bool m_IsNetEdge;
+            public bool m_HasUpgrade;
+            public CompositionFlags m_Upgrade;
+
+            // Indeksi u tabelu čvorova klipborda — preko njih se nalepljenom
+            // čvoru vrate nadogradnje (kružni tok, semafori, stop znakovi).
+            public int m_StartNodeIndex;
+            public int m_EndNodeIndex;
+
+            // Generacija klipborda u trenutku stampa: tabele čvorova se
+            // rebuild-uju svakim Copy/učitavanjem, pa stari indeksi ne smeju
+            // da čitaju NOVU tabelu (tuđi markeri/nadogradnje).
+            public int m_ClipboardGeneration;
+
+            // Cela kriva i svetske tačke čvorova sa STAMPA. Igra ume da
+            // PODELI nalepljenu deonicu (portali tunela, potporni zidovi) —
+            // parčići imaju druge sredine pa ih midpoint match ne vidi: undo
+            // ih briše po "sredina leži na ovoj krivoj", a redo iz ovih
+            // podataka rekreira i deonice koje rezolucija nije prepoznala.
+            public Bezier4x3 m_NetCurve;
+            public float3 m_StartNodeWorld;
+            public float3 m_EndNodeWorld;
+
             // Zgrade: potpisi površina izvora (vidi ClipboardItem.m_SurfaceSigs).
             public List<SurfaceSig> m_SurfaceSigs;
 
@@ -367,6 +508,7 @@ namespace Copaste
         // (isti prefab + pozicija) — rezolucija ih preskače da undo ne bi
         // obrisao tuđu identičnu zgradu (dupli stamp uz road snap je lak).
         private HashSet<Entity> m_PostPasteExclude;
+        private List<PreStampNetCurve> m_PostPasteNetPreCurves;
         private ComponentType m_PreventOverrideType;
         private bool m_HasPreventOverride;
 
@@ -386,21 +528,63 @@ namespace Copaste
         {
             base.InitializeRaycast();
 
-            if (m_Mode == Mode.Paste || m_Mode == Mode.Relocate || m_MoveDragging || m_MarqueeHeld)
+            if (m_Mode == Mode.Paste || m_Mode == Mode.Relocate || m_MoveDragging || m_MarqueeHeld || m_HandleDragging)
             {
                 // Net je uključen da bi se grupa mogla nalepiti na površinu puta/staze, ne samo na teren.
                 // Isti mask važi tokom pomeranja i marquee razvlačenja — da raycast ne pogađa
                 // propove koje vučemo, niti "iskače" na zgrade preko kojih kursor prelazi.
-                m_ToolRaycastSystem.typeMask = TypeMask.Terrain | TypeMask.Net;
+                // IZUZETAK: dok se vuku MREŽE ili ručka krive, ray ne sme da pogodi
+                // baš put koji pomeramo (most bi pravio paralaksni trzaj) — samo teren.
+                bool draggingNetworks = (m_MoveDragging && (m_SelectedNodes.Count > 0 || m_SelectedNetEdges.Count > 0)) || m_HandleDragging;
+                m_ToolRaycastSystem.typeMask = draggingNetworks ? TypeMask.Terrain : TypeMask.Terrain | TypeMask.Net;
                 m_ToolRaycastSystem.netLayerMask = Game.Net.Layer.Road | Game.Net.Layer.Pathway | Game.Net.Layer.PublicTransportRoad;
                 m_ToolRaycastSystem.collisionMask = CollisionMask.OnGround | CollisionMask.Overground;
             }
             else
             {
+                // Raycast je NAJSKUPLJI deo alata — izmereno 167 us od 194 us
+                // po frejmu — a cena raste sa brojem slojeva koje tražimo.
+                // Zato se traži samo ono što trenutni filteri stvarno mogu da
+                // izaberu: bez objekatskih filtera dovoljan je teren (mreže se
+                // biraju preko prostornog stabla, ne odavde), dekali i
+                // pod-elementi zgrada samo kad su te opcije upaljene.
+                bool needObjects = SelectProps || SelectTrees || SelectDecals || SelectBuildings;
+
+                // MREŽE MORAJU U MASKU kad se biraju: bez njih zrak prođe kroz
+                // most i pogodi teren daleko iza, pa se sve što se bira "pod
+                // kursorom" bira na pogrešnom mestu — čvorovi na mostu se ne
+                // mogu uhvatiti, umesto čvora se hvata cela deonica, a
+                // Shift+klik promaši narednu deonicu.
+                bool needNets = SelectNetworks || SelectFences;
+
                 // Teren je uključen da bi marquee imao početnu tačku na praznom tlu.
-                m_ToolRaycastSystem.typeMask = TypeMask.StaticObjects | TypeMask.Terrain;
+                m_ToolRaycastSystem.typeMask = TypeMask.Terrain
+                    | (needObjects ? TypeMask.StaticObjects : default)
+                    | (needNets ? TypeMask.Net : default);
+                if (needNets)
+                {
+                    m_ToolRaycastSystem.netLayerMask = Game.Net.Layer.Road | Game.Net.Layer.Pathway |
+                        Game.Net.Layer.PublicTransportRoad | Game.Net.Layer.TrainTrack |
+                        Game.Net.Layer.TramTrack | Game.Net.Layer.SubwayTrack;
+                }
+
                 m_ToolRaycastSystem.collisionMask = CollisionMask.OnGround | CollisionMask.Overground;
-                m_ToolRaycastSystem.raycastFlags |= RaycastFlags.Decals | RaycastFlags.SubElements;
+
+                if (SelectDecals)
+                {
+                    m_ToolRaycastSystem.raycastFlags |= RaycastFlags.Decals;
+                }
+
+                // SubElements spušta ray u POD-OBJEKTE. Treba svaki put kad
+                // se objekti uopšte biraju: pod-objekti nisu samo zgradini —
+                // propovi u vlasništvu puteva i čvorova su selektabilni i kad
+                // je "Building elements" ugašen (vidi IsCopyable), pa je
+                // vezivanje ove zastavice za tu opciju činilo ulični mobilijar
+                // nedohvatljivim.
+                if (needObjects)
+                {
+                    m_ToolRaycastSystem.raycastFlags |= RaycastFlags.SubElements;
+                }
             }
         }
 
@@ -536,6 +720,8 @@ namespace Copaste
                 },
             });
 
+            OnCreateFences();
+
             // Preview (Temp) entiteti našeg paste-a — za doterivanje boja ghost-a.
             m_TempPreviewQuery = GetEntityQuery(new EntityQueryDesc
             {
@@ -589,9 +775,64 @@ namespace Copaste
 
         private bool m_PreventOverrideScanned;
 
+        // Sistem zivi koliko i proces, pa se pri ucitavanju DRUGOG grada
+        // zatekne sa istorijom iz prethodnog. Entitetski ID-jevi tamo znace
+        // nesto sasvim drugo, a undo zapisi pamte i POZICIJE — pozicioni
+        // fallback bi u novom gradu brisao ZATECENE objekte koji se slucajno
+        // poklope po tipu i mestu, a undo brisanja bi materijalizovao objekat
+        // iz starog grada. Zato se cela istorija i sve nedovrseno odbacuje.
+        //
+        // Klipbord se NE dira: on drzi prefabe i relativne ofsete, a prefabi
+        // prezive ucitavanje — kopiranje u jednom pa lepljenje u drugom gradu
+        // je korisno i bezbedno.
+        protected override void OnGameLoadingComplete(Colossal.Serialization.Entities.Purpose purpose, Game.GameMode mode)
+        {
+            base.OnGameLoadingComplete(purpose, mode);
+            DiscardWorldBoundState();
+        }
+
+        private void DiscardWorldBoundState()
+        {
+            m_UndoStack.Clear();
+            m_RedoStack.Clear();
+            m_PostPasteFix = null;
+            m_PostPasteExclude = null;
+            m_PostPasteNetPreCurves = null;
+            m_PostPasteFixFrames = 0;
+            m_SubPropFixFrames = 0;
+            m_KeepDefinitionFrames = 0;
+            m_KeepAliveFrame = false;
+            m_PendingUndoSteps = 0;
+            m_PendingRedoSteps = 0;
+            m_LastPreview.Clear();
+
+            m_PendingNetRemaps.Clear();
+            m_PendingNetRemapFrames = 0;
+            m_PendingMarkerAttaches.Clear();
+            m_PendingMarkerFrames = 0;
+            m_DelayedNetSettle.Clear();
+            m_PendingSurfacePrune.Clear();
+
+            ClearSelection();
+            m_HoverEntity = Entity.Null;
+            m_StickyHandleIndex = -1;
+            m_StickyHandleEntity = Entity.Null;
+            m_HandleDragging = false;
+            m_HandleEntity = Entity.Null;
+        }
+
+        // Kuka za razvojne provere: parcijalna metoda bez tela u ovom
+        // buildu, pa je prevodilac uklanja zajedno sa pozivom.
+        partial void SelfTestTick();
+
+        // Broji paljenja alata. Odloženi poslovi koji smeju da prežive
+        // gašenje po njemu vide koliko su ostarili.
+        private int m_ToolSessionId;
+
         protected override void OnStartRunning()
         {
             base.OnStartRunning();
+            m_ToolSessionId++;
 
             // Sken za Anarchy tek sada — pri OnCreate drugi modovi još nisu učitani.
             if (!m_PreventOverrideScanned)
@@ -679,8 +920,27 @@ namespace Copaste
             m_MoveOffsetsPending = false;
             m_MoveItems.Clear();
             m_MoveSurfaceItems.Clear();
+            m_MoveLaneItems.Clear();
             m_Selected.Clear();
             m_SelectedSurfaces.Clear();
+            m_SelectedLanes.Clear();
+            m_SelectedNodes.Clear();
+            m_SelectedNetEdges.Clear();
+            m_NetMoveActive = false;
+            m_DelayedNetSettle.Clear();
+
+            // ID-jevi ne prežive u sledeću učitanu igru — nedovršena
+            // prevezivanja se odbacuju sa alatom.
+            m_PendingNetRemaps.Clear();
+            m_PendingNetRemapFrames = 0;
+            m_PendingMarkerAttaches.Clear();
+            m_PendingMarkerFrames = 0;
+            m_HandleDragging = false;
+            m_HandleIndex = -1;
+            m_HandleEntity = Entity.Null;
+            m_StickyHandleIndex = -1;
+            m_StickyHandleEntity = Entity.Null;
+            m_StraightenArmed = false;
             m_HoverEntity = Entity.Null;
             if (m_Mode == Mode.Paste)
             {
@@ -713,13 +973,45 @@ namespace Copaste
             {
                 applyMode = ApplyMode.Clear;
 
+                // Definicije emitovane VAN paste moda (redo rekreacija puteva,
+                // markeri kružnih tokova) žive frejm-dva dok ih igrini Generate
+                // sistemi ne obrade — applyMode=Clear bi ih pobio pre toga i
+                // rekreirani putevi ne bi ni nastali.
+                // Flag za CEO frejm: paste freeze (UpdatePasteMode) mora
+                // da pokrije SVAKI applyMode=None frejm — čitanje brojača
+                // POSLE dekrementa je poslednji frejm ostavljalo nezamrznut,
+                // pa je klik u njemu štampao nepraćeni duplikat.
+                m_KeepAliveFrame = m_KeepDefinitionFrames > 0;
+                if (m_KeepAliveFrame)
+                {
+                    m_KeepDefinitionFrames--;
+                    applyMode = ApplyMode.None;
+                }
+
+                // Podzemni prikaz prati prekidač (igra renderuje tunele i
+                // zatamni površinu — isti mehanizam kao buldožer).
+                requireUnderground = m_Mode != Mode.Relocate && UndergroundMode;
+
+                RunPendingHistorySteps();
                 RunPostPasteFix();
                 RunSubPropFix();
                 RunDelayedSettles();
+                RunDelayedNetSettles();
+                RunPendingNetRemaps();
+                RunPendingMarkerAttaches();
                 RunPendingSurfacePrunes();
+
+                // Razvojni self-test (prazan u produkciji — partial bez tela).
+                SelfTestTick();
 
                 if (m_UiTyping)
                 {
+                    // Ovaj frejm je počeo sa ApplyMode.Clear, pa je ghost
+                    // obrisan. Bez ovoga bi sledeći frejm sa istim sidrom
+                    // rekao "ništa se nije promenilo" i definicije se nikad ne
+                    // bi ponovo emitovale — a m_LastPreview ostaje pun, pa bi
+                    // klik odštampao nulu i gurnuo prazan undo korak.
+                    m_PasteDirty = true;
                     return inputDeps;
                 }
 
@@ -754,6 +1046,24 @@ namespace Copaste
                 {
                     CancelRelocate();
                 }
+                else if (m_Mode == Mode.Relocate)
+                {
+                    // Zgrada je nestala usred premeštanja a alat se gasi:
+                    // knjigovodstvo se ipak rasplete — fantomski zapis dole,
+                    // sklonjeni redo stek nazad.
+                    if (m_RelocateUndoRecord != null)
+                    {
+                        m_UndoStack.Remove(m_RelocateUndoRecord);
+                        m_RelocateUndoRecord = null;
+                    }
+
+                    if (m_RelocateRedoBackup != null)
+                    {
+                        m_RedoStack.Clear();
+                        m_RedoStack.AddRange(m_RelocateRedoBackup);
+                        m_RelocateRedoBackup = null;
+                    }
+                }
                 else if (m_MoveDragging)
                 {
                     foreach (MoveItem item in m_MoveItems)
@@ -765,14 +1075,37 @@ namespace Copaste
                     }
 
                     SettleSurfaces();
+                    SettleLanes();
+                    SettleNetworks();
+                    m_NetMoveActive = false;
                 }
+
+                // I ove tri su unutar try/catch: iz njih je izuzetak bežao
+                // kroz ResetToolState i dalje u igru — tačno onaj pad zbog kog
+                // ceo blok postoji.
+                FlushBuildingFixups();
+
+                // Odloženi net settle nema ko da otkuca kad alat stane — okini odmah.
+                FlushNetSettles();
+
+                // Prekinuto povlačenje ručke: uredan kraj (undo zapis već postoji).
+                EndHandleDrag();
             }
             catch (System.Exception e)
             {
                 Mod.Log.Warn($"Copaste: gesture cleanup failed: {e.Message}");
             }
 
-            FlushBuildingFixups();
+            // Prozor rezolucije se ZATVARA kad alat stane. Frejmovi otkucavaju
+            // samo dok alat radi, pa bi inače nastavio tamo gde je stao — a u
+            // međuvremenu korisnik igrinim alatom napravi put koji zapisu
+            // odgovara po prefabu i mestu, i rezolucija bi usvojila tuđe delo
+            // (undo bi ga posle obrisao). Sama lista NE nestaje: nju drži undo
+            // zapis, pa se paste i dalje uredno poništava pozicionim matchom.
+            m_PostPasteFix = null;
+            m_PostPasteExclude = null;
+            m_PostPasteNetPreCurves = null;
+            m_PostPasteFixFrames = 0;
         }
 
         private void ResetToolState()
@@ -809,21 +1142,30 @@ namespace Copaste
             m_MoveOffsetsPending = false;
             m_MoveItems.Clear();
             m_MoveSurfaceItems.Clear();
+            m_MoveLaneItems.Clear();
+            m_NetMoveActive = false;
             m_RightHeld = false;
             m_RightDragging = false;
             m_SameFilterPrefab = Entity.Null;
             SetSameFilterName();
             m_HeightPickArmed = false;
             m_AlignPickArmed = false;
+
+            // Alt-tap se mora razoružati: ovo je putanja POSLE izuzetka u
+            // OnUpdate, a selekcija čvorova ostaje — sledeće puštanje Alt-a bi
+            // odradilo ravnanje lanca baš u trenutku kad se alat smiruje.
+            m_StraightenArmed = false;
             m_PostPasteFix = null;
             m_PostPasteFixFrames = 0;
+            m_PostPasteExclude = null;
+            m_PostPasteNetPreCurves = null;
             m_HoverEntity = Entity.Null;
         }
 
         // Da li je kursor iznad UI-ja (naš panel, meniji igre) — sirove mišje akcije se tada ignorišu.
         private static bool MouseOverUI => InputManager.instance != null && InputManager.instance.mouseOverUI;
 
-        // Klik čitamo i direktno sa miša: drugi modovi (npr. Line Tool) drže globalne
+        // Klik čitamo i direktno sa miša: drugi modovi umeju da drže globalne
         // Shift/Ctrl+klik akcije koje preuzmu vanila Apply akciju pa ona ne okine.
         // Ali NE kada je kursor na UI-ju — klik na dugme panela ne sme da bude i klik na mapu.
         private bool ClickedThisFrame()
@@ -901,6 +1243,8 @@ namespace Copaste
                     }
 
                     SettleSurfaces();
+                    SettleLanes();
+                    SettleNetworks();
                 }
 
                 m_RightDragging = false;
@@ -959,10 +1303,21 @@ namespace Copaste
             NativeArray<Entity> areas = query.ToEntityArray(Allocator.Temp);
             for (int i = 0; i < areas.Length; i++)
             {
+                // Isti limit selekcije kao za propove/mreže — marquee preko
+                // ogromnog broja površina ne sme da zaobiđe kapu.
+                if (SelectedCount >= kMaxSelection)
+                {
+                    break;
+                }
 
                 if (m_SelectedSurfaces.Contains(areas[i]) ||
                     !EntityManager.TryGetBuffer(areas[i], true, out DynamicBuffer<Game.Areas.Node> nodes) ||
                     nodes.Length < 3)
+                {
+                    continue;
+                }
+
+                if (UndergroundMode && !MatchesUndergroundMode(nodes[0].m_Position))
                 {
                     continue;
                 }
@@ -1071,6 +1426,16 @@ namespace Copaste
                         continue;
                     }
 
+                    // Podzemni režim: okvir tada bira samo ono ispod zemlje.
+                    // U NORMALNOM režimu se ne filtrira — prop namerno ukopan
+                    // ispod terena je uobičajen potez pri detaljisanju i mora
+                    // da ostane u okviru (klik ga ionako hvata). Uzorkovanje
+                    // terena je skupo, pa ide POSLE odbacivanja po okviru.
+                    if (UndergroundMode && !MatchesUndergroundMode(transforms[i].m_Position))
+                    {
+                        continue;
+                    }
+
                     if (m_MarqueeHits.Count >= kMaxSelection)
                     {
                         break;
@@ -1134,7 +1499,6 @@ namespace Copaste
 
         private void CommitMarquee(bool additive)
         {
-            m_SelectionFromMarquee = true;
             EndAlignSession();
 
             if (!additive)
@@ -1149,11 +1513,21 @@ namespace Copaste
                 CollectSurfacesInMarquee();
             }
 
+            // Ograde: uđu ako im bilo koji uzorak krive upadne u okvir.
+            CollectLanesInMarquee();
+
+            // Mreže: čvorovi u okviru + ivice čija su oba kraja unutra.
+            CollectNetworksInMarquee();
+
             HashSet<Entity> selectedSet = new HashSet<Entity>(m_Selected);
             for (int i = 0; i < m_MarqueeHits.Count; i++)
             {
                 Entity entity = m_MarqueeHits[i];
-                if (m_Selected.Count >= kMaxSelection)
+
+                // Limit važi za CELU selekciju: mreže i ograde su već ušle
+                // (svoji kolektori), pa poređenje samo sa propovima je puštalo
+                // dvostruko preko kape.
+                if (SelectedCount >= kMaxSelection)
                 {
                     // Višak preko limita mora da izgubi highlight — inače svetli zauvek.
                     Mod.Log.Info($"Copaste: selection capped at {kMaxSelection}");
@@ -1255,6 +1629,12 @@ namespace Copaste
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+
+            // Ograde idu gore/dole sa selekcijom (Net.Elevation ih drži na visini).
+            AdjustSelectedLaneHeights(delta);
+
+            // Mreže takođe — čvor nosi elevaciju, susedne deonice prave rampu.
+            AdjustNetworkHeight(delta);
         }
 
         private void ApplyClickSelection(Entity entity, bool shiftHeld)
@@ -1265,7 +1645,6 @@ namespace Copaste
                 return;
             }
 
-            m_SelectionFromMarquee = false;
 
             // Dok je filter aktivan, klik na prop prebacuje filter na njegov tip.
             if (m_SameFilterPrefab != Entity.Null &&
@@ -1298,13 +1677,86 @@ namespace Copaste
             }
         }
 
+        // Da li pritisak "hvata" selekciju bez propa: u radijusu selektovanog
+        // čvora, blizu krive selektovanog segmenta/ograde, ili unutar poligona
+        // selektovane površine. (Propovi imaju svoj put kroz raycast pogodak.)
+        private bool TryGrabSelection(float3 position)
+        {
+            // Klik i hover moraju da se SLAŽU: ako bi klik na ovom mestu
+            // pokupio NESELEKTOVAN čvor/segment/ogradu, selekcija ima
+            // prednost nad hvatanjem (čvor na kraju selektovanog segmenta!).
+            if (SelectNetworks && TryPickNetAt(position, out Entity pickNode, out Entity pickEdge))
+            {
+                if (pickNode != Entity.Null && !m_SelectedNodes.Contains(pickNode))
+                {
+                    return false;
+                }
+
+                if (pickNode == Entity.Null && pickEdge != Entity.Null && !m_SelectedNetEdges.Contains(pickEdge))
+                {
+                    return false;
+                }
+            }
+
+            if (SelectFences && TryPickLaneAt(position, out Entity pickLane) && !m_SelectedLanes.Contains(pickLane))
+            {
+                return false;
+            }
+
+            foreach (Entity node in m_SelectedNodes)
+            {
+                if (EntityManager.TryGetComponent(node, out Game.Net.Node nodeData) &&
+                    math.distance(nodeData.m_Position.xz, position.xz) <= GetNetNodeRadius(node))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Entity edge in m_SelectedNetEdges)
+            {
+                if (EntityManager.TryGetComponent(edge, out Game.Net.Curve curve))
+                {
+                    MathUtils.Distance(curve.m_Bezier, position, out float t);
+                    if (math.distance(MathUtils.Position(curve.m_Bezier, t).xz, position.xz) <= kNetEdgePickThreshold)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            foreach (Entity lane in m_SelectedLanes)
+            {
+                if (EntityManager.TryGetComponent(lane, out Game.Net.Curve curve))
+                {
+                    MathUtils.Distance(curve.m_Bezier, position, out float t);
+                    if (math.distance(MathUtils.Position(curve.m_Bezier, t).xz, position.xz) <= kLanePickThreshold)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            foreach (Entity area in m_SelectedSurfaces)
+            {
+                if (EntityManager.Exists(area) &&
+                    !EntityManager.HasComponent<Owner>(area) &&
+                    EntityManager.TryGetBuffer(area, true, out DynamicBuffer<Game.Areas.Node> nodes) &&
+                    nodes.Length >= 3 &&
+                    PointInPolygon(nodes, position.xz))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void BeginMoveDrag(float3 anchor)
         {
             EndAlignSession();
             // Prop pod mišem ulazi u selekciju ako već nije u njoj.
             if (!m_Selected.Contains(m_LeftPressEntity) && EntityManager.Exists(m_LeftPressEntity))
             {
-                m_SelectionFromMarquee = false;
                 if (!m_LeftPressShift)
                 {
                     ClearSelection();
@@ -1381,6 +1833,29 @@ namespace Copaste
                         });
                     }
                 }
+
+                // Ograde: sidro = sredina krive, korak po frejmu kao površine.
+                m_MoveLaneItems.Clear();
+                foreach (Entity lane in m_SelectedLanes)
+                {
+                    if (EntityManager.Exists(lane) &&
+                        !EntityManager.HasComponent<Owner>(lane) &&
+                        EntityManager.TryGetComponent(lane, out Game.Net.Curve laneCurve))
+                    {
+                        m_MoveLaneItems.Add(new LaneMoveItem
+                        {
+                            m_Entity = lane,
+                            m_Offset = LaneMidpoint(laneCurve.m_Bezier).xz - anchor.xz,
+                        });
+                    }
+                }
+
+                // Mreže: jedna referentna tačka za ceo pokretni skup čvorova.
+                m_NetMoveActive = TryGetNetSelectionCenter(out float3 netCenter);
+                if (m_NetMoveActive)
+                {
+                    m_NetMoveOffset = netCenter.xz - anchor.xz;
+                }
             }
 
             m_MoveOffsetsPending = false;
@@ -1433,6 +1908,49 @@ namespace Copaste
 
                 TransformSurface(item.m_Entity, quaternion.identity, float3.zero, new float3(step.x, 0f, step.y), tick);
             }
+
+            if (m_MoveLaneItems.Count > 0)
+            {
+                // HashSet umesto liste u vrućoj petlji (Contains po susedu);
+                // pun Updated svaki frejm samo za male selekcije — velike idu
+                // na tick + završni settle, kao zgrade/površine.
+                HashSet<Entity> laneGroup = BuildLaneGroup();
+                bool laneMark = m_MoveLaneItems.Count <= 100 || tick;
+                foreach (LaneMoveItem item in m_MoveLaneItems)
+                {
+                    if (!EntityManager.Exists(item.m_Entity) ||
+                        !EntityManager.TryGetComponent(item.m_Entity, out Game.Net.Curve laneCurve))
+                    {
+                        continue;
+                    }
+
+                    float2 laneStep = anchor.xz + item.m_Offset - LaneMidpoint(laneCurve.m_Bezier).xz;
+                    if (math.lengthsq(laneStep) < 1e-6f)
+                    {
+                        continue;
+                    }
+
+                    TransformLane(item.m_Entity, quaternion.identity, float3.zero, new float3(laneStep.x, 0f, laneStep.y), laneGroup, laneMark);
+                }
+            }
+
+            if (m_NetMoveActive)
+            {
+                // Jedan izgrađen skup po frejmu: i centar i transformacija ga dele.
+                HashSet<Entity> movingNet = BuildMovingNodeSet();
+
+                // ALT tokom vuče JEDNOG među-čvora: čvor se lepi na pravu
+                // između svoja dva suseda i klizi samo po njoj.
+                if (!TrySlideNodeAlongLine(anchor, movingNet, tick) &&
+                    TryGetNetCenter(EntityManager, movingNet, out float3 currentNetCenter))
+                {
+                    float2 netStep = anchor.xz + m_NetMoveOffset - currentNetCenter.xz;
+                    if (math.lengthsq(netStep) > 1e-6f)
+                    {
+                        TransformNetSelection(quaternion.identity, float3.zero, new float3(netStep.x, 0f, netStep.y), tick, movingNet);
+                    }
+                }
+            }
         }
 
         private void CancelMarquee()
@@ -1467,10 +1985,26 @@ namespace Copaste
             c11.y = TerrainUtils.SampleHeight(ref heightData, c11) + 0.5f;
             c01.y = TerrainUtils.SampleHeight(ref heightData, c01) + 0.5f;
 
-            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c00, c10), 0.3f);
-            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c10, c11), 0.3f);
-            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c11, c01), 0.3f);
-            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c01, c00), 0.3f);
+            // Debljina linije je u METRIMA sveta: fiksnih 0.3 m sa velike
+            // visine padne ispod jednog piksela i okvir se praktično ne vidi.
+            // Zato raste sa udaljenošću kamere (~0.25% rastojanja).
+            float width = MarqueeLineWidth(c00);
+            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c00, c10), width);
+            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c10, c11), width);
+            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c11, c01), width);
+            overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(c01, c00), width);
+        }
+
+        private static float MarqueeLineWidth(float3 reference)
+        {
+            UnityEngine.Camera camera = UnityEngine.Camera.main;
+            if (camera == null)
+            {
+                return 0.3f;
+            }
+
+            float distance = math.distance((float3)camera.transform.position, reference);
+            return math.clamp(distance * 0.0025f, 0.3f, 40f);
         }
 
         private float3 GetSelectionCenter()
@@ -1486,13 +2020,25 @@ namespace Copaste
                 }
             }
 
+            // Čvorovi mreža ulaze u GLAVNI prosek — pivot mešovite selekcije
+            // (propovi + putevi) mora da obuhvati i puteve, inače rotacija
+            // "orbitira" oko pogrešnog centra.
+            foreach (Entity node in BuildMovingNodeSet())
+            {
+                if (EntityManager.TryGetComponent(node, out Game.Net.Node nodeData))
+                {
+                    center += nodeData.m_Position;
+                    count++;
+                }
+            }
+
             if (count > 0)
             {
                 return center / count;
             }
 
-            // Selekcija od samih površina: centar iz centroida poligona.
-            // Zgradine se preskaču — ne rotiraju se, pa ne pomeraju ni pivot.
+            // Selekcija od samih površina/ograda: centar iz centroida poligona
+            // i sredina krivih. Zgradine se preskaču — ne rotiraju se.
             float2 surfaceCenter = float2.zero;
             foreach (Entity area in m_SelectedSurfaces)
             {
@@ -1500,6 +2046,17 @@ namespace Copaste
                     TryGetSurfaceCentroid(area, out float2 centroid))
                 {
                     surfaceCenter += centroid;
+                    count++;
+                }
+            }
+
+            foreach (Entity lane in m_SelectedLanes)
+            {
+                if (EntityManager.Exists(lane) &&
+                    !EntityManager.HasComponent<Owner>(lane) &&
+                    EntityManager.TryGetComponent(lane, out Game.Net.Curve laneCurve))
+                {
+                    surfaceCenter += LaneMidpoint(laneCurve.m_Bezier).xz;
                     count++;
                 }
             }
@@ -1552,6 +2109,20 @@ namespace Copaste
             {
                 TransformSurface(area, rotation, m_RotationCenter, float3.zero, tick);
             }
+
+            // Ograde se okreću oko istog centra (krive ostaju krute).
+            if (m_SelectedLanes.Count > 0)
+            {
+                HashSet<Entity> laneGroup = BuildLaneGroup();
+                bool laneMark = m_SelectedLanes.Count <= 100 || tick;
+                foreach (Entity lane in m_SelectedLanes)
+                {
+                    TransformLane(lane, rotation, m_RotationCenter, float3.zero, laneGroup, laneMark);
+                }
+            }
+
+            // Mreže se okreću oko istog centra.
+            TransformNetSelection(rotation, m_RotationCenter, float3.zero, tick);
         }
 
         private void RotateClipboard(float angle)
@@ -1579,12 +2150,109 @@ namespace Copaste
                 }
             }
 
+            RotateClipboardLanes(sin, cos);
+            RotateClipboardNetEdges(sin, cos);
+
             m_PasteDirty = true;
         }
+
+        // Je li ovog frejma pritisnut bilo koji taster osim samog Alt-a.
+        // (anyKey ovde ne pomaže: već je "pritisnut" zbog držanog Alt-a, pa
+        // drugi taster ne pravi novu ivicu.)
+        private static bool AnyNonAltKeyPressedThisFrame()
+        {
+            if (Keyboard.current == null)
+            {
+                return false;
+            }
+
+            foreach (KeyControl key in Keyboard.current.allKeys)
+            {
+                if (key.wasPressedThisFrame && key.keyCode != Key.LeftAlt && key.keyCode != Key.RightAlt)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Vidi komentar u OnUpdate: štiti sveže emitovane definicije od
+        // našeg sopstvenog ApplyMode.Clear u select modu.
+        private int m_KeepDefinitionFrames;
+        private bool m_KeepAliveFrame;
+
+        // Okvir pretrage za net zapis mora da pokrije CELU krivu: sredina
+        // parčeta posle igrine podele (tunel/zidovi) ume da bude i pola
+        // dužine deonice daleko od sredine zapisa.
+        private static void ExpandBoundsForRecord(PastedRecord record, ref float3 boundsMin, ref float3 boundsMax)
+        {
+            if (!record.m_IsNetEdge)
+            {
+                return;
+            }
+
+            boundsMin = math.min(boundsMin, math.min(math.min(record.m_NetCurve.a, record.m_NetCurve.b), math.min(record.m_NetCurve.c, record.m_NetCurve.d)));
+            boundsMax = math.max(boundsMax, math.max(math.max(record.m_NetCurve.a, record.m_NetCurve.b), math.max(record.m_NetCurve.c, record.m_NetCurve.d)));
+        }
+
+        private void KeepDefinitionsAlive()
+        {
+            m_KeepDefinitionFrames = 3;
+            applyMode = ApplyMode.None;
+        }
+
+        // Klipbord se menja dok fixup prethodnog stampa još radi: node
+        // indeksi u tim zapisima pokazuju u STARU tabelu — poništavaju se da
+        // nalepljena raskrsnica ne dobije nadogradnje/markere iz NOVOG
+        // klipborda.
+        private void InvalidatePendingNodeFixups()
+        {
+            if (m_PostPasteFix == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < m_PostPasteFix.Count; i++)
+            {
+                PastedRecord record = m_PostPasteFix[i];
+                if (record.m_IsNetEdge)
+                {
+                    record.m_StartNodeIndex = -1;
+                    record.m_EndNodeIndex = -1;
+                    m_PostPasteFix[i] = record;
+                }
+            }
+        }
+
+        // Tvrda granica za brisanje ODJEDNOM. Brisanje N objekata u jednom
+        // frejmu je strukturna oluja: svaka deonica vuče čvorove, pod-objekte
+        // i Updated na susede, pa igrini nativni job-ovi dobiju zalogaj kakav
+        // vanila nikad ne pravi — brisanje celog grada (61 čvor + 75 deonica
+        // + sve ostalo, 01.09) je tvrdo srušilo igru, bez izuzetka i bez
+        // dump-a. Granica se odbija uz zvuk greške; korisnik briše u delovima.
+        // Granica nestaje kad brisanje pređe na rate kroz frejmove.
+        private const int kMaxDeleteAtOnce = 500;
 
         private void DeleteSelection()
         {
             EndAlignSession();
+
+            if (DeletableSelectedCount == 0)
+            {
+                return;
+            }
+
+            if (DeletableSelectedCount > kMaxDeleteAtOnce)
+            {
+                Mod.Log.Info($"Copaste: delete refused — {DeletableSelectedCount} selected, limit is {kMaxDeleteAtOnce} at once (one-frame delete of this size can crash the game)");
+                if (!m_SoundQuery.IsEmptyIgnoreFilter)
+                {
+                    m_AudioManager.PlayUISound(m_SoundQuery.GetSingleton<ToolUXSoundSettingsData>().m_PlaceBuildingFailSound);
+                }
+
+                return;
+            }
 
             // Zgrade se sad brišu kao i sve ostalo (vanila Deleted — isto što
             // radi buldožer). Undo ih vraća kroz construction trik, ali kao
@@ -1596,9 +2264,11 @@ namespace Copaste
             // + Surfaces) — ode i spawner, vanilla Deleted, ništa u save-u.
             List<TransformSnapshot> snapshots = SnapshotSelection(includeBuildings: true, includeUnderConstruction: true, includeBuildingOwned: false);
             List<SurfaceSnapshot> surfaceSnapshots = SnapshotSurfaces(m_SelectedSurfaces);
-            if (snapshots.Count > 0 || surfaceSnapshots.Count > 0)
+            List<LaneSnapshot> laneSnapshots = SnapshotLanes(m_SelectedLanes);
+            List<NetEdgeSnapshot> netEdgeSnapshots = SnapshotDeletableNetEdges();
+            if (snapshots.Count > 0 || surfaceSnapshots.Count > 0 || laneSnapshots.Count > 0 || netEdgeSnapshots.Count > 0)
             {
-                PushUndo(new UndoRecord { m_Kind = UndoKind.Delete, m_Snapshots = snapshots, m_Surfaces = surfaceSnapshots });
+                PushUndo(new UndoRecord { m_Kind = UndoKind.Delete, m_Snapshots = snapshots, m_Surfaces = surfaceSnapshots, m_Lanes = laneSnapshots, m_NetEdges = netEdgeSnapshots });
             }
 
             foreach (Entity entity in m_Selected)
@@ -1618,8 +2288,23 @@ namespace Copaste
                 DeleteSurfaceWithChildren(area);
             }
 
+            foreach (Entity lane in m_SelectedLanes)
+            {
+                DeleteLaneWithNodes(lane);
+            }
+
+            // Mreže: vanila Deleted na svaku ivicu (selektovane + kraci
+            // selektovanih čvorova); čvor bez preostalih ivica ode s njima.
+            foreach (NetEdgeSnapshot netEdge in netEdgeSnapshots)
+            {
+                DeleteNetEdgeWithNodes(netEdge.m_Entity);
+            }
+
             m_Selected.Clear();
             m_SelectedSurfaces.Clear();
+            m_SelectedLanes.Clear();
+            m_SelectedNodes.Clear();
+            m_SelectedNetEdges.Clear();
 
             // Hover koji nije bio u selekciji mora da izgubi highlight — inače svetli zauvek.
             if (m_HoverEntity != Entity.Null)
@@ -1639,6 +2324,8 @@ namespace Copaste
         // siročići. Samostalne farbane površine nemaju SubObject bafer.
         // Koriste je i delete i redo (posle undo-a igra respawn-uje dekoracije
         // na vraćenoj površini, pa i redo mora kaskadno).
+        private readonly List<Entity> m_SurfaceChildScratch = new List<Entity>();
+
         private void DeleteSurfaceWithChildren(Entity area, bool updatePendingSigs = true)
         {
             if (!EntityManager.Exists(area))
@@ -1657,9 +2344,17 @@ namespace Copaste
 
             if (EntityManager.TryGetBuffer(area, true, out DynamicBuffer<Game.Objects.SubObject> areaSubs))
             {
+                // Popis PRE mutacija: AddComponent u petlji invalidira bafer
+                // koji se u njoj i dalje čita (pravilo koje ostatak fajla
+                // poštuje, ovde je bilo propušteno).
+                m_SurfaceChildScratch.Clear();
                 for (int i = 0; i < areaSubs.Length; i++)
                 {
-                    Entity sub = areaSubs[i].m_SubObject;
+                    m_SurfaceChildScratch.Add(areaSubs[i].m_SubObject);
+                }
+
+                foreach (Entity sub in m_SurfaceChildScratch)
+                {
                     if (EntityManager.Exists(sub) && !EntityManager.HasComponent<Deleted>(sub))
                     {
                         EntityManager.AddComponent<Deleted>(sub);
@@ -1679,16 +2374,24 @@ namespace Copaste
                 return;
             }
 
+            // Jedno poređenje maske po frejmu: čipovi se menjaju i iz panela i
+            // iz Options, pa se promena hvata ovde umesto na svakom mestu gde
+            // se filter može promeniti.
+            PurgeSelectionForDisabledFilters();
+
             UpdateRightButton(out float rotationDelta, out bool rightClick);
 
-            // Rotacija selekcije desnim prevlačenjem.
-            if (rotationDelta != 0f && (m_Selected.Count > 0 || m_SelectedSurfaces.Count > 0))
+            // Rotacija selekcije desnim prevlačenjem. Ne dok se vuče ručka
+            // krive — rotacija i ručka bi se otimale oko iste krive.
+            if (rotationDelta != 0f && SelectedCount > 0 && !m_HandleDragging)
             {
                 RotateSelection(rotationDelta);
             }
 
             bool raycastValid = GetRaycastResult(out Entity raycastEntity, out RaycastHit hit);
             Entity hitEntity = raycastValid && IsCopyable(raycastEntity) ? raycastEntity : Entity.Null;
+            // Hover za mreže/ograde: beli obris kandidata pod kursorom.
+            UpdateNetHover(raycastValid, hitEntity, hit.m_HitPosition);
 
             // Klik na neselektabilan entitet: objasni u logu tačno koja provera
             // ga obara, jednom po entitetu.
@@ -1730,7 +2433,7 @@ namespace Copaste
             // Home: naoružaj biranje visine — sledeći klik na prop preuzima njegovu visinu.
             if (m_MatchHeightAction.WasPressedThisFrame())
             {
-                m_HeightPickArmed = !m_HeightPickArmed && m_Selected.Count > 0;
+                m_HeightPickArmed = !m_HeightPickArmed && SelectionHasHeightTargets();
                 if (m_HeightPickArmed)
                 {
                     m_AlignPickArmed = false; // samo jedan pick mod istovremeno
@@ -1745,7 +2448,7 @@ namespace Copaste
 
             // Isto važi i za height-pick (Match H) — bez selekcije nema šta da
             // se poravna, a armiran pick bi progutao sledeći klik.
-            if (m_HeightPickArmed && m_Selected.Count == 0)
+            if (m_HeightPickArmed && !SelectionHasHeightTargets())
             {
                 m_HeightPickArmed = false;
             }
@@ -1755,7 +2458,12 @@ namespace Copaste
                 (Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed);
             Entity ctrlPick = Entity.Null;
 
-            if (ClickedThisFrame())
+            // Dok traje vuča ručke, "novi klik" ne postoji: promena
+            // modifikatora (puštanje ALT-a usred klizanja spoja ograde) ume
+            // da PONOVO okine apply akciju iako taster nije ni puštan — lanac
+            // bi krenuo ispočetka, ručka bi odbila klik jer vuča već traje, i
+            // klik bi propao do okvira: usred vuče bi se upalio marquee.
+            if (ClickedThisFrame() && !m_HandleDragging)
             {
                 if (m_AlignPickArmed && hitEntity != Entity.Null)
                 {
@@ -1768,6 +2476,13 @@ namespace Copaste
                 {
                     // Klik bira uzor-prop: cela selekcija preuzima njegovu visinu iznad terena.
                     MatchSelectionHeight(hitEntity);
+                    m_HeightPickArmed = false;
+                }
+                else if (m_HeightPickArmed && raycastValid &&
+                    TryPickHeightSource(hit.m_HitPosition, out float pickedSourceY))
+                {
+                    // Uzor može da bude i čvor puta / segment / ograda.
+                    MatchSelectionHeightToY(pickedSourceY);
                     m_HeightPickArmed = false;
                 }
                 else if (ctrlHeld && raycastValid &&
@@ -1783,6 +2498,16 @@ namespace Copaste
                     // i samo ako kandidat postoji (inače klik normalno propada dalje).
                     ApplyClickSelection(ctrlPick, shiftHeld);
                 }
+                else if (TryClickLaneAlignHandle(raycastValid ? hit.m_HitPosition : default))
+                {
+                    // Trouglić poravnanja traka na kraju segmenta — klik
+                    // ciklusira centar → levo → desno.
+                }
+                else if (TryBeginHandleDrag(raycastValid ? hit.m_HitPosition : default, hitEntity))
+                {
+                    // Pritisak na ručku krive (jedna ograda / jedan segment) —
+                    // uska meta, sme da pobedi prop ispod sebe.
+                }
                 else if (hitEntity != Entity.Null)
                 {
                     m_LeftHeldOnProp = true;
@@ -1794,16 +2519,43 @@ namespace Copaste
                         (Keyboard.current.leftAltKey.isPressed || Keyboard.current.rightAltKey.isPressed);
                     m_MoveStart = hit.m_HitPosition;
                 }
-                else if (raycastValid && !m_LeftHeldOnProp &&
-                    (raycastEntity == Entity.Null || !EntityManager.HasComponent<Game.Objects.Object>(raycastEntity)))
+                else if (!shiftHeld && raycastValid && TryGrabSelection(hit.m_HitPosition))
                 {
-                    // Marquee počinje samo na tlu — klik na zgradu ne sme da "usidri" ugao na njen krov.
+                    // "CS1 osećaj": pritisak na već selektovanu mrežu/ogradu/
+                    // površinu hvata CELU selekciju u pomeranje — nije potreban
+                    // prop u selekciji. Shift je izuzet (on menja selekciju).
+                    EndAlignSession();
+                    m_LeftHeldOnProp = true;
+                    m_MoveDragging = false;
+                    m_MoveOffsetsPending = false;
+                    m_LeftPressEntity = Entity.Null;
+                    m_LeftPressShift = false;
+                    m_LeftPressAlt = false;
+                    m_MoveStart = hit.m_HitPosition;
+                }
+                else if (raycastValid && !m_LeftHeldOnProp && hitEntity == Entity.Null)
+                {
+                    // Okvir kreće i kad je pod kursorom objekat koji NIJE
+                    // selektabilan (ugašen čip): ranije se takav pritisak nije
+                    // primao nigde, pa je nad pošumljenim delom sa ugašenim
+                    // drvećem alat izgledao mrtvo — okvir ne kreće, selekcija
+                    // se ne briše, puštanje ne radi ništa.
                     m_MarqueeHeld = true;
                     m_MarqueeActive = false;
+
+                    // Ugao se i dalje sidri NA TLU: zrak koji je pogodio krov
+                    // ili krošnju vraća tačku desetak metara u vazduhu, a
+                    // okvir se meri po zemlji.
                     m_MarqueeStart = hit.m_HitPosition;
+                    if (raycastEntity != Entity.Null && EntityManager.HasComponent<Game.Objects.Object>(raycastEntity))
+                    {
+                        TerrainHeightData marqueeTerrain = m_TerrainSystem.GetHeightData();
+                        m_MarqueeStart.y = TerrainUtils.SampleHeight(ref marqueeTerrain, m_MarqueeStart);
+                    }
+
                     m_MarqueeEnd = m_MarqueeStart;
 
-                    // Okvir se poravnava sa uglom kamere, kao u Move It-u.
+                    // Okvir se poravnava sa uglom kamere.
                     UnityEngine.Camera camera = UnityEngine.Camera.main;
                     float3 forward = camera != null ? (float3)camera.transform.forward : new float3(0f, 0f, 1f);
                     m_MarqueeForward = math.normalizesafe(forward.xz, new float2(0f, 1f));
@@ -1812,6 +2564,24 @@ namespace Copaste
             }
 
             // Pomeranje: prevlačenje sa propa vuče celu selekciju.
+            // Povlačenje ručke krive: tačka prati terenski pogodak.
+            if (m_HandleDragging)
+            {
+                // Bez uslova raycastValid: nad mostom ili vodom zrak ume da
+                // promaši teren, a ručka se vodi po kursoru u SVOJOJ ravni —
+                // terenski pogodak joj je samo rezerva. Ranije se ručka na
+                // uzdignutoj deonici prosto nije pomerala.
+                if (leftHeld)
+                {
+                    UpdateHandleDrag(raycastValid ? hit.m_HitPosition : default);
+                }
+
+                if (leftReleased)
+                {
+                    EndHandleDrag();
+                }
+            }
+
             if (m_LeftHeldOnProp && leftHeld && raycastValid)
             {
                 if (!m_MoveDragging && math.distance(m_MoveStart.xz, hit.m_HitPosition.xz) > 0.4f)
@@ -1850,6 +2620,9 @@ namespace Copaste
                     }
 
                     SettleSurfaces();
+                    SettleLanes();
+                    SettleNetworks();
+                    m_NetMoveActive = false;
 
                     // Siročići (dekali placa sa mrtvim vlasnikom) vise na
                     // STAROM mestu odakle je drag krenuo.
@@ -1864,6 +2637,7 @@ namespace Copaste
                 m_MoveOffsetsPending = false;
                 m_MoveItems.Clear();
                 m_MoveSurfaceItems.Clear();
+                m_MoveLaneItems.Clear();
             }
 
             // Marquee: prevlačenje razvlači okvir, sve unutra se selektuje uživo.
@@ -1895,10 +2669,9 @@ namespace Copaste
                     // Klik na farbanu površinu je selektuje (Shift = dodaj/skini).
                     // Isti gate kao marquee: površine su deo Buildings moda.
                     EndAlignSession();
-                    m_SelectionFromMarquee = false;
                     if (shiftHeld)
                     {
-                        if (!m_SelectedSurfaces.Remove(clickedSurface))
+                        if (!m_SelectedSurfaces.Remove(clickedSurface) && SelectedCount < kMaxSelection)
                         {
                             m_SelectedSurfaces.Add(clickedSurface);
                         }
@@ -1907,6 +2680,43 @@ namespace Copaste
                     {
                         ClearSelection();
                         m_SelectedSurfaces.Add(clickedSurface);
+                    }
+                }
+                else if (SelectFences && TryPickLaneAt(m_MarqueeStart, out Entity clickedLane))
+                {
+                    // Klik blizu ograde je selektuje — ista pravila kao površine.
+                    EndAlignSession();
+                    if (shiftHeld)
+                    {
+                        if (!m_SelectedLanes.Remove(clickedLane) && SelectedCount < kMaxSelection)
+                        {
+                            m_SelectedLanes.Add(clickedLane);
+                        }
+                    }
+                    else
+                    {
+                        ClearSelection();
+                        m_SelectedLanes.Add(clickedLane);
+                    }
+                }
+                else if (SelectNetworks && TryPickNetAt(m_MarqueeStart, out Entity clickedNode, out Entity clickedNetEdge))
+                {
+                    // Klik na mrežu: čvor ima prednost u svom radijusu, inače
+                    // segment. Shift dodaje/skida, isto kao ostalo.
+                    EndAlignSession();
+                    List<Entity> targetList = clickedNode != Entity.Null ? m_SelectedNodes : m_SelectedNetEdges;
+                    Entity clickedNet = clickedNode != Entity.Null ? clickedNode : clickedNetEdge;
+                    if (shiftHeld)
+                    {
+                        if (!targetList.Remove(clickedNet) && SelectedCount < kMaxSelection)
+                        {
+                            targetList.Add(clickedNet);
+                        }
+                    }
+                    else
+                    {
+                        ClearSelection();
+                        targetList.Add(clickedNet);
                     }
                 }
                 else if (!shiftHeld)
@@ -1922,6 +2732,16 @@ namespace Copaste
             // Brzi desni klik: prvo gasi height-pick, pa čisti selekciju, pa izlazi iz alata.
             if (rightClick)
             {
+                // Tokom vuče ručke desni klik znači "prekini potez": vuča se
+                // uredno završi, selekcija OSTAJE. Ranije je brisao selekciju,
+                // a vuča je preživljavala — kriva je sablasno pratila miš bez
+                // ijedne vidljive ručke, i bez završnog settle-a.
+                if (m_HandleDragging)
+                {
+                    EndHandleDrag();
+                    return;
+                }
+
                 if (m_AlignPickArmed)
                 {
                     m_AlignPickArmed = false;
@@ -1930,7 +2750,7 @@ namespace Copaste
                 {
                     m_HeightPickArmed = false;
                 }
-                else if (m_Selected.Count > 0)
+                else if (SelectedCount > 0)
                 {
                     ClearSelection();
                 }
@@ -1946,10 +2766,56 @@ namespace Copaste
             // Tokom aktivnog poteza (drag/rotacija/marquee) delete i undo/redo
             // se ignorišu — undo bi pojeo zapis SOPSTVENOG poteza i teleportovao
             // entitete usred vučenja.
-            bool gestureActive = m_MoveDragging || m_RightDragging || m_MarqueeActive;
+            bool gestureActive = m_MoveDragging || m_RightDragging || m_MarqueeActive || m_HandleDragging;
+
+            // U: podzemni režim (prikaz + šta klik/okvir biraju; copy/paste/
+            // undo rade isto u oba sveta).
+            if (Keyboard.current != null && Keyboard.current.uKey.wasPressedThisFrame && !m_UiTyping)
+            {
+                UndergroundMode = !UndergroundMode;
+            }
+
+            // ALT (tap): izravnaj selektovane među-čvorove mreže u pravu liniju
+            // između suseda-sidara. ALT je već i modifikator (45°
+            // snap rotacije, Alt+klik na prop, Alt+točkić), a igrin sistem
+            // prečica ne ume goli modifikator kao taster — zato TAP: pritisak
+            // naoruža, sve ostalo razoružava, čisto otpuštanje okida.
+            // MORA pre Delete/Undo/Redo/Relocate izlaza: oni izlaze iz funkcije
+            // pa bi razoružavanje bilo preskočeno i Alt bi ostao naoružan.
+            if (Keyboard.current != null)
+            {
+                bool altPressed = Keyboard.current.leftAltKey.wasPressedThisFrame ||
+                    Keyboard.current.rightAltKey.wasPressedThisFrame;
+                bool altReleased = Keyboard.current.leftAltKey.wasReleasedThisFrame ||
+                    Keyboard.current.rightAltKey.wasReleasedThisFrame;
+                if (altPressed && !gestureActive && !m_UiTyping && m_SelectedNodes.Count > 0)
+                {
+                    m_StraightenArmed = true;
+                }
+
+                // Klik/skrol, bilo koji drugi taster (Alt+Tab, Ctrl+Z dok je
+                // Alt dole) i gubitak fokusa prozora — sve gasi tap.
+                if (m_StraightenArmed &&
+                    (gestureActive ||
+                    !UnityEngine.Application.isFocused ||
+                    (Mouse.current != null &&
+                        (Mouse.current.leftButton.isPressed || Mouse.current.rightButton.isPressed ||
+                        math.abs(Mouse.current.scroll.ReadValue().y) > 0.01f)) ||
+                    AnyNonAltKeyPressedThisFrame()))
+                {
+                    m_StraightenArmed = false;
+                }
+
+                if (altReleased && m_StraightenArmed)
+                {
+                    m_StraightenArmed = false;
+                    StraightenSelectedNetNodes();
+                    return;
+                }
+            }
 
             if (m_DeleteAction.WasPressedThisFrame() && !gestureActive &&
-                (m_Selected.Count > 0 || m_SelectedSurfaces.Count > 0))
+                DeletableSelectedCount > 0)
             {
                 DeleteSelection();
                 return;
@@ -2013,12 +2879,15 @@ namespace Copaste
                 if (scroll != 0f)
                 {
                     // Jedan undo zapis po "naletu" okretanja, ne po svakom koraku.
-                    if (UnityEngine.Time.time - m_LastAltSpinTime > 1f)
+                    int spinStamp = AltSpinSelectionStamp();
+                    if (UnityEngine.Time.time - m_LastAltSpinTime > 1f ||
+                        m_LastAltSpinStamp != spinStamp)
                     {
                         PushTransformUndo();
                     }
 
                     m_LastAltSpinTime = UnityEngine.Time.time;
+                    m_LastAltSpinStamp = spinStamp;
                     float notches = math.abs(scroll) > 10f ? scroll / 120f : scroll;
                     SpinSelection(math.radians(15f) * notches);
                 }
@@ -2040,7 +2909,19 @@ namespace Copaste
 
             // PageUp/PageDown: podizanje/spuštanje selekcije.
             float heightDelta = GetHeightInputDelta();
-            if (heightDelta != 0f && SelectionHasHeightTargets())
+
+            // Dok se drži ručka krive, PgUp/PgDn diže/spušta BAŠ TU TAČKU
+            // (kos segment) — ne celu selekciju.
+            if (heightDelta != 0f && m_HandleDragging)
+            {
+                m_HandleHeightOffset += heightDelta;
+            }
+            else if (heightDelta != 0f &&
+                TryAdjustStickyHandleHeight(heightDelta, m_RaiseAction.WasPressedThisFrame() || m_LowerAction.WasPressedThisFrame()))
+            {
+                // Klikom izabrana ručka: pomera se samo ta tačka.
+            }
+            else if (heightDelta != 0f && SelectionHasHeightTargets())
             {
                 if (m_RaiseAction.WasPressedThisFrame() || m_LowerAction.WasPressedThisFrame())
                 {
@@ -2051,13 +2932,17 @@ namespace Copaste
             }
 
             // Copy: kopiraj selekciju u clipboard.
-            if (m_CopyAction.WasPressedThisFrame() && (m_Selected.Count > 0 || m_SelectedSurfaces.Count > 0))
+            if (m_CopyAction.WasPressedThisFrame() && CopyableSelectedCount > 0)
             {
                 CopySelection();
             }
 
             // Paste: pređi u paste mod ako clipboard nije prazan.
-            if (m_PasteAction.WasPressedThisFrame() && ClipboardCount > 0)
+            // NE usred vuče ručke: prelazak u paste mod bi preskočio puštanje
+            // tastera (detektuje se samo u select bloku), m_HandleDragging bi
+            // ostao true zauvek, a guard lanca klikova bi posle povratka
+            // blokirao SVE klikove — alat izgleda mrtav do restarta.
+            if (m_PasteAction.WasPressedThisFrame() && ClipboardCount > 0 && !m_HandleDragging)
             {
                 EnterPasteMode();
             }
@@ -2090,6 +2975,14 @@ namespace Copaste
                 m_PasteDirty = true;
             }
 
+            // I redo: poništeni stamp se vraća bez izlaska iz paste moda.
+            // (Ranije Ctrl+Y ovde NIJE bio vezan, a panel dugme je bilo
+            // ugašeno u paste modu — redo posle undo-a stampa bio nemoguć.)
+            if (m_RedoAction.WasPressedThisFrame())
+            {
+                Redo();
+            }
+
             // End: resetuj visinski pomak preview-a.
             if (m_SnapGroundAction.WasPressedThisFrame() && m_PasteHeightBoost != 0f)
             {
@@ -2114,6 +3007,9 @@ namespace Copaste
 
             if (!GetRaycastResult(out Entity _, out RaycastHit hit))
             {
+                // Isti razlog kao kod gard-a za kucanje: ghost je ovog frejma
+                // obrisan, pa sledeći mora ponovo da emituje definicije.
+                m_PasteDirty = true;
                 return;
             }
 
@@ -2125,6 +3021,23 @@ namespace Copaste
             float3 anchor = hit.m_HitPosition;
             anchor = ApplyRoadSnap(anchor);
             DrawPasteOverlays(anchor);
+
+            // Keep-alive prozor (markeri kružnog toka posle stampa / redo
+            // rekreacija): applyMode je None pa se stari ghost NE čisti — novi
+            // preview preko njega bi napravio DUPLI set koji bi klik ceo
+            // primenio (trajni duplikat koga undo ne vidi). Zato se preview i
+            // klik zamrznu par frejmova; posle prozora prvi Clear frejm briše
+            // nagomilano i preview se emituje svež.
+            if (m_KeepAliveFrame || m_KeepDefinitionFrames > 0)
+            {
+                m_PasteDirty = true;
+                if (m_PreviewLookFrames > 0)
+                {
+                    m_PreviewLookFrames--;
+                }
+
+                return;
+            }
 
             // Klik: potvrdi — prošlofrejmovski preview postaje trajan.
             if (ClickedThisFrame())
@@ -2142,13 +3055,24 @@ namespace Copaste
                 // razrešavaju TAČNE entitete koje je paste stvorio, pa undo briše samo njih.
                 m_PostPasteFix = new List<PastedRecord>(m_LastPreview);
                 m_PostPasteFixFrames = 10;
+                m_EmittedNodeMarkers.Clear();
 
                 // U ovom frejmu upiti vide samo pre-postojeće entitete (novi
                 // nastaju tek posle Apply) — popis "dvojnika" za rezoluciju,
                 // da undo ne obriše tuđu identičnu zgradu.
-                m_PostPasteExclude = CollectPreStampMatches(m_PostPasteFix);
+                m_PostPasteNetPreCurves = new List<PreStampNetCurve>();
+                m_PostPasteExclude = CollectPreStampMatches(m_PostPasteFix, m_PostPasteNetPreCurves);
 
-                PushUndo(new UndoRecord { m_Kind = UndoKind.Paste, m_Pasted = m_PostPasteFix });
+                // Isključeni "blizanci" idu i u SAM zapis: prozor rezolucije
+                // nuluje m_PostPasteExclude, a kasni undo mora i dalje da zna
+                // koje postojeće entitete NE sme da obriše pozicionim matchom.
+                PushUndo(new UndoRecord
+                {
+                    m_Kind = UndoKind.Paste,
+                    m_Pasted = m_PostPasteFix,
+                    m_PastedExclude = m_PostPasteExclude,
+                    m_PastedPreCurves = m_PostPasteNetPreCurves,
+                });
                 if (!m_SoundQuery.IsEmptyIgnoreFilter)
                 {
                     m_AudioManager.PlayUISound(m_SoundQuery.GetSingleton<ToolUXSoundSettingsData>().m_PlacePropSound);
@@ -2278,19 +3202,71 @@ namespace Copaste
             temps.Dispose();
         }
 
-        private void DrawSelectOverlays()
+        // ---------- Odsecanje overlay-a ----------
+        //
+        // Ono što je IZA kamere ili predaleko ne može da se vidi, a svaki
+        // oblik košta poziv crtanja (izmereno ~1.3 us po pozivu). Pri velikim
+        // selekcijama je pola oblika redovno van vidnog polja.
+        private bool m_OverlayCullValid;
+        private float3 m_OverlayCameraPosition;
+        private float3 m_OverlayCameraForward;
+
+        private void BeginOverlayCull()
         {
-            if (m_Selected.Count == 0 && m_SelectedSurfaces.Count == 0 &&
-                m_HoverEntity == Entity.Null && !m_MarqueeActive)
+            UnityEngine.Camera camera = UnityEngine.Camera.main;
+            m_OverlayCullValid = camera != null;
+            if (!m_OverlayCullValid)
             {
                 return;
             }
 
+            UnityEngine.Vector3 position = camera.transform.position;
+            UnityEngine.Vector3 forward = camera.transform.forward;
+            m_OverlayCameraPosition = new float3(position.x, position.y, position.z);
+            m_OverlayCameraForward = new float3(forward.x, forward.y, forward.z);
+
+        }
+
+        private bool OverlayVisible(float3 position)
+        {
+            if (!m_OverlayCullValid)
+            {
+                return true;
+            }
+
+            // Tolerancija od 50 m pokriva oblike tik uz ivicu kadra. Granica
+            // daljine je namerno preko cele mape: pri odaljenoj kameri i sama
+            // visina kamere ume da premaši par kilometara, pa bi uža granica
+            // sakrila selekciju koja se lepo vidi. Pravi dobitak ionako nosi
+            // provera "iza kamere".
+            float3 delta = position - m_OverlayCameraPosition;
+            return math.dot(delta, m_OverlayCameraForward) > -50f &&
+                math.lengthsq(delta) < 10000f * 10000f;
+        }
+
+        private void DrawSelectOverlays()
+        {
+            if (SelectedCount == 0 &&
+                m_HoverEntity == Entity.Null && !m_MarqueeActive &&
+                m_LaneHoverEntity == Entity.Null && m_NetHoverNode == Entity.Null && m_NetHoverEdge == Entity.Null)
+            {
+                return;
+            }
+
+            BeginOverlayCull();
             OverlayRenderSystem.Buffer overlayBuffer = m_OverlayRenderSystem.GetBuffer(out JobHandle _);
 
             // Selektovane površine: obris poligona u boji selekcije.
+            // Isti overlay budžet kao za krugove — hiljade površina ne smeju
+            // da sruše frejmrejt crtanjem obrisa.
+            int surfacesDrawn = 0;
             foreach (Entity area in m_SelectedSurfaces)
             {
+                if (surfacesDrawn >= kMaxOverlayCircles)
+                {
+                    break;
+                }
+
                 if (!EntityManager.Exists(area) ||
                     !EntityManager.TryGetBuffer(area, true, out DynamicBuffer<Game.Areas.Node> nodes) ||
                     nodes.Length < 2)
@@ -2298,6 +3274,7 @@ namespace Copaste
                     continue;
                 }
 
+                surfacesDrawn++;
                 for (int n = 0; n < nodes.Length; n++)
                 {
                     float3 a = nodes[n].m_Position;
@@ -2305,6 +3282,21 @@ namespace Copaste
                     overlayBuffer.DrawLine(kSelectedColor, new Line3.Segment(a, b), 0.3f);
                 }
             }
+
+            // Selektovane ograde: linija duž krive.
+            DrawLaneOverlays(overlayBuffer);
+
+            // Selektovane mreže: krug na čvoru, linija duž segmenta.
+            DrawNetworkOverlays(overlayBuffer);
+
+            // Ručke za savijanje (jedna ograda / jedan segment).
+            DrawHandleOverlays(overlayBuffer);
+
+            // EKSPERIMENT: kružići poravnanja traka.
+            DrawLaneAlignHandles(overlayBuffer);
+
+            // Hover kandidati (mreže/ograde).
+            DrawNetHoverOverlays(overlayBuffer);
 
             if (m_MarqueeActive)
             {
@@ -2322,6 +3314,11 @@ namespace Copaste
                 if (EntityManager.Exists(entity) &&
                     EntityManager.TryGetComponent(entity, out Game.Objects.Transform transform))
                 {
+                    if (!OverlayVisible(transform.m_Position))
+                    {
+                        continue;
+                    }
+
                     // Zgrade: obris placa umesto velikog kruga.
                     if (IsBuilding(entity) &&
                         TryDrawBuildingLotOutline(overlayBuffer, entity, transform, kSelectedColor, 0.3f))
@@ -2473,8 +3470,21 @@ namespace Copaste
 
         private void CopySelection()
         {
+            // PRE čišćenja klipborda: selekcija koja ne bi proizvela NIJEDNU
+            // stavku (npr. sam jedan čvor puta) ne sme da uništi sadržaj.
+            // Meri se ISTIM brojačem koji pali Copy dugme — kapija i posao
+            // ne smeju da se razilaze.
+            if (CopyableSelectedCount == 0)
+            {
+                return;
+            }
+
+            InvalidatePendingNodeFixups();
             m_Clipboard.Clear();
             m_ClipboardAreas.Clear();
+            m_ClipboardLanes.Clear();
+            m_ClipboardNetEdges.Clear();
+            ResetClipboardNetNodes(null, null, null, null);
 
             // Anti-duplikat: prop čiji je VLASNIK (zgrada) takođe u selekciji se
             // NE kopira zasebno — nalepljena zgrada kroz construction sagradi
@@ -2511,7 +3521,8 @@ namespace Copaste
 
             if (count == 0)
             {
-                // Selekcija bez objekata: kopiraju se samo površine, centroid iz njih.
+                // Selekcija bez objekata: kopiraju se samo površine/ograde,
+                // centroid iz njihovih poligona i sredina krivih.
                 float2 surfaceCentroid = float2.zero;
                 int surfaceCount = 0;
                 foreach (Entity area in m_SelectedSurfaces)
@@ -2519,6 +3530,27 @@ namespace Copaste
                     if (TryGetSurfaceCentroid(area, out float2 areaCentroid))
                     {
                         surfaceCentroid += areaCentroid;
+                        surfaceCount++;
+                    }
+                }
+
+                foreach (Entity lane in m_SelectedLanes)
+                {
+                    if (EntityManager.Exists(lane) &&
+                        !EntityManager.HasComponent<Owner>(lane) &&
+                        EntityManager.TryGetComponent(lane, out Game.Net.Curve laneCurve))
+                    {
+                        surfaceCentroid += LaneMidpoint(laneCurve.m_Bezier).xz;
+                        surfaceCount++;
+                    }
+                }
+
+                // Mreže: pokretni skup čvorova ulazi u centroid.
+                foreach (Entity node in BuildMovingNodeSet())
+                {
+                    if (EntityManager.TryGetComponent(node, out Game.Net.Node netNode))
+                    {
+                        surfaceCentroid += netNode.m_Position.xz;
                         surfaceCount++;
                     }
                 }
@@ -2574,8 +3606,10 @@ namespace Copaste
             }
 
             CaptureSurfaces(centroid);
+            CaptureLanes(centroid);
+            CaptureNetworkEdges(centroid);
 
-            Mod.Log.Info($"Copaste: copied {m_Clipboard.Count} objects, {m_ClipboardAreas.Count} surfaces");
+            Mod.Log.Info($"Copaste: copied {m_Clipboard.Count} objects, {m_ClipboardAreas.Count} surfaces, {m_ClipboardLanes.Count} fences, {m_ClipboardNetEdges.Count} road segments");
         }
 
         private void CreatePasteDefinitions(float3 anchor)
@@ -2676,6 +3710,12 @@ namespace Copaste
                     m_IsArea = true,
                 });
             }
+
+            // Ograde: CreationDefinition{container, m_SubPrefab=ograda} + NetCourse.
+            CreateLaneDefinitions(buffer, anchor, ref heightData, ref random, keepLook, baseDelta);
+
+            // Putevi: isti pipeline, sa DisableMerge (inače se kopija raspadne).
+            CreateNetworkDefinitions(buffer, anchor, ref heightData, ref random, baseDelta);
         }
 
         // Ctrl+klik: vrati sledećeg kandidata oko tačke pogotka. Ponovljeni klik
@@ -2850,6 +3890,11 @@ namespace Copaste
         {
             EndAlignSession();
             m_SelectedSurfaces.Clear();
+            m_SelectedLanes.Clear();
+            m_SelectedNodes.Clear();
+            m_SelectedNetEdges.Clear();
+            m_StickyHandleIndex = -1;
+            m_StickyHandleEntity = Entity.Null;
             foreach (Entity entity in m_Selected)
             {
                 if (entity != m_HoverEntity)
@@ -2859,6 +3904,78 @@ namespace Copaste
             }
 
             m_Selected.Clear();
+        }
+
+        // Selekcija mora da prati čipove. Filteri se konsultuju samo pri
+        // HVATANJU, pa je gašenje čipa ostavljalo već selektovane entitete u
+        // selekciji: panel tvrdi da putevi nisu selektabilna kategorija, a Del
+        // ih i dalje buldožira i brojač ih i dalje broji.
+        private int m_LastFilterMask = -1;
+
+        private static int CurrentSelectionFilterMask()
+        {
+            return (SelectProps ? 1 : 0) | (SelectTrees ? 2 : 0) | (SelectDecals ? 4 : 0) |
+                (SelectSurfaces ? 8 : 0) | (SelectBuildings ? 16 : 0) |
+                (SelectFences ? 32 : 0) | (SelectNetworks ? 64 : 0) |
+                (SelectBuildingProps ? 128 : 0);
+        }
+
+        private void PurgeSelectionForDisabledFilters()
+        {
+            int mask = CurrentSelectionFilterMask();
+            if (mask == m_LastFilterMask)
+            {
+                return;
+            }
+
+            bool first = m_LastFilterMask < 0;
+            m_LastFilterMask = mask;
+            if (first)
+            {
+                return;
+            }
+
+            if (!SelectNetworks && (m_SelectedNodes.Count > 0 || m_SelectedNetEdges.Count > 0))
+            {
+                m_SelectedNodes.Clear();
+                m_SelectedNetEdges.Clear();
+                EndAlignSession();
+                m_StickyHandleIndex = -1;
+                m_StickyHandleEntity = Entity.Null;
+            }
+
+            if (!SelectFences && m_SelectedLanes.Count > 0)
+            {
+                m_SelectedLanes.Clear();
+                m_StickyHandleIndex = -1;
+                m_StickyHandleEntity = Entity.Null;
+            }
+
+            if (!SelectSurfaces)
+            {
+                m_SelectedSurfaces.Clear();
+            }
+
+            for (int i = m_Selected.Count - 1; i >= 0; i--)
+            {
+                Entity entity = m_Selected[i];
+
+                // Ista kapija kao pri hvatanju (IsCopyable): i "Building
+                // elements" čip — gašenje mora da izbaci zgradine elemente iz
+                // selekcije, inače ih Del i dalje briše.
+                if (EntityManager.Exists(entity) && IsCategoryEnabled(entity) &&
+                    (SelectBuildingProps || !IsOwnedByBuilding(entity)))
+                {
+                    continue;
+                }
+
+                if (entity != m_HoverEntity)
+                {
+                    Unhighlight(entity);
+                }
+
+                m_Selected.RemoveAt(i);
+            }
         }
 
         public void ToggleTool()
@@ -2886,7 +4003,7 @@ namespace Copaste
         // Akcije koje poziva UI panel (dugmad) — ekvivalenti prečica.
         public void TriggerCopy()
         {
-            if (ToolIsActive && m_Mode == Mode.Select && (m_Selected.Count > 0 || m_SelectedSurfaces.Count > 0))
+            if (ToolIsActive && m_Mode == Mode.Select && CopyableSelectedCount > 0)
             {
                 CopySelection();
             }
@@ -2928,6 +4045,13 @@ namespace Copaste
         // Jedinstven ulazak u paste mod — čisti SVA stanja selekcionog moda.
         private void EnterPasteMode()
         {
+            // Aktivna vuča ručke se uredno završava PRE promene moda — posle
+            // prelaska nema ko da detektuje puštanje tastera.
+            if (m_HandleDragging)
+            {
+                EndHandleDrag();
+            }
+
             EndAlignSession();
             CancelMarquee();
             if (m_HoverEntity != Entity.Null && !m_Selected.Contains(m_HoverEntity))
@@ -2943,6 +4067,8 @@ namespace Copaste
             m_MoveOffsetsPending = false;
             m_MoveItems.Clear();
             m_MoveSurfaceItems.Clear();
+            m_MoveLaneItems.Clear();
+            m_NetMoveActive = false;
             m_Mode = Mode.Paste;
             m_PasteDirty = true;
             m_PasteHeightBoost = 0f;
@@ -2965,9 +4091,44 @@ namespace Copaste
         public void TriggerDelete()
         {
             if (ToolIsActive && m_Mode == Mode.Select && !m_MoveDragging && !m_RightDragging &&
-                (m_Selected.Count > 0 || m_SelectedSurfaces.Count > 0))
+                DeletableSelectedCount > 0)
             {
                 DeleteSelection();
+            }
+        }
+
+        // Panel dugmad NE izvršavaju istoriju odmah: UI klik stiže u fazi
+        // frejma u kojoj igra ZABRANJUJE CreateCommandBuffer ("Trying to
+        // create EntityCommandBuffer when it's not allowed!"), a rekreacija
+        // puteva ide kroz definicije i bafer. Klik samo zakaže korak, OnUpdate
+        // ga odigra u prvom sledećem frejmu — u dozvoljenoj fazi.
+        private int m_PendingUndoSteps;
+        private int m_PendingRedoSteps;
+
+        private void RunPendingHistorySteps()
+        {
+            bool gestureActive = m_Mode == Mode.Relocate || m_MoveDragging || m_RightDragging || m_MarqueeActive || m_HandleDragging;
+            if (gestureActive)
+            {
+                m_PendingUndoSteps = 0;
+                m_PendingRedoSteps = 0;
+                return;
+            }
+
+            while (m_PendingUndoSteps > 0)
+            {
+                m_PendingUndoSteps--;
+                Undo();
+                if (m_Mode == Mode.Paste)
+                {
+                    m_PasteDirty = true;
+                }
+            }
+
+            while (m_PendingRedoSteps > 0)
+            {
+                m_PendingRedoSteps--;
+                Redo();
             }
         }
 
@@ -2978,11 +4139,7 @@ namespace Copaste
             // tokom aktivnog drag-a/rotacije (zapis sopstvenog poteza).
             if (ToolIsActive && m_Mode != Mode.Relocate && !m_MoveDragging && !m_RightDragging)
             {
-                Undo();
-                if (m_Mode == Mode.Paste)
-                {
-                    m_PasteDirty = true;
-                }
+                m_PendingUndoSteps++;
             }
         }
 
@@ -3045,6 +4202,8 @@ namespace Copaste
                 }
 
                 SettleSurfaces();
+                SettleLanes();
+                SettleNetworks();
             }
         }
 
@@ -3112,6 +4271,21 @@ namespace Copaste
             // Površine nemaju seed/boje/drveće/overrides — zapis služi samo za undo.
             if (record.m_IsArea)
             {
+                return;
+            }
+
+            // Ograda (container ivica): poseban tok — upis seed-a traži i
+            // Updated da LaneSystem ponovo izvede varijaciju vidljivog lane-a.
+            if (record.m_IsLane)
+            {
+                ApplyPastedLaneFix(entity, record);
+                return;
+            }
+
+            // Segment puta: samo nadogradnje (drvoredi i sl.).
+            if (record.m_IsNetEdge)
+            {
+                ApplyPastedNetEdgeFix(entity, record);
                 return;
             }
 
@@ -3257,6 +4431,7 @@ namespace Copaste
                     {
                         boundsMin = math.min(boundsMin, record.m_Position);
                         boundsMax = math.max(boundsMax, record.m_Position);
+                        ExpandBoundsForRecord(record, ref boundsMin, ref boundsMax);
                     }
                 }
 
@@ -3269,7 +4444,7 @@ namespace Copaste
                 // Bez uslova na IncludeBuildings — paste je mogao da se desi pre gašenja.
                 foreach (PastedRecord record in m_PostPasteFix)
                 {
-                    if (record.m_Resolved == Entity.Null && !record.m_IsArea)
+                    if (record.m_Resolved == Entity.Null && !record.m_IsArea && !record.m_IsLane && !record.m_IsNetEdge)
                     {
                         ResolvePastedFromQuery(m_BuildingQuery, boundsMin, boundsMax, claimed);
                         break;
@@ -3285,23 +4460,63 @@ namespace Copaste
                         break;
                     }
                 }
+
+                // Ograde: rezolucija po prefabu + sredini krive container ivice.
+                foreach (PastedRecord record in m_PostPasteFix)
+                {
+                    if (record.m_Resolved == Entity.Null && record.m_IsLane)
+                    {
+                        ResolvePastedLanes(boundsMin, boundsMax, claimed);
+                        break;
+                    }
+                }
+
+                // Putevi: rezolucija kroz net stablo po prefabu + sredini krive.
+                foreach (PastedRecord record in m_PostPasteFix)
+                {
+                    if (record.m_Resolved == Entity.Null && record.m_IsNetEdge)
+                    {
+                        ResolvePastedNetEdges(boundsMin, boundsMax, claimed);
+                        break;
+                    }
+                }
             }
 
             if (m_PostPasteFixFrames == 0)
             {
+                LogPastedNetTopology(m_PostPasteFix);
+
                 // Bez Clear — istu listu drži undo zapis (sa razrešenim entitetima).
                 m_PostPasteFix = null;
                 m_PostPasteExclude = null;
+                m_PostPasteNetPreCurves = null;
             }
         }
 
         // Popiši postojeće entitete koji po prefabu i poziciji odgovaraju
         // nalepljenim zapisima — kandidati koje rezolucija NE sme da usvoji.
-        private HashSet<Entity> CollectPreStampMatches(List<PastedRecord> records)
+        // Blueprint sme da bude ručno menjan: NaN i beskonačnost bi propali
+        // kroz TryParse i odveli prop u nedefinisano mesto.
+        private static bool IsFiniteBlueprintNumber(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value) && math.abs(value) < 1e6f;
+        }
+
+        // Svaka float vrednost iz blueprint fajla prolazi kroz OVO — NaN i
+        // beskonačnost su ranije prolazili u sve linije osim objektnih.
+        private static bool TryParseBlueprintFloat(string text, System.IFormatProvider inv, out float value)
+        {
+            return float.TryParse(text, System.Globalization.NumberStyles.Float, inv, out value) &&
+                IsFiniteBlueprintNumber(value);
+        }
+
+        private HashSet<Entity> CollectPreStampMatches(List<PastedRecord> records, List<PreStampNetCurve> netPreCurves)
         {
             HashSet<Entity> exclude = new HashSet<Entity>();
             bool anyObject = false;
             bool anyArea = false;
+            bool anyLane = false;
+            bool anyNetEdge = false;
             float3 boundsMin = new float3(float.MaxValue);
             float3 boundsMax = new float3(float.MinValue);
             foreach (PastedRecord record in records)
@@ -3309,7 +4524,9 @@ namespace Copaste
                 boundsMin = math.min(boundsMin, record.m_Position);
                 boundsMax = math.max(boundsMax, record.m_Position);
                 anyArea |= record.m_IsArea;
-                anyObject |= !record.m_IsArea;
+                anyLane |= record.m_IsLane;
+                anyNetEdge |= record.m_IsNetEdge;
+                anyObject |= !record.m_IsArea && !record.m_IsLane && !record.m_IsNetEdge;
             }
 
             boundsMin -= 0.5f;
@@ -3354,6 +4571,16 @@ namespace Copaste
 
                 areas.Dispose();
                 areaPrefabs.Dispose();
+            }
+
+            if (anyLane)
+            {
+                CollectPreStampLanes(records, boundsMin, boundsMax, exclude);
+            }
+
+            if (anyNetEdge)
+            {
+                CollectPreStampNetEdges(records, boundsMin, boundsMax, exclude, netPreCurves);
             }
 
             return exclude;
@@ -3711,6 +4938,30 @@ namespace Copaste
                 }
             }
 
+            foreach (Entity lane in m_SelectedLanes)
+            {
+                if (EntityManager.Exists(lane) && !EntityManager.HasComponent<Owner>(lane))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Entity node in m_SelectedNodes)
+            {
+                if (EntityManager.Exists(node))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Entity edge in m_SelectedNetEdges)
+            {
+                if (EntityManager.Exists(edge))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
@@ -3733,6 +4984,30 @@ namespace Copaste
                 }
             }
 
+            foreach (Entity lane in m_SelectedLanes)
+            {
+                if (EntityManager.Exists(lane) && !EntityManager.HasComponent<Owner>(lane))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Entity node in m_SelectedNodes)
+            {
+                if (EntityManager.Exists(node))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Entity edge in m_SelectedNetEdges)
+            {
+                if (EntityManager.Exists(edge))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
@@ -3741,12 +5016,44 @@ namespace Copaste
         {
             get
             {
+                EnsureDerivedSelectionData();
+                return m_CachedHeightTargetCount;
+            }
+        }
+
+        private int ComputeHeightTargetCount()
+        {
+            {
                 int count = 0;
                 foreach (Entity entity in m_Selected)
                 {
                     if (EntityManager.Exists(entity) &&
                         EntityManager.HasComponent<Game.Objects.Transform>(entity) &&
                         (!IsBuilding(entity) || IsMovableBuilding(entity)))
+                    {
+                        count++;
+                    }
+                }
+
+                foreach (Entity lane in m_SelectedLanes)
+                {
+                    if (EntityManager.Exists(lane) && !EntityManager.HasComponent<Owner>(lane))
+                    {
+                        count++;
+                    }
+                }
+
+                foreach (Entity node in m_SelectedNodes)
+                {
+                    if (EntityManager.Exists(node))
+                    {
+                        count++;
+                    }
+                }
+
+                foreach (Entity edge in m_SelectedNetEdges)
+                {
+                    if (EntityManager.Exists(edge))
                     {
                         count++;
                     }
@@ -3760,9 +5067,11 @@ namespace Copaste
         {
             List<TransformSnapshot> snapshots = SnapshotSelection();
             List<SurfaceSnapshot> surfaces = SnapshotSurfaces(m_SelectedSurfaces);
-            if (snapshots.Count > 0 || surfaces.Count > 0)
+            List<LaneSnapshot> lanes = SnapshotLanes(m_SelectedLanes);
+            SnapshotNetworks(out List<NetNodeSnapshot> netNodes, out List<NetEdgeSnapshot> netEdges);
+            if (snapshots.Count > 0 || surfaces.Count > 0 || lanes.Count > 0 || netNodes.Count > 0 || netEdges.Count > 0)
             {
-                PushUndo(new UndoRecord { m_Kind = UndoKind.Transforms, m_Snapshots = snapshots, m_Surfaces = surfaces });
+                PushUndo(new UndoRecord { m_Kind = UndoKind.Transforms, m_Snapshots = snapshots, m_Surfaces = surfaces, m_Lanes = lanes, m_NetNodes = netNodes, m_NetEdges = netEdges });
             }
 
             // Početak transformacije = tačka u kojoj se pamti custom raspored
@@ -3796,13 +5105,23 @@ namespace Copaste
                     List<SurfaceSnapshot> redoSurfaces = record.m_Surfaces != null
                         ? SnapshotSurfaceEntities(record.m_Surfaces)
                         : new List<SurfaceSnapshot>();
-                    if (redoSnapshots.Count > 0 || redoSurfaces.Count > 0)
+                    List<LaneSnapshot> redoLanes = record.m_Lanes != null
+                        ? SnapshotLaneEntities(record.m_Lanes)
+                        : new List<LaneSnapshot>();
+                    List<NetNodeSnapshot> redoNetNodes = record.m_NetNodes != null
+                        ? SnapshotNetNodeEntities(record.m_NetNodes)
+                        : new List<NetNodeSnapshot>();
+                    List<NetEdgeSnapshot> redoNetEdges = record.m_NetEdges != null
+                        ? SnapshotNetEdgeEntities(record.m_NetEdges)
+                        : new List<NetEdgeSnapshot>();
+                    // Zapis ide na redo stek UVEK — i kad su svi snimci prazni
+                    // (entiteti u međuvremenu obrisani). Preskakanje bi
+                    // pomerilo stekove: sledeći Ctrl+Y bi odigrao SLEDEĆI
+                    // zapis, pa bi "vrati pomeranje" ispalo brisanje.
+                    m_RedoStack.Add(new UndoRecord { m_Kind = UndoKind.Transforms, m_Snapshots = redoSnapshots, m_Surfaces = redoSurfaces, m_Lanes = redoLanes, m_NetNodes = redoNetNodes, m_NetEdges = redoNetEdges });
+                    if (m_RedoStack.Count > kMaxUndo)
                     {
-                        m_RedoStack.Add(new UndoRecord { m_Kind = UndoKind.Transforms, m_Snapshots = redoSnapshots, m_Surfaces = redoSurfaces });
-                        if (m_RedoStack.Count > kMaxUndo)
-                        {
-                            m_RedoStack.RemoveAt(0);
-                        }
+                        m_RedoStack.RemoveAt(0);
                     }
 
                     ApplyTransformSnapshots(record.m_Snapshots);
@@ -3810,6 +5129,13 @@ namespace Copaste
                     {
                         ApplySurfaceSnapshots(record.m_Surfaces);
                     }
+
+                    if (record.m_Lanes != null)
+                    {
+                        ApplyLaneSnapshots(record.m_Lanes);
+                    }
+
+                    ApplyNetworkSnapshots(record.m_NetNodes, record.m_NetEdges);
 
                     break;
 
@@ -3860,6 +5186,20 @@ namespace Copaste
                         }
                     }
 
+                    if (record.m_Lanes != null)
+                    {
+                        // Indeksna petlja: RecreateLane kroz remap piše u OVU listu.
+                        BeginLaneRecreateBatch();
+                        for (int i = 0; i < record.m_Lanes.Count; i++)
+                        {
+                            RecreateLane(record.m_Lanes[i]);
+                        }
+                    }
+
+                    // Obrisane mreže: rekreacija kroz Permanent definicije sa
+                    // zavarenim krajevima — raskrsnica se vraća SASTAVLJENA.
+                    RecreateNetEdges(record.m_NetEdges);
+
                     break;
 
                 case UndoKind.Paste:
@@ -3867,8 +5207,22 @@ namespace Copaste
                     // rotaciju ni poligone) — redo iz ovoga ponovo stvara.
                     record.m_Snapshots = SnapshotResolvedPasted(record.m_Pasted);
                     record.m_Surfaces = SnapshotResolvedPastedAreas(record.m_Pasted);
+                    record.m_Lanes = SnapshotResolvedPastedLanes(record.m_Pasted);
 
-                    DeletePastedEntities(record.m_Pasted);
+                    // Ako su razrešenja u međuvremenu pomrla (put je obrisan pa
+                    // vraćen undo-om kao NOV entitet), svež snimak je prazan —
+                    // tada se čuva stari, da redo i dalje ume da ih sagradi.
+                    List<NetEdgeSnapshot> previousNetEdges = record.m_NetEdges;
+                    record.m_NetEdges = SnapshotResolvedPastedNetEdges(record.m_Pasted);
+                    if ((record.m_NetEdges == null || record.m_NetEdges.Count == 0) &&
+                        previousNetEdges != null && previousNetEdges.Count > 0)
+                    {
+                        record.m_NetEdges = previousNetEdges;
+                    }
+
+                    Mod.Log.Info($"Copaste: undo paste snapshot: {record.m_NetEdges?.Count ?? 0} net edges from {record.m_Pasted?.Count ?? 0} records");
+
+                    DeletePastedEntities(record.m_Pasted, record.m_PastedExclude, record.m_PastedPreCurves);
 
                     // Ako se fixup za taj stamp još vrti, prekini ga — entiteti su upravo obrisani.
                     if (ReferenceEquals(record.m_Pasted, m_PostPasteFix))
@@ -3876,6 +5230,7 @@ namespace Copaste
                         m_PostPasteFix = null;
                         m_PostPasteFixFrames = 0;
                         m_PostPasteExclude = null;
+                        m_PostPasteNetPreCurves = null;
                     }
 
                     m_RedoStack.Add(record);
@@ -3959,6 +5314,12 @@ namespace Copaste
 
             UndoRecord record = m_RedoStack[m_RedoStack.Count - 1];
             m_RedoStack.RemoveAt(m_RedoStack.Count - 1);
+            Mod.Log.Info($"Copaste: redo ({record.m_Kind}) start, netEdges={record.m_NetEdges?.Count ?? -1}");
+
+            // Sopstveni catch: UI dugme zove Redo van OnUpdate try bloka, pa
+            // bi izuzetak odavde inače nestao bez traga u našem logu.
+            try
+            {
 
             switch (record.m_Kind)
             {
@@ -3969,13 +5330,21 @@ namespace Copaste
                     List<SurfaceSnapshot> undoSurfaces = record.m_Surfaces != null
                         ? SnapshotSurfaceEntities(record.m_Surfaces)
                         : new List<SurfaceSnapshot>();
-                    if (undoSnapshots.Count > 0 || undoSurfaces.Count > 0)
+                    List<LaneSnapshot> undoLanes = record.m_Lanes != null
+                        ? SnapshotLaneEntities(record.m_Lanes)
+                        : new List<LaneSnapshot>();
+                    List<NetNodeSnapshot> undoNetNodes = record.m_NetNodes != null
+                        ? SnapshotNetNodeEntities(record.m_NetNodes)
+                        : new List<NetNodeSnapshot>();
+                    List<NetEdgeSnapshot> undoNetEdges = record.m_NetEdges != null
+                        ? SnapshotNetEdgeEntities(record.m_NetEdges)
+                        : new List<NetEdgeSnapshot>();
+                    // Uvek, kao i na undo strani: preskočen zapis bi pomerio
+                    // stekove i sledeći Ctrl+Z bi odigrao pogrešan korak.
+                    m_UndoStack.Add(new UndoRecord { m_Kind = UndoKind.Transforms, m_Snapshots = undoSnapshots, m_Surfaces = undoSurfaces, m_Lanes = undoLanes, m_NetNodes = undoNetNodes, m_NetEdges = undoNetEdges });
+                    if (m_UndoStack.Count > kMaxUndo)
                     {
-                        m_UndoStack.Add(new UndoRecord { m_Kind = UndoKind.Transforms, m_Snapshots = undoSnapshots, m_Surfaces = undoSurfaces });
-                        if (m_UndoStack.Count > kMaxUndo)
-                        {
-                            m_UndoStack.RemoveAt(0);
-                        }
+                        m_UndoStack.RemoveAt(0);
                     }
 
                     ApplyTransformSnapshots(record.m_Snapshots);
@@ -3983,6 +5352,13 @@ namespace Copaste
                     {
                         ApplySurfaceSnapshots(record.m_Surfaces);
                     }
+
+                    if (record.m_Lanes != null)
+                    {
+                        ApplyLaneSnapshots(record.m_Lanes);
+                    }
+
+                    ApplyNetworkSnapshots(record.m_NetNodes, record.m_NetEdges);
 
                     break;
 
@@ -4021,6 +5397,22 @@ namespace Copaste
                         }
                     }
 
+                    if (record.m_Lanes != null)
+                    {
+                        foreach (LaneSnapshot laneSnapshot in record.m_Lanes)
+                        {
+                            if (EntityManager.Exists(laneSnapshot.m_Entity))
+                            {
+                                m_SelectedLanes.Remove(laneSnapshot.m_Entity);
+                                DeleteLaneWithNodes(laneSnapshot.m_Entity);
+                            }
+                        }
+                    }
+
+                    // Mreže: rekreacija je napravila NOVE entitete — nalaze se
+                    // pozicionim fallback-om pa brišu.
+                    RedeleteNetEdges(record.m_NetEdges);
+
                     break;
 
                 case UndoKind.Paste:
@@ -4051,19 +5443,38 @@ namespace Copaste
                         }
                     }
 
+                    if (record.m_Lanes != null)
+                    {
+                        BeginLaneRecreateBatch();
+                        for (int i = 0; i < record.m_Lanes.Count; i++)
+                        {
+                            RecreateLane(record.m_Lanes[i]);
+                        }
+                    }
+
+                    // Putevi: ponovo kroz definicije (Permanent), bez remapa —
+                    // sledeći undo ih nalazi pozicionim fallback-om.
+                    RecreateNetEdges(record.m_NetEdges);
+
                     break;
             }
 
-            Mod.Log.Info($"Copaste: redo ({record.m_Kind})");
+            }
+            catch (System.Exception e)
+            {
+                Mod.Log.Error($"Copaste: redo ({record.m_Kind}) FAILED: {e}");
+            }
+
+            Mod.Log.Info($"Copaste: redo ({record.m_Kind}) done");
         }
 
         public int RedoCount => m_RedoStack.Count;
 
         public void TriggerRedo()
         {
-            if (ToolIsActive && m_Mode == Mode.Select && !m_MoveDragging && !m_RightDragging)
+            if (ToolIsActive && m_Mode != Mode.Relocate && !m_MoveDragging && !m_RightDragging)
             {
-                Redo();
+                m_PendingRedoSteps++;
             }
         }
 
@@ -4075,8 +5486,12 @@ namespace Copaste
                 return;
             }
 
+            InvalidatePendingNodeFixups();
             m_Clipboard.Clear();
             m_ClipboardAreas.Clear();
+            m_ClipboardLanes.Clear();
+            m_ClipboardNetEdges.Clear();
+            ResetClipboardNetNodes(null, null, null, null);
             if (m_Mode == Mode.Paste)
             {
                 ExitPasteMode();
@@ -4145,6 +5560,19 @@ namespace Copaste
                     }
                 }
 
+                if (record.m_Lanes != null)
+                {
+                    for (int i = 0; i < record.m_Lanes.Count; i++)
+                    {
+                        if (record.m_Lanes[i].m_Entity == oldEntity)
+                        {
+                            LaneSnapshot snapshot = record.m_Lanes[i];
+                            snapshot.m_Entity = newEntity;
+                            record.m_Lanes[i] = snapshot;
+                        }
+                    }
+                }
+
                 if (record.m_Pasted != null)
                 {
                     for (int i = 0; i < record.m_Pasted.Count; i++)
@@ -4157,10 +5585,66 @@ namespace Copaste
                         }
                     }
                 }
+
+                // Twin zaštita mora da prati rekreaciju: entitet koji je
+                // POSTOJAO pri stampu pa je obrisan i vraćen undo-om vraća se
+                // kao NOV ID. Bez ovoga bi stari ID ostao u skupu, zaštita bi
+                // pokazivala na mrtvog, a sledeći undo paste-a bi pozicionim
+                // matchom obrisao korisnikov zatečeni objekat.
+                if (record.m_PastedExclude != null && record.m_PastedExclude.Remove(oldEntity))
+                {
+                    record.m_PastedExclude.Add(newEntity);
+                }
+
+                // Mreže: bez ovoga bi posle brisanja i undo-a stariji zapisi
+                // pokazivali na mrtve ivice/čvorove i ćutke ne bi radili ništa.
+                if (record.m_NetNodes != null)
+                {
+                    for (int i = 0; i < record.m_NetNodes.Count; i++)
+                    {
+                        if (record.m_NetNodes[i].m_Entity == oldEntity)
+                        {
+                            NetNodeSnapshot snapshot = record.m_NetNodes[i];
+                            snapshot.m_Entity = newEntity;
+                            record.m_NetNodes[i] = snapshot;
+                        }
+                    }
+                }
+
+                if (record.m_NetEdges != null)
+                {
+                    for (int i = 0; i < record.m_NetEdges.Count; i++)
+                    {
+                        NetEdgeSnapshot snapshot = record.m_NetEdges[i];
+                        if (snapshot.m_Entity != oldEntity &&
+                            snapshot.m_StartNode != oldEntity &&
+                            snapshot.m_EndNode != oldEntity)
+                        {
+                            continue;
+                        }
+
+                        if (snapshot.m_Entity == oldEntity)
+                        {
+                            snapshot.m_Entity = newEntity;
+                        }
+
+                        if (snapshot.m_StartNode == oldEntity)
+                        {
+                            snapshot.m_StartNode = newEntity;
+                        }
+
+                        if (snapshot.m_EndNode == oldEntity)
+                        {
+                            snapshot.m_EndNode = newEntity;
+                        }
+
+                        record.m_NetEdges[i] = snapshot;
+                    }
+                }
             }
         }
 
-        // Ponovno kreiranje obrisanog propa direktno iz arhetipa prefaba (LineToolLite pristup).
+        // Ponovno kreiranje obrisanog propa direktno iz arhetipa prefaba.
         private void RecreateProp(TransformSnapshot snapshot)
         {
             if (!EntityManager.Exists(snapshot.m_Prefab) ||
@@ -4261,24 +5745,62 @@ namespace Copaste
             RemapHistoryEntity(snapshot.m_Entity, entity);
         }
 
-        private void DeletePastedEntities(List<PastedRecord> records)
+        private void DeletePastedEntities(List<PastedRecord> records, HashSet<Entity> stampExclude, List<PreStampNetCurve> stampPreCurves)
         {
             if (records == null || records.Count == 0)
             {
                 return;
             }
 
+            // Twin zaštita: kombinuj živi prozorski set (ako još traje) sa
+            // setom sačuvanim u zapisu — pozicioni fallback nikad ne sme da
+            // obriše entitet koji je postojao pre stampa.
+            HashSet<Entity> exclude = stampExclude ?? m_PostPasteExclude;
+            List<PreStampNetCurve> preCurves = stampPreCurves ?? m_PostPasteNetPreCurves;
+
+            // Razrešenje koje pokazuje na MRTAV entitet (nalepljeni put je u
+            // međuvremenu obrisan pa vraćen undo-om — vratio se kao NOV
+            // entitet) mora nazad u "nerazrešeno", da ga pozicioni fallback
+            // pronađe. Inače bi undo paste-a tiho ostavio taj put da stoji.
+            for (int i = 0; i < records.Count; i++)
+            {
+                PastedRecord record = records[i];
+                if (record.m_Resolved != Entity.Null &&
+                    (!EntityManager.Exists(record.m_Resolved) || EntityManager.HasComponent<Deleted>(record.m_Resolved)))
+                {
+                    record.m_Resolved = Entity.Null;
+                    records[i] = record;
+                }
+            }
+
             // Prvo razrešeni zapisi: brišemo TAČNO entitete koje je paste stvorio.
             HashSet<Entity> deleted = new HashSet<Entity>();
             int unresolvedCount = 0;
+            bool anyNetEdgeRecord = false;
             foreach (PastedRecord record in records)
             {
+                anyNetEdgeRecord |= record.m_IsNetEdge;
                 if (record.m_Resolved != Entity.Null)
                 {
                     if (EntityManager.Exists(record.m_Resolved) && deleted.Add(record.m_Resolved))
                     {
                         m_Selected.Remove(record.m_Resolved);
-                        EntityManager.AddComponent<Deleted>(record.m_Resolved);
+
+                        // Ograda/put: i osiroteli čvorovi idu sa ivicom.
+                        if (record.m_IsLane)
+                        {
+                            m_SelectedLanes.Remove(record.m_Resolved);
+                            DeleteLaneWithNodes(record.m_Resolved);
+                        }
+                        else if (record.m_IsNetEdge)
+                        {
+                            m_SelectedNetEdges.Remove(record.m_Resolved);
+                            DeleteNetEdgeWithNodes(record.m_Resolved);
+                        }
+                        else
+                        {
+                            EntityManager.AddComponent<Deleted>(record.m_Resolved);
+                        }
                     }
                 }
                 else
@@ -4287,7 +5809,11 @@ namespace Copaste
                 }
             }
 
-            if (unresolvedCount == 0)
+            // Rani izlaz SAMO kad nema net zapisa: drugi prolaz brisanja
+            // (parčad koje je igra napravila deljenjem na tunelima/zidovima)
+            // mora da radi i kad su SVI zapisi rezolvovani — sredina velikog
+            // parčeta ume da rezolvuje zapis, a portalska parčad ostaju.
+            if (unresolvedCount == 0 && !anyNetEdgeRecord)
             {
                 return;
             }
@@ -4303,6 +5829,11 @@ namespace Copaste
                     boundsMin = math.min(boundsMin, record.m_Position);
                     boundsMax = math.max(boundsMax, record.m_Position);
                 }
+
+                // Net zapisi UVEK (i rezolvovani!): drugi prolaz čisti parčad
+                // podele duž cele krive, a okvir samo od nerezolvovanih ume da
+                // bude sitan ili čak prazan.
+                ExpandBoundsForRecord(record, ref boundsMin, ref boundsMax);
             }
 
             boundsMin -= 0.5f;
@@ -4312,12 +5843,14 @@ namespace Copaste
             // isključuje, pa bi nerazrešene nalepljene zgrade/površine
             // preživele undo.
             bool[] recordUsed = new bool[records.Count];
-            DeleteUnresolvedFromQuery(m_PropQuery, records, recordUsed, boundsMin, boundsMax, deleted);
-            DeleteUnresolvedFromQuery(m_BuildingQuery, records, recordUsed, boundsMin, boundsMax, deleted);
-            DeleteUnresolvedAreas(records, recordUsed, boundsMin, boundsMax, deleted);
+            DeleteUnresolvedFromQuery(m_PropQuery, records, recordUsed, boundsMin, boundsMax, deleted, exclude);
+            DeleteUnresolvedFromQuery(m_BuildingQuery, records, recordUsed, boundsMin, boundsMax, deleted, exclude);
+            DeleteUnresolvedAreas(records, recordUsed, boundsMin, boundsMax, deleted, exclude);
+            DeleteUnresolvedLanes(records, recordUsed, boundsMin, boundsMax, deleted, exclude);
+            DeleteUnresolvedNetEdges(records, recordUsed, boundsMin, boundsMax, deleted, exclude, preCurves);
         }
 
-        private void DeleteUnresolvedFromQuery(EntityQuery query, List<PastedRecord> records, bool[] recordUsed, float3 boundsMin, float3 boundsMax, HashSet<Entity> deleted)
+        private void DeleteUnresolvedFromQuery(EntityQuery query, List<PastedRecord> records, bool[] recordUsed, float3 boundsMin, float3 boundsMax, HashSet<Entity> deleted, HashSet<Entity> exclude)
         {
             NativeArray<Entity> entities = query.ToEntityArray(Allocator.Temp);
             NativeArray<Game.Objects.Transform> transforms = query.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
@@ -4327,7 +5860,8 @@ namespace Copaste
             {
                 float3 position = transforms[i].m_Position;
                 if (math.any(position < boundsMin) || math.any(position > boundsMax) ||
-                    deleted.Contains(entities[i]))
+                    deleted.Contains(entities[i]) ||
+                    (exclude != null && exclude.Contains(entities[i])))
                 {
                     continue;
                 }
@@ -4335,7 +5869,7 @@ namespace Copaste
                 for (int j = 0; j < records.Count; j++)
                 {
                     PastedRecord record = records[j];
-                    if (recordUsed[j] || record.m_IsArea || record.m_Resolved != Entity.Null ||
+                    if (recordUsed[j] || record.m_IsArea || record.m_IsLane || record.m_IsNetEdge || record.m_Resolved != Entity.Null ||
                         prefabRefs[i].m_Prefab != record.m_Prefab ||
                         math.distancesq(position, record.m_Position) > 0.01f)
                     {
@@ -4357,7 +5891,7 @@ namespace Copaste
 
         // Nerazrešene POVRŠINE iz paste undo-a: match po prefabu + centroidu
         // poligona (isti kriterijum kao rezolucija — pola metra).
-        private void DeleteUnresolvedAreas(List<PastedRecord> records, bool[] recordUsed, float3 boundsMin, float3 boundsMax, HashSet<Entity> deleted)
+        private void DeleteUnresolvedAreas(List<PastedRecord> records, bool[] recordUsed, float3 boundsMin, float3 boundsMax, HashSet<Entity> deleted, HashSet<Entity> exclude)
         {
             NativeArray<Entity> areas = m_SurfaceQuery.ToEntityArray(Allocator.Temp);
             NativeArray<PrefabRef> prefabRefs = m_SurfaceQuery.ToComponentDataArray<PrefabRef>(Allocator.Temp);
@@ -4365,6 +5899,7 @@ namespace Copaste
             for (int i = 0; i < areas.Length; i++)
             {
                 if (deleted.Contains(areas[i]) ||
+                    (exclude != null && exclude.Contains(areas[i])) ||
                     !EntityManager.TryGetBuffer(areas[i], true, out DynamicBuffer<Game.Areas.Node> nodes) ||
                     nodes.Length < 3)
                 {
@@ -4407,7 +5942,6 @@ namespace Copaste
 
         private Entity m_SameFilterPrefab = Entity.Null;
         private string m_SameFilterName = string.Empty;
-        private bool m_SelectionFromMarquee;
         private Entity m_SelectedNameEntity = Entity.Null;
         private string m_SelectedName = string.Empty;
 
@@ -4422,27 +5956,58 @@ namespace Copaste
                 // Ime se pokazuje kad god je selektovana TAČNO jedna stvar —
                 // svejedno da li klikom ili marquee-jem (brojač kaže 1, pa i
                 // ime treba da stoji).
+                if (SelectedCount != 1)
+                {
+                    return string.Empty;
+                }
+
                 Entity entity;
                 if (m_Selected.Count == 1)
                 {
                     entity = m_Selected[0];
                 }
-                else if (m_Selected.Count == 0 && m_SelectedSurfaces.Count == 1)
+                else if (m_SelectedSurfaces.Count == 1)
                 {
                     entity = m_SelectedSurfaces[0];
                 }
+                else if (m_SelectedLanes.Count == 1)
+                {
+                    entity = m_SelectedLanes[0];
+                }
+                else if (m_SelectedNodes.Count == 1)
+                {
+                    entity = m_SelectedNodes[0];
+                }
+                else if (m_SelectedNetEdges.Count == 1)
+                {
+                    entity = m_SelectedNetEdges[0];
+                }
                 else
                 {
+                    // Nova vrsta selekcije koja još nema granu ovde — bolje
+                    // prazno ime nego indeksiranje pogrešne liste.
                     return string.Empty;
                 }
 
                 if (entity != m_SelectedNameEntity)
                 {
                     m_SelectedNameEntity = entity;
+
+                    // Ograda: PrefabRef pokazuje na nevidljivi container — pravo
+                    // ime nosi prefab ograde iz EditorContainer-a.
+                    Entity namePrefab = Entity.Null;
+                    if (EntityManager.Exists(entity))
+                    {
+                        if (!TryGetLanePrefab(entity, out namePrefab) &&
+                            EntityManager.TryGetComponent(entity, out PrefabRef prefabRef))
+                        {
+                            namePrefab = prefabRef.m_Prefab;
+                        }
+                    }
+
                     m_SelectedName =
-                        EntityManager.Exists(entity) &&
-                        EntityManager.TryGetComponent(entity, out PrefabRef prefabRef) &&
-                        m_PrefabSystem.TryGetPrefab(prefabRef.m_Prefab, out PrefabBase prefabBase) &&
+                        namePrefab != Entity.Null &&
+                        m_PrefabSystem.TryGetPrefab(namePrefab, out PrefabBase prefabBase) &&
                         prefabBase != null
                             ? prefabBase.name
                             : string.Empty;
@@ -4618,6 +6183,19 @@ namespace Copaste
             {
                 TransformSurface(area, quaternion.identity, float3.zero, new float3(delta.x, 0f, delta.z));
             }
+
+            // Ograde takođe (nudge nema tick/settle pa Updated ide uvek).
+            if (m_SelectedLanes.Count > 0)
+            {
+                HashSet<Entity> laneGroup = BuildLaneGroup();
+                foreach (Entity lane in m_SelectedLanes)
+                {
+                    TransformLane(lane, quaternion.identity, float3.zero, new float3(delta.x, 0f, delta.z), laneGroup);
+                }
+            }
+
+            // Mreže: nudge uvek sa punim update-om (mali pomaci, retko masovni).
+            TransformNetSelection(quaternion.identity, float3.zero, new float3(delta.x, 0f, delta.z), true);
         }
 
         // Aktivna align "sesija": posle Spaced/Circle poravnanja strelice
@@ -5090,11 +6668,17 @@ namespace Copaste
 
         // "Selected props" lista u panelu: samo za male selekcije (2-15) — tu ima
         // smisla birati pojedinačan prop; za veće selekcije lista se ne prikazuje.
-        private const int kSelectionListMax = 50;
+        private static int kSelectionListMax => Mod.Settings != null ? Mod.Settings.SelectionListMax : 50;
         private Entity m_ListFocusEntity = Entity.Null;
         private readonly Dictionary<Entity, string> m_PrefabNameCache = new Dictionary<Entity, string>();
 
         public string GetSelectionList()
+        {
+            EnsureDerivedSelectionData();
+            return m_CachedSelectionList;
+        }
+
+        private string ComputeSelectionList()
         {
             if (m_Mode != Mode.Select || m_Selected.Count < 2 || m_Selected.Count > kSelectionListMax)
             {
@@ -5154,7 +6738,6 @@ namespace Copaste
             ClearSelection();
             m_Selected.Add(entity);
             Highlight(entity);
-            m_SelectionFromMarquee = false;
             m_ListFocusEntity = Entity.Null;
         }
 
@@ -5175,15 +6758,47 @@ namespace Copaste
         // Postavi visinu (iznad terena) cele selekcije prema uzor-propu.
         private void MatchSelectionHeight(Entity sourceEntity)
         {
-            if (!EntityManager.TryGetComponent(sourceEntity, out Game.Objects.Transform sourceTransform))
+            if (EntityManager.TryGetComponent(sourceEntity, out Game.Objects.Transform sourceTransform))
             {
-                return;
+                MatchSelectionHeightToY(sourceTransform.m_Position.y);
+            }
+        }
+
+        // Uzor za visinu može da bude i čvor puta ili ograda pod kursorom.
+        private bool TryPickHeightSource(float3 position, out float sourceY)
+        {
+            if (TryPickNetAt(position, out Entity sourceNode, out Entity sourceEdge))
+            {
+                if (sourceNode != Entity.Null &&
+                    EntityManager.TryGetComponent(sourceNode, out Game.Net.Node nodeData))
+                {
+                    sourceY = nodeData.m_Position.y;
+                    return true;
+                }
+
+                if (sourceEdge != Entity.Null &&
+                    EntityManager.TryGetComponent(sourceEdge, out Game.Net.Curve edgeCurve))
+                {
+                    MathUtils.Distance(edgeCurve.m_Bezier, position, out float t);
+                    sourceY = MathUtils.Position(edgeCurve.m_Bezier, t).y;
+                    return true;
+                }
             }
 
-            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
+            if (TryPickLaneAt(position, out Entity sourceLane) &&
+                EntityManager.TryGetComponent(sourceLane, out Game.Net.Curve laneCurve))
+            {
+                sourceY = LaneMidpoint(laneCurve.m_Bezier).y;
+                return true;
+            }
 
-            // Apsolutno poravnanje: svi na tačno istu svetsku visinu kao uzor-prop.
-            float targetY = sourceTransform.m_Position.y;
+            sourceY = 0f;
+            return false;
+        }
+
+        private void MatchSelectionHeightToY(float targetY)
+        {
+            TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
 
             PushTransformUndo();
 
@@ -5220,6 +6835,22 @@ namespace Copaste
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+
+            // Ograde na ciljnu visinu: cela kriva za razliku sredine do cilja.
+            if (m_SelectedLanes.Count > 0)
+            {
+                HashSet<Entity> laneGroup = BuildLaneGroup();
+                foreach (Entity lane in m_SelectedLanes)
+                {
+                    if (EntityManager.TryGetComponent(lane, out Game.Net.Curve laneCurve))
+                    {
+                        AdjustLaneHeight(lane, targetY - LaneMidpoint(laneCurve.m_Bezier).y, laneGroup);
+                    }
+                }
+            }
+
+            // Mreže: svaki selektovani čvor tačno na ciljnu visinu.
+            MatchNetworkHeight(targetY);
         }
 
         // End: spusti selekciju na teren i resetuj elevaciju.
@@ -5263,6 +6894,12 @@ namespace Copaste
                 EntityManager.AddComponent<Updated>(entity);
                 EntityManager.AddComponent<BatchesUpdated>(entity);
             }
+
+            // Ograde se spuštaju na teren (elevacija se skida).
+            SnapLanesToGround();
+
+            // Mreže isto — čvorovi na teren, deonice prate.
+            SnapNetworksToGround();
         }
 
         private static string BlueprintDirectory =>
@@ -5320,8 +6957,14 @@ namespace Copaste
             }
 
             // I selekcija od samih površina mora prvo u clipboard — inače bi se
-            // snimio stari sadržaj (1.0.4 lekcija).
-            if (m_Selected.Count > 0 || m_SelectedSurfaces.Count > 0)
+            // snimio stari sadržaj (1.0.4 lekcija). Selekcija koja ne proizvodi
+            // stavke (npr. sam čvor) — bolje odbiti nego sačuvati zatečeno.
+            if (SelectedCount > 0 && CopyableSelectedCount == 0)
+            {
+                return null;
+            }
+
+            if (CopyableSelectedCount > 0)
             {
                 CopySelection();
             }
@@ -5367,7 +7010,10 @@ namespace Copaste
                         continue;
                     }
 
-                    lines.Add(string.Join("|", new string[]
+                    // 17. polje = hash prefaba, SAMO za PDX assete (vanila hash je
+                    // prazan pa linija ostaje identična starom formatu; stariji
+                    // loaderi 17-polja preskaču — ionako taj asset ne bi našli).
+                    List<string> fields = new List<string>
                     {
                         typeName,
                         prefabName,
@@ -5385,7 +7031,15 @@ namespace Copaste
                         item.m_Tree.m_Growth.ToString(inv),
                         item.m_HasSeed ? item.m_Seed.ToString(inv) : "-1",
                         item.m_HasCustomColor ? SerializeColorSet(item.m_CustomColor, inv) : "-",
-                    }));
+                    };
+
+                    string prefabHash = GetPrefabHashString(prefabBase);
+                    if (prefabHash.Length > 0)
+                    {
+                        fields.Add(prefabHash);
+                    }
+
+                    lines.Add(string.Join("|", fields));
 
                     // Plac zgrade: "BLOT|n" pa po jedna "BSURF|tip|ime|x,z;..."
                     // linija po površini (lokalni poligon) — važi za POSLEDNJU
@@ -5396,6 +7050,11 @@ namespace Copaste
                     {
                         int written = 0;
                         List<string> surfLines = new List<string>();
+
+                        // Linije SA hashom (5 polja) idu na KRAJ bloka: stariji
+                        // loader nepoznatu liniju tretira kao preskočenu STAVKU
+                        // (lastItemSkipped) i oborio bi ostatak bloka iza nje.
+                        List<string> hashedSurfLines = new List<string>();
                         foreach (SurfaceSig sig in item.m_SurfaceSigs)
                         {
                             if (sig.m_LocalNodes == null || sig.m_LocalNodes.Length < 3 ||
@@ -5422,12 +7081,24 @@ namespace Copaste
                                 poly.Append(node.x.ToString("R", inv)).Append(',').Append(node.y.ToString("R", inv));
                             }
 
-                            surfLines.Add(string.Join("|", new string[] { "BSURF", sigType, sigName, poly.ToString() }));
+                            // Hash kao umetnuto polje samo za PDX assete — stariji
+                            // loaderi te linije preskaču (asset im ionako fali).
+                            string sigHash = GetPrefabHashString(sigPrefab);
+                            if (sigHash.Length > 0)
+                            {
+                                hashedSurfLines.Add(string.Join("|", new string[] { "BSURF", sigType, sigName, sigHash, poly.ToString() }));
+                            }
+                            else
+                            {
+                                surfLines.Add(string.Join("|", new string[] { "BSURF", sigType, sigName, poly.ToString() }));
+                            }
+
                             written++;
                         }
 
                         lines.Add("BLOT|" + written.ToString(inv));
                         lines.AddRange(surfLines);
+                        lines.AddRange(hashedSurfLines);
                     }
                 }
 
@@ -5458,7 +7129,151 @@ namespace Copaste
                         polygon.Append(offset.x.ToString("R", inv)).Append(',').Append(offset.y.ToString("R", inv));
                     }
 
-                    lines.Add(string.Join("|", new string[] { "AREA", areaType, areaName, polygon.ToString() }));
+                    string areaHash = GetPrefabHashString(areaPrefab);
+                    lines.Add(areaHash.Length > 0
+                        ? string.Join("|", new string[] { "AREA", areaType, areaName, areaHash, polygon.ToString() })
+                        : string.Join("|", new string[] { "AREA", areaType, areaName, polygon.ToString() }));
+                }
+
+                // Ograde: "LANE|tip|ime|hash|seed|x,z,h;x,z,h;x,z,h;x,z,h" —
+                // 4 bezier tačke kao centroid-relativni xz + visina iznad
+                // terena. Stariji loaderi liniju preskaču (nepoznat format).
+                foreach (LaneClipboardItem lane in m_ClipboardLanes)
+                {
+                    if (lane.m_CurveOffsets == null || lane.m_CurveOffsets.Length != 4 ||
+                        lane.m_HeightOffsets == null || lane.m_HeightOffsets.Length != 4 ||
+                        !m_PrefabSystem.TryGetPrefab(lane.m_Prefab, out PrefabBase lanePrefab) || lanePrefab == null)
+                    {
+                        continue;
+                    }
+
+                    string laneType = lanePrefab.GetType().Name;
+                    string laneName = lanePrefab.name;
+                    if (laneType.Contains("|") || laneName.Contains("|"))
+                    {
+                        continue;
+                    }
+
+                    System.Text.StringBuilder points = new System.Text.StringBuilder();
+                    for (int k = 0; k < 4; k++)
+                    {
+                        if (points.Length > 0)
+                        {
+                            points.Append(';');
+                        }
+
+                        points.Append(lane.m_CurveOffsets[k].x.ToString("R", inv)).Append(',')
+                            .Append(lane.m_CurveOffsets[k].y.ToString("R", inv)).Append(',')
+                            .Append(lane.m_HeightOffsets[k].ToString("R", inv));
+                    }
+
+                    string laneHash = GetPrefabHashString(lanePrefab);
+                    lines.Add(string.Join("|", new string[]
+                    {
+                        "LANE",
+                        laneType,
+                        laneName,
+                        laneHash.Length > 0 ? laneHash : "-",
+                        lane.m_HasSeed ? lane.m_Seed.ToString(inv) : "-1",
+                        points.ToString(),
+                    }));
+                }
+
+                // Cvorovi mreze: "NETNODE|x,z,h" — jedan po IZVORNOM cvoru, redom.
+                // Bez njih nalepljena raskrsnica iz blueprinta nema po cemu da
+                // spoji deonice (spajanje traži bitski istu tacku).
+                for (int n = 0; n < ClipboardNetNodeCount; n++)
+                {
+                    GetClipboardNetNode(n, out float2 nodeOffset, out float nodeHeight);
+                    GetClipboardNetNodeUpgrade(n, out bool nodeHasUpgrade, out CompositionFlags nodeUpgrade);
+                    lines.Add("NETNODE|" +
+                        nodeOffset.x.ToString("R", inv) + "," +
+                        nodeOffset.y.ToString("R", inv) + "," +
+                        nodeHeight.ToString("R", inv) + "|" +
+                        (nodeHasUpgrade
+                            ? ((uint)nodeUpgrade.m_General).ToString(inv) + "," +
+                              ((uint)nodeUpgrade.m_Left).ToString(inv) + "," +
+                              ((uint)nodeUpgrade.m_Right).ToString(inv)
+                            : "-"));
+                }
+
+                // Markeri cvorova: "NETMARK|indeks|tip|ime" — kruzni tok,
+                // rucni semafor, stop znak. To su POD-OBJEKTI cvora, ne
+                // nadogradnje, pa ne staju u NETNODE liniju; jedna linija po
+                // markeru jer ih cvor moze imati vise. Stari loaderi
+                // preskacu nepoznat tip linije.
+                foreach (NetNodeMarker marker in m_ClipboardNetNodeMarkers)
+                {
+                    if (marker.m_NodeIndex < 0 ||
+                        !m_PrefabSystem.TryGetPrefab(marker.m_Prefab, out PrefabBase markerPrefab) ||
+                        markerPrefab == null)
+                    {
+                        continue;
+                    }
+
+                    string markerType = markerPrefab.GetType().Name;
+                    string markerName = markerPrefab.name;
+                    if (markerType.Contains("|") || markerName.Contains("|"))
+                    {
+                        continue;
+                    }
+
+                    // Hash kao i sve ostale linije: bez njega PDX marker
+                    // (kružni tok iz workshopa) na učitavanju ne bi bio
+                    // pronađen — ista zamka koju smo već rešili za propove.
+                    string markerHash = GetPrefabHashString(markerPrefab);
+                    lines.Add("NETMARK|" + marker.m_NodeIndex.ToString(inv) + "|" + markerType + "|" + markerName +
+                        "|" + (markerHash.Length > 0 ? markerHash : "-"));
+                }
+
+                // Putevi: "ROAD|tip|ime|hash|nadogradnje|x,z,h;x4|startCvor,krajCvor"
+                // — nadogradnje su tri uint flaga ("g,l,r") ili "-", a indeksi
+                // cvorova pokazuju u NETNODE tabelu (-1 = nepoznat).
+                foreach (NetEdgeClipboardItem road in m_ClipboardNetEdges)
+                {
+                    if (road.m_CurveOffsets == null || road.m_CurveOffsets.Length != 4 ||
+                        road.m_HeightOffsets == null || road.m_HeightOffsets.Length != 4 ||
+                        !m_PrefabSystem.TryGetPrefab(road.m_Prefab, out PrefabBase roadPrefab) || roadPrefab == null)
+                    {
+                        continue;
+                    }
+
+                    string roadType = roadPrefab.GetType().Name;
+                    string roadName = roadPrefab.name;
+                    if (roadType.Contains("|") || roadName.Contains("|"))
+                    {
+                        continue;
+                    }
+
+                    System.Text.StringBuilder roadPoints = new System.Text.StringBuilder();
+                    for (int k = 0; k < 4; k++)
+                    {
+                        if (roadPoints.Length > 0)
+                        {
+                            roadPoints.Append(';');
+                        }
+
+                        roadPoints.Append(road.m_CurveOffsets[k].x.ToString("R", inv)).Append(',')
+                            .Append(road.m_CurveOffsets[k].y.ToString("R", inv)).Append(',')
+                            .Append(road.m_HeightOffsets[k].ToString("R", inv));
+                    }
+
+                    string roadHash = GetPrefabHashString(roadPrefab);
+                    string upgrade = road.m_HasUpgrade
+                        ? ((uint)road.m_Upgrade.m_General).ToString(inv) + "," +
+                          ((uint)road.m_Upgrade.m_Left).ToString(inv) + "," +
+                          ((uint)road.m_Upgrade.m_Right).ToString(inv)
+                        : "-";
+                    lines.Add(string.Join("|", new string[]
+                    {
+                        "ROAD",
+                        roadType,
+                        roadName,
+                        roadHash.Length > 0 ? roadHash : "-",
+                        upgrade,
+                        roadPoints.ToString(),
+                        road.m_StartNodeIndex.ToString(inv) + "," + road.m_EndNodeIndex.ToString(inv),
+                    }));
                 }
 
                 if (lines.Count <= 1)
@@ -5508,6 +7323,13 @@ namespace Copaste
                 System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
                 List<ClipboardItem> items = new List<ClipboardItem>();
                 List<AreaClipboardItem> areaItems = new List<AreaClipboardItem>();
+                List<LaneClipboardItem> laneItems = new List<LaneClipboardItem>();
+                List<NetEdgeClipboardItem> roadItems = new List<NetEdgeClipboardItem>();
+                List<float2> roadNodeOffsets = new List<float2>();
+                List<float> roadNodeHeights = new List<float>();
+                List<bool> roadNodeHasUpgrade = new List<bool>();
+                List<CompositionFlags> roadNodeUpgrades = new List<CompositionFlags>();
+                List<NetNodeMarker> roadNodeMarkers = new List<NetNodeMarker>();
                 int missing = 0;
                 Unity.Mathematics.Random loadRandom = RandomSeed.Next().GetRandom(0);
 
@@ -5537,7 +7359,8 @@ namespace Copaste
                         continue;
                     }
 
-                    if (parts.Length == 4 && parts[0] == "BSURF")
+                    // 5 polja = varijanta sa hash-om (PDX asseti, od 1.2.0).
+                    if ((parts.Length == 4 || parts.Length == 5) && parts[0] == "BSURF")
                     {
                         if (items.Count == 0 || lastItemSkipped ||
                             items[items.Count - 1].m_SurfaceSigs == null)
@@ -5545,18 +7368,34 @@ namespace Copaste
                             continue;
                         }
 
-                        if (!m_PrefabSystem.TryGetPrefab(new PrefabID(parts[1], parts[2]), out PrefabBase sigPrefab) ||
-                            sigPrefab == null)
+                        string sigHash = parts.Length == 5 ? parts[3] : null;
+                        if (!TryResolveBlueprintPrefab(parts[1], parts[2], sigHash, out PrefabBase sigPrefab))
                         {
                             // Površina placa čiji prefab nedostaje — broji se u
                             // "missing" da korisnik vidi da nešto fali.
                             missing++;
+
+                            // I popis se ODUSTAJE. Ne-prazan popis dole znači
+                            // "izvor je imao TAČNO ove površine, ostalo obriši",
+                            // pa bi krnji popis (asset na koji korisnik nije
+                            // pretplaćen) obrisao fabričke staze i prilaz i
+                            // ostavio kuću na goloj zemlji. Bez popisa zgrada
+                            // dobija fabrički plac — to je ispravno odstupanje.
+                            ClipboardItem brokenLot = items[items.Count - 1];
+                            brokenLot.m_SurfaceSigs = null;
+                            items[items.Count - 1] = brokenLot;
                             continue;
                         }
 
-                        string[] sigPairs = parts[3].Split(';');
+                        string[] sigPairs = parts[parts.Length - 1].Split(';');
                         if (sigPairs.Length < 3)
                         {
+                            // Pokvarena geometrija odustaje CEO popis, isto kao
+                            // nedostajući prefab — krnji popis znači "obriši
+                            // fabričke staze", a to ovde niko nije hteo.
+                            ClipboardItem malformedLot = items[items.Count - 1];
+                            malformedLot.m_SurfaceSigs = null;
+                            items[items.Count - 1] = malformedLot;
                             continue;
                         }
 
@@ -5566,8 +7405,8 @@ namespace Copaste
                         {
                             string[] xy = sigPairs[n].Split(',');
                             if (xy.Length != 2 ||
-                                !float.TryParse(xy[0], System.Globalization.NumberStyles.Float, inv, out float sx) ||
-                                !float.TryParse(xy[1], System.Globalization.NumberStyles.Float, inv, out float sz))
+                                !TryParseBlueprintFloat(xy[0], inv, out float sx) ||
+                                !TryParseBlueprintFloat(xy[1], inv, out float sz))
                             {
                                 sigValid = false;
                                 break;
@@ -5584,20 +7423,29 @@ namespace Copaste
                                 m_LocalNodes = localNodes,
                             });
                         }
+                        else
+                        {
+                            // Neparsirljiva koordinata (odsečen/prepravljen
+                            // fajl) — odustani popis kao i gore.
+                            ClipboardItem invalidLot = items[items.Count - 1];
+                            invalidLot.m_SurfaceSigs = null;
+                            items[items.Count - 1] = invalidLot;
+                        }
 
                         continue;
                     }
 
-                    // Farbana površina: "AREA|tip|ime|x,z;x,z;...".
-                    if (parts.Length == 4 && parts[0] == "AREA")
+                    // Farbana površina: "AREA|tip|ime|x,z;x,z;..." (5 polja = sa hash-om).
+                    if ((parts.Length == 4 || parts.Length == 5) && parts[0] == "AREA")
                     {
-                        if (!m_PrefabSystem.TryGetPrefab(new PrefabID(parts[1], parts[2]), out PrefabBase areaPrefab) || areaPrefab == null)
+                        string areaHash = parts.Length == 5 ? parts[3] : null;
+                        if (!TryResolveBlueprintPrefab(parts[1], parts[2], areaHash, out PrefabBase areaPrefab))
                         {
                             missing++;
                             continue;
                         }
 
-                        string[] pairs = parts[3].Split(';');
+                        string[] pairs = parts[parts.Length - 1].Split(';');
                         if (pairs.Length < 3)
                         {
                             continue;
@@ -5609,8 +7457,8 @@ namespace Copaste
                         {
                             string[] xy = pairs[n].Split(',');
                             if (xy.Length != 2 ||
-                                !float.TryParse(xy[0], System.Globalization.NumberStyles.Float, inv, out float x) ||
-                                !float.TryParse(xy[1], System.Globalization.NumberStyles.Float, inv, out float z))
+                                !TryParseBlueprintFloat(xy[0], inv, out float x) ||
+                                !TryParseBlueprintFloat(xy[1], inv, out float z))
                             {
                                 valid = false;
                                 break;
@@ -5631,17 +7479,266 @@ namespace Copaste
                         continue;
                     }
 
+                    // Marker cvora: "NETMARK|indeks|tip|ime" (kruzni tok,
+                    // semafor, stop). Indeks se proverava tek na kraju, kad je
+                    // cela tabela cvorova procitana.
+                    // 5 polja = varijanta sa hashom; 4 polja su fajlovi
+                    // napisani pre nego što je hash dodat.
+                    if ((parts.Length == 4 || parts.Length == 5) && parts[0] == "NETMARK")
+                    {
+                        if (int.TryParse(parts[1], System.Globalization.NumberStyles.Integer, inv, out int markerNode) &&
+                            markerNode >= 0)
+                        {
+                            string markerHash = parts.Length == 5 && parts[4] != "-" ? parts[4] : null;
+                            if (TryResolveBlueprintPrefab(parts[2], parts[3], markerHash, out PrefabBase markerPrefab))
+                            {
+                                roadNodeMarkers.Add(new NetNodeMarker
+                                {
+                                    m_NodeIndex = markerNode,
+                                    m_Prefab = m_PrefabSystem.GetEntity(markerPrefab),
+                                });
+                            }
+                            else
+                            {
+                                missing++;
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    // Put: "ROAD|tip|ime|hash|nadogradnje|x,z,h;x4".
+                    // Cvor mreze: "NETNODE|x,z,h|g,l,r" (redosled u fajlu =
+                    // indeks; nadogradnje su kruzni tok/semafori/stop, ili "-").
+                    if (parts.Length >= 1 && parts[0] == "NETNODE")
+                    {
+                        string[] nodeXzh = parts.Length >= 2 ? parts[1].Split(',') : new string[0];
+                        if (nodeXzh.Length == 3 &&
+                            TryParseBlueprintFloat(nodeXzh[0], inv, out float nx) &&
+                            TryParseBlueprintFloat(nodeXzh[1], inv, out float nz) &&
+                            TryParseBlueprintFloat(nodeXzh[2], inv, out float nh))
+                        {
+                            bool nodeHasUpgrade = false;
+                            CompositionFlags nodeUpgrade = default;
+                            if (parts.Length == 3 && parts[2] != "-")
+                            {
+                                string[] nodeFlags = parts[2].Split(',');
+                                if (nodeFlags.Length == 3 &&
+                                    uint.TryParse(nodeFlags[0], System.Globalization.NumberStyles.Integer, inv, out uint ng) &&
+                                    uint.TryParse(nodeFlags[1], System.Globalization.NumberStyles.Integer, inv, out uint nl) &&
+                                    uint.TryParse(nodeFlags[2], System.Globalization.NumberStyles.Integer, inv, out uint nr))
+                                {
+                                    nodeHasUpgrade = true;
+                                    nodeUpgrade = new CompositionFlags
+                                    {
+                                        m_General = (CompositionFlags.General)ng,
+                                        m_Left = (CompositionFlags.Side)nl,
+                                        m_Right = (CompositionFlags.Side)nr,
+                                    };
+                                }
+                            }
+
+                            roadNodeOffsets.Add(new float2(nx, nz));
+                            roadNodeHeights.Add(nh);
+                            roadNodeHasUpgrade.Add(nodeHasUpgrade);
+                            roadNodeUpgrades.Add(nodeUpgrade);
+                        }
+                        else
+                        {
+                            // Indeksi su POZICIONI: preskok pokvarene linije bi
+                            // pomerio sve kasnije čvorove i spojio pogrešne
+                            // raskrsnice. Placeholder drži poravnanje, a putevi
+                            // koji ga referišu padaju na spajanje po blizini.
+                            roadNodeOffsets.Add(new float2(float.MaxValue, float.MaxValue));
+                            roadNodeHeights.Add(0f);
+                            roadNodeHasUpgrade.Add(false);
+                            roadNodeUpgrades.Add(default);
+                            Mod.Log.Warn($"Copaste: blueprint '{name}' has a malformed NETNODE line — that junction falls back to proximity welding");
+                        }
+
+                        continue;
+                    }
+
+                    if ((parts.Length == 6 || parts.Length == 7) && parts[0] == "ROAD")
+                    {
+                        if (!TryResolveBlueprintPrefab(parts[1], parts[2], parts[3] == "-" ? null : parts[3], out PrefabBase roadPrefab))
+                        {
+                            missing++;
+                            continue;
+                        }
+
+                        string[] roadPoints = parts[5].Split(';');
+                        if (roadPoints.Length != 4)
+                        {
+                            continue;
+                        }
+
+                        float2[] roadOffsets = new float2[4];
+                        float[] roadHeights = new float[4];
+                        bool roadValid = true;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            string[] xzh = roadPoints[k].Split(',');
+                            if (xzh.Length != 3 ||
+                                !TryParseBlueprintFloat(xzh[0], inv, out float rx) ||
+                                !TryParseBlueprintFloat(xzh[1], inv, out float rz) ||
+                                !TryParseBlueprintFloat(xzh[2], inv, out float rh))
+                            {
+                                roadValid = false;
+                                break;
+                            }
+
+                            roadOffsets[k] = new float2(rx, rz);
+                            roadHeights[k] = rh;
+                        }
+
+                        if (!roadValid)
+                        {
+                            continue;
+                        }
+
+                        bool hasUpgrade = false;
+                        CompositionFlags upgrade = default;
+                        if (parts[4] != "-")
+                        {
+                            string[] flags = parts[4].Split(',');
+                            if (flags.Length == 3 &&
+                                uint.TryParse(flags[0], System.Globalization.NumberStyles.Integer, inv, out uint general) &&
+                                uint.TryParse(flags[1], System.Globalization.NumberStyles.Integer, inv, out uint left) &&
+                                uint.TryParse(flags[2], System.Globalization.NumberStyles.Integer, inv, out uint right))
+                            {
+                                hasUpgrade = true;
+                                upgrade = new CompositionFlags
+                                {
+                                    m_General = (CompositionFlags.General)general,
+                                    m_Left = (CompositionFlags.Side)left,
+                                    m_Right = (CompositionFlags.Side)right,
+                                };
+                            }
+                        }
+
+                        // Stari blueprint (6 polja) nema tabelu cvorova: -1 znaci
+                        // "nepoznat", pa paste pada na spajanje po blizini. NIKAD
+                        // ne sme da ostane podrazumevana 0 — sve deonice bi se
+                        // srucile u istu tacku (blob).
+                        int startNodeIndex = -1;
+                        int endNodeIndex = -1;
+                        if (parts.Length == 7)
+                        {
+                            string[] nodeIdx = parts[6].Split(',');
+                            if (nodeIdx.Length != 2 ||
+                                !int.TryParse(nodeIdx[0], System.Globalization.NumberStyles.Integer, inv, out startNodeIndex) ||
+                                !int.TryParse(nodeIdx[1], System.Globalization.NumberStyles.Integer, inv, out endNodeIndex))
+                            {
+                                startNodeIndex = -1;
+                                endNodeIndex = -1;
+                            }
+                        }
+
+                        roadItems.Add(new NetEdgeClipboardItem
+                        {
+                            m_Prefab = m_PrefabSystem.GetEntity(roadPrefab),
+                            m_CurveOffsets = roadOffsets,
+                            m_HeightOffsets = roadHeights,
+                            m_HasUpgrade = hasUpgrade,
+                            m_Upgrade = upgrade,
+                            m_StartNodeIndex = startNodeIndex,
+                            m_EndNodeIndex = endNodeIndex,
+                        });
+                        continue;
+                    }
+
+                    // Ograda: "LANE|tip|ime|hash|seed|x,z,h;x,z,h;x,z,h;x,z,h".
+                    if (parts.Length == 6 && parts[0] == "LANE")
+                    {
+                        if (!TryResolveBlueprintPrefab(parts[1], parts[2], parts[3] == "-" ? null : parts[3], out PrefabBase lanePrefab))
+                        {
+                            missing++;
+                            continue;
+                        }
+
+                        string[] lanePoints = parts[5].Split(';');
+                        if (lanePoints.Length != 4)
+                        {
+                            continue;
+                        }
+
+                        float2[] laneOffsets = new float2[4];
+                        float[] laneHeights = new float[4];
+                        bool laneValid = true;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            string[] xzh = lanePoints[k].Split(',');
+                            if (xzh.Length != 3 ||
+                                !TryParseBlueprintFloat(xzh[0], inv, out float lx) ||
+                                !TryParseBlueprintFloat(xzh[1], inv, out float lz) ||
+                                !TryParseBlueprintFloat(xzh[2], inv, out float lh))
+                            {
+                                laneValid = false;
+                                break;
+                            }
+
+                            laneOffsets[k] = new float2(lx, lz);
+                            laneHeights[k] = lh;
+                        }
+
+                        if (laneValid)
+                        {
+                            bool laneHasSeed = int.TryParse(parts[4], System.Globalization.NumberStyles.Integer, inv, out int laneSeed) && laneSeed >= 0 && laneSeed <= ushort.MaxValue;
+                            laneItems.Add(new LaneClipboardItem
+                            {
+                                m_Prefab = m_PrefabSystem.GetEntity(lanePrefab),
+                                m_CurveOffsets = laneOffsets,
+                                m_HeightOffsets = laneHeights,
+                                m_HasSeed = laneHasSeed,
+                                m_Seed = laneHasSeed ? (ushort)laneSeed : (ushort)0,
+                                m_PreviewSeed = loadRandom.NextInt(),
+                            });
+                        }
+
+                        continue;
+                    }
+
                     // 11 polja = najstariji format, 14 = sa drvećem (v1.0.4),
-                    // 15 = sa seed-om, 16 = sa custom bojom (v1.0.6).
-                    if (parts.Length != 11 && parts.Length != 14 && parts.Length != 15 && parts.Length != 16)
+                    // 15 = sa seed-om, 16 = sa custom bojom (v1.0.6),
+                    // 17 = sa hash-om prefaba (v1.2.0, samo PDX asseti).
+                    // PAŽNJA: polje [16] je REZERVISANO za hash — svako buduće
+                    // polje mora iza njega, uz hash uvek prisutan ("-" kad ga
+                    // nema), inače broj polja postaje dvosmislen.
+                    if (parts.Length != 11 && parts.Length != 14 && parts.Length != 15 && parts.Length != 16 && parts.Length != 17)
                     {
                         lastItemSkipped = true;
                         continue;
                     }
 
-                    if (!m_PrefabSystem.TryGetPrefab(new PrefabID(parts[0], parts[1]), out PrefabBase prefabBase) || prefabBase == null)
+                    string itemHash = parts.Length >= 17 ? parts[16] : null;
+                    if (!TryResolveBlueprintPrefab(parts[0], parts[1], itemHash, out PrefabBase prefabBase))
                     {
                         missing++;
+                        lastItemSkipped = true;
+                        continue;
+                    }
+
+                    // TryParse sa NumberStyles.Float, kao i AREA/LANE/ROAD
+                    // linije. Bacajući Parse je izuzetak iznosio iz cele petlje,
+                    // pa bi jedna ručno prepravljena linija oborila UČITAVANJE
+                    // CELOG fajla; uz to Parse(string, IFormatProvider) prima
+                    // grupni separator, pa je "12,5" prolazilo kao 125 i prop
+                    // se tiho postavljao sto metara dalje.
+                    float[] numbers = new float[9];
+                    bool numbersOk = true;
+                    for (int n = 0; n < numbers.Length; n++)
+                    {
+                        if (!TryParseBlueprintFloat(parts[n + 2], inv, out numbers[n]) ||
+                            !IsFiniteBlueprintNumber(numbers[n]))
+                        {
+                            numbersOk = false;
+                            break;
+                        }
+                    }
+
+                    if (!numbersOk)
+                    {
                         lastItemSkipped = true;
                         continue;
                     }
@@ -5650,30 +7747,29 @@ namespace Copaste
                     ClipboardItem item = new ClipboardItem
                     {
                         m_Prefab = prefabEntity,
-                        m_Offset = new float3(
-                            float.Parse(parts[2], inv),
-                            float.Parse(parts[3], inv),
-                            float.Parse(parts[4], inv)),
-                        m_Rotation = new quaternion(
-                            float.Parse(parts[5], inv),
-                            float.Parse(parts[6], inv),
-                            float.Parse(parts[7], inv),
-                            float.Parse(parts[8], inv)),
-                        m_HeightOffset = float.Parse(parts[9], inv),
-                        m_Diameter = float.Parse(parts[10], inv),
+                        m_Offset = new float3(numbers[0], numbers[1], numbers[2]),
+                        m_Rotation = new quaternion(numbers[3], numbers[4], numbers[5], numbers[6]),
+                        m_HeightOffset = numbers[7],
+                        m_Diameter = numbers[8],
                     };
 
-                    if (parts.Length >= 14 && parts[11] == "1")
+                    if (parts.Length >= 14 && parts[11] == "1" &&
+                        int.TryParse(parts[12], System.Globalization.NumberStyles.Integer, inv, out int treeState) &&
+                        byte.TryParse(parts[13], System.Globalization.NumberStyles.Integer, inv, out byte treeGrowth))
                     {
                         item.m_HadTree = true;
                         item.m_Tree = new Game.Objects.Tree
                         {
-                            m_State = (Game.Objects.TreeState)int.Parse(parts[12], inv),
-                            m_Growth = byte.Parse(parts[13], inv),
+                            m_State = (Game.Objects.TreeState)treeState,
+                            m_Growth = treeGrowth,
                         };
                     }
 
-                    if (parts.Length >= 15 && int.TryParse(parts[14], System.Globalization.NumberStyles.Integer, inv, out int seedValue) && seedValue >= 0)
+                    // Opseg, ne samo znak: (ushort)65536 je 0, pa bi seed
+                    // izvan opsega tiho promenio izgled propa (ROAD/LANE grane
+                    // to već ograničavaju).
+                    if (parts.Length >= 15 && int.TryParse(parts[14], System.Globalization.NumberStyles.Integer, inv, out int seedValue) &&
+                        seedValue >= 0 && seedValue <= ushort.MaxValue)
                     {
                         item.m_HasSeed = true;
                         item.m_Seed = (ushort)seedValue;
@@ -5690,7 +7786,7 @@ namespace Copaste
                     lastItemSkipped = false;
                 }
 
-                if (items.Count == 0 && areaItems.Count == 0)
+                if (items.Count == 0 && areaItems.Count == 0 && laneItems.Count == 0 && roadItems.Count == 0)
                 {
                     Mod.Log.Warn($"Blueprint '{name}': nothing could be resolved ({missing} missing)");
                     return false;
@@ -5700,7 +7796,42 @@ namespace Copaste
                 m_Clipboard.AddRange(items);
                 m_ClipboardAreas.Clear();
                 m_ClipboardAreas.AddRange(areaItems);
-                Mod.Log.Info($"Copaste: blueprint '{name}' loaded ({items.Count} objects, {areaItems.Count} surfaces, {missing} missing)");
+                m_ClipboardLanes.Clear();
+                m_ClipboardLanes.AddRange(laneItems);
+                // Indeksi van tabele (osteceni/rucno menjani fajl) padaju na
+                // spajanje po blizini — kao stari format bez tabele.
+                for (int r = 0; r < roadItems.Count; r++)
+                {
+                    NetEdgeClipboardItem item = roadItems[r];
+                    if (item.m_StartNodeIndex >= roadNodeOffsets.Count ||
+                        (item.m_StartNodeIndex >= 0 && roadNodeOffsets[item.m_StartNodeIndex].x == float.MaxValue)) { item.m_StartNodeIndex = -1; }
+                    if (item.m_EndNodeIndex >= roadNodeOffsets.Count ||
+                        (item.m_EndNodeIndex >= 0 && roadNodeOffsets[item.m_EndNodeIndex].x == float.MaxValue)) { item.m_EndNodeIndex = -1; }
+                    roadItems[r] = item;
+                }
+
+                // Marker bez ispravnog cvora se odbacuje (neispravna
+                // NETNODE linija je ostavila mesto-drzac sa float.MaxValue).
+                for (int m = roadNodeMarkers.Count - 1; m >= 0; m--)
+                {
+                    int markerIndex = roadNodeMarkers[m].m_NodeIndex;
+                    if (markerIndex >= roadNodeOffsets.Count ||
+                        roadNodeOffsets[markerIndex].x == float.MaxValue)
+                    {
+                        roadNodeMarkers.RemoveAt(m);
+                    }
+                }
+
+                // Fixup prethodnog otiska još ume da radi, a njegovi node
+                // indeksi pokazuju u tabelu koju upravo menjamo — bez ovoga
+                // bi markeri novog blueprinta završili na prethodnoj
+                // raskrsnici.
+                InvalidatePendingNodeFixups();
+
+                m_ClipboardNetEdges.Clear();
+                m_ClipboardNetEdges.AddRange(roadItems);
+                ResetClipboardNetNodes(roadNodeOffsets, roadNodeHeights, roadNodeHasUpgrade, roadNodeUpgrades, roadNodeMarkers);
+                Mod.Log.Info($"Copaste: blueprint '{name}' loaded ({items.Count} objects, {areaItems.Count} surfaces, {laneItems.Count} fences, {roadItems.Count} road segments, {missing} missing)");
                 return true;
             }
             catch (System.Exception e)
@@ -5708,6 +7839,56 @@ namespace Copaste
                 Mod.Log.Warn($"Blueprint load failed: {e.Message}");
                 return false;
             }
+        }
+
+        // PrefabID je (tip, ime, HASH) i Equals poredi sva tri: PDX asseti se
+        // registruju SA hashom (iz platformID-a), vanila sa praznim — lookup bez
+        // hasha ih zato ne nalazi. Blueprint linije od sada nose i hash; čita se
+        // kroz JAVNI ToUrlSegment() ("tip/ime/hash" kad hash postoji; tip i ime
+        // su URL-eskejpovani pa ne mogu da sadrže '/').
+        private static string GetPrefabHashString(PrefabBase prefabBase)
+        {
+            try
+            {
+                string[] segments = prefabBase.GetPrefabID().ToUrlSegment().Split('/');
+                return segments.Length >= 3 ? segments[2] : string.Empty;
+            }
+            catch (System.Exception)
+            {
+                return string.Empty;
+            }
+        }
+
+        // Prefab lookup za blueprint linije: prvo sa hashom (PDX asseti), pa bez
+        // njega (vanila; i stariji fajlovi koji hash polje nemaju).
+        private bool TryResolveBlueprintPrefab(string type, string name, string hash, out PrefabBase prefabBase)
+        {
+            bool hashTried = false;
+            if (!string.IsNullOrEmpty(hash) &&
+                Colossal.Hash128.TryParse(hash, out Colossal.Hash128 parsed) &&
+                parsed.isValid)
+            {
+                hashTried = true;
+                if (m_PrefabSystem.TryGetPrefab(new PrefabID(type, name, parsed), out prefabBase) &&
+                    prefabBase != null)
+                {
+                    return true;
+                }
+            }
+
+            if (m_PrefabSystem.TryGetPrefab(new PrefabID(type, name), out prefabBase) && prefabBase != null)
+            {
+                if (hashTried)
+                {
+                    // Vidljivost: isti tip+ime, drugi asset (hash se ne poklapa) —
+                    // učitava se imenjak umesto da se broji kao nedostajući.
+                    Mod.Log.Info($"Copaste: blueprint prefab '{name}' resolved by name only (asset hash mismatch)");
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         // ColorSet ↔ string za blueprint fajlove: "r,g,b,a;r,g,b,a;r,g,b,a".
@@ -5737,10 +7918,10 @@ namespace Copaste
             {
                 string[] rgba = channels[i].Split(',');
                 if (rgba.Length != 4 ||
-                    !float.TryParse(rgba[0], System.Globalization.NumberStyles.Float, inv, out float r) ||
-                    !float.TryParse(rgba[1], System.Globalization.NumberStyles.Float, inv, out float g) ||
-                    !float.TryParse(rgba[2], System.Globalization.NumberStyles.Float, inv, out float b) ||
-                    !float.TryParse(rgba[3], System.Globalization.NumberStyles.Float, inv, out float a))
+                    !TryParseBlueprintFloat(rgba[0], inv, out float r) ||
+                    !TryParseBlueprintFloat(rgba[1], inv, out float g) ||
+                    !TryParseBlueprintFloat(rgba[2], inv, out float b) ||
+                    !TryParseBlueprintFloat(rgba[3], inv, out float a))
                 {
                     return false;
                 }

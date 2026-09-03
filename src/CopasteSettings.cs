@@ -5,15 +5,35 @@ namespace Copaste
     using Game.Modding;
     using Game.Settings;
 
+    public enum PanelThemeOption
+    {
+        Copaste = 0,
+        Vanilla = 1,
+    }
+
+    public enum ModLanguageOption
+    {
+        Auto = 0,
+        English = 1,
+        German = 2,
+        French = 3,
+        Serbian = 4,
+    }
+
     [FileLocation("ModsSettings/Copaste/Copaste")]
     [SettingsUITabOrder(kGeneralTab, kKeybindingsTab)]
-    [SettingsUIGroupOrder(kBehaviorGroup, kToolGroup, kClipboardGroup, kEditingGroup, kNudgeGroup, kAlignGroup)]
-    [SettingsUIShowGroupName(kToolGroup, kClipboardGroup, kEditingGroup, kNudgeGroup, kAlignGroup)]
+    [SettingsUIGroupOrder(kBehaviorGroup, kPanelGroup, kLimitsGroup, kToolGroup, kClipboardGroup, kEditingGroup, kNudgeGroup, kAlignGroup)]
+    [SettingsUIShowGroupName(kBehaviorGroup, kPanelGroup, kLimitsGroup, kToolGroup, kClipboardGroup, kEditingGroup, kNudgeGroup, kAlignGroup)]
     public class CopasteSettings : ModSetting
     {
         public const string kGeneralTab = "General";
         public const string kKeybindingsTab = "Keybindings";
         public const string kBehaviorGroup = "Behavior";
+
+        // Odvojene grupe = separatori u Options: panel-izgled iza Anarchy,
+        // limiti iza Text size (grupe bez naslova daju čist razmak).
+        public const string kPanelGroup = "PanelOptions";
+        public const string kLimitsGroup = "Limits";
         public const string kToolGroup = "ToolKeys";
         public const string kClipboardGroup = "ClipboardKeys";
         public const string kEditingGroup = "EditingKeys";
@@ -116,8 +136,41 @@ namespace Copaste
         [SettingsUISection(kKeybindingsTab, kAlignGroup)]
         public ProxyBinding AlignGapMinusBinding { get; set; }
 
+        // Jezik SAMO za mod (panel + ove opcije) — igra ostaje na svom.
+        [SettingsUISection(kGeneralTab, kBehaviorGroup)]
+        public ModLanguageOption ModLanguage { get; set; } = ModLanguageOption.Auto;
+
         [SettingsUISection(kGeneralTab, kBehaviorGroup)]
         public bool AnarchyPaste { get; set; } = true;
+
+        // Izgled panela: nas potpis ili cista igrina paleta (getovi kroz
+        // igrine CSS varijable — korisnici su trazili vanila izgled).
+        [SettingsUISection(kGeneralTab, kPanelGroup)]
+        public PanelThemeOption PanelTheme { get; set; } = PanelThemeOption.Copaste;
+
+        // Velicina panela u procentima — nekome je default sitan.
+        [SettingsUISlider(min = 80, max = 125, step = 5)]
+        [SettingsUISection(kGeneralTab, kPanelGroup)]
+        public int PanelScale { get; set; } = 100;
+
+        // Samo TEKST — panel ostaje istih dimenzija.
+        [SettingsUISlider(min = 90, max = 130, step = 5)]
+        [SettingsUISection(kGeneralTab, kPanelGroup)]
+        public int TextScale { get; set; } = 100;
+
+        // Zaštitni limiti kao opcije — jače mašine mogu više, slabije manje.
+        // Defaulti = dosadašnje konstante.
+        [SettingsUISlider(min = 500, max = 5000, step = 100)]
+        [SettingsUISection(kGeneralTab, kLimitsGroup)]
+        public int MaxSelection { get; set; } = 1000;
+
+        [SettingsUISlider(min = 100, max = 1000, step = 50)]
+        [SettingsUISection(kGeneralTab, kLimitsGroup)]
+        public int MaxOverlayShapes { get; set; } = 400;
+
+        [SettingsUISlider(min = 10, max = 100, step = 5)]
+        [SettingsUISection(kGeneralTab, kLimitsGroup)]
+        public int SelectionListMax { get; set; } = 50;
 
         // Sačuvana pozicija panela u pikselima ekrana; -1 = default (CSS pozicija).
         [SettingsUIHidden]
@@ -150,6 +203,14 @@ namespace Copaste
         [SettingsUIHidden]
         public bool SelectBuildings { get; set; } = false;
 
+        // Samostalne ograde/živice (net lanes). Default isključeno, kao zgrade.
+        [SettingsUIHidden]
+        public bool SelectFences { get; set; } = false;
+
+        // Mreže: čvorovi i segmenti puteva/staza/šina (samo pomeranje).
+        [SettingsUIHidden]
+        public bool SelectNetworks { get; set; } = false;
+
         // Road snap pri paste-u zgrada: sidro-zgrada se lepi na najbližu ivicu
         // puta kao kod običnog plopovanja, grupa prati.
         [SettingsUIHidden]
@@ -160,9 +221,22 @@ namespace Copaste
         [SettingsUIHidden]
         public bool SelectBuildingProps { get; set; } = false;
 
+        public override void Apply()
+        {
+            base.Apply();
+            Mod.ApplyLanguageOverride();
+        }
+
         public override void SetDefaults()
         {
+            ModLanguage = ModLanguageOption.Auto;
             AnarchyPaste = true;
+            PanelTheme = PanelThemeOption.Copaste;
+            PanelScale = 100;
+            TextScale = 100;
+            MaxSelection = 1000;
+            MaxOverlayShapes = 400;
+            SelectionListMax = 50;
             PanelX = -1;
             PanelY = -1;
             RandomPasteVariation = false;
@@ -171,6 +245,8 @@ namespace Copaste
             SelectDecals = true;
             SelectSurfaces = true;
             SelectBuildings = false;
+            SelectFences = false;
+            SelectNetworks = false;
             RoadSnapPaste = true;
             SelectBuildingProps = false;
         }

@@ -10,12 +10,12 @@ Copaste is built from four cooperating pieces:
 │  (cohtml panel) │                               │ (UISystemBase)   │
 └─────────────────┘                               └────────┬─────────┘
                                                            │ direct calls
-                                                  ┌────────▼─────────┐
+                                                  ┌────────▼──────────┐
                                                   │ CopasteToolSystem │
                                                   │ (ToolBaseSystem)  │
-                                                  └────────┬─────────┘
+                                                  └────────┬──────────┘
                                                            │ ECS + definition pipeline
-                                                  ┌────────▼─────────┐
+                                                  ┌────────▼──────────┐
                                                   │   Game systems    │
                                                   └───────────────────┘
 ```
@@ -86,7 +86,7 @@ Every feature must pass all three:
 2. **Official pipelines only.** Placement goes through the definition pipeline;
    no Harmony patches anywhere in the mod.
 3. **Errors kill the action, never the game.** Try/catch around the update loop,
-   hard limits (1000 selected props, 400 overlay circles), and graceful fallback
+   safety limits (1000 selected objects, 400 overlay circles — both sliders in Options), and graceful fallback
    when optional integrations (Anarchy) are missing.
 
 ## Optional Anarchy integration

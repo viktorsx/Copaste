@@ -23,7 +23,7 @@ trigger) empties it.
 ## Entering paste mode
 
 `EnterPasteMode` switches `m_Mode`, remembers the game's previous
-`ignoreErrors` flag and, if the *Anarchy while pasting* option is on, sets
+`ignoreErrors` flag and, if the *Ignore placement errors when pasting* option is on, sets
 `ToolSystem.ignoreErrors = true` so placement validation doesn't reject
 overlaps. The flag is restored on exit. ESC or a quick right-click leaves paste
 mode.
@@ -121,6 +121,21 @@ Two hard rules learned the hard way:
 - Matching ghost→record is nearest-neighbor per prefab; it is only used for the
   *preview*. The authoritative transfer happens in the post-paste fix, which
   matches by exact position.
+
+## Fences
+
+A placed fence/hedge is a small net: two invisible container nodes plus a
+container edge that carries the fence prefab (`Game.Tools.EditorContainer`)
+and the curve; the visible lane is a child the game regenerates from that
+curve. Copy captures the container edge's curve (as centroid-relative XZ
+plus per-point height above terrain) and seed. Paste emits the game's own
+net definition (`CreationDefinition` with the invisible lane-container
+prefab as `m_Prefab` and the fence prefab as `m_SubPrefab`, plus a
+`NetCourse`) — the ghost preview and final entities come from the same
+pipeline the net tool uses. Post-paste resolution matches new container
+edges by fence prefab and curve midpoint **in the XZ plane** (heights can
+drift between the record and the built curve), with the same
+one-entity-per-record claim rule as props.
 
 ## Duplicate in place
 

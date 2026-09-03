@@ -5,46 +5,46 @@
 .copasteLogo img{width:16rem;height:16rem}
 /* Eksplicitna širina I visina — cohtml bez toga SVG-u da default kutiju (300x150). */
 .copasteTitleLogo{width:82rem;height:9.5rem;margin-left:2rem;flex:0 0 auto}
-.copasteVersion{font-size:11rem;color:#8fe6b4;flex:1 1 0;text-align:right;padding-right:2rem}
+.copasteVersion{font-size:0.846em;color:#8fe6b4;flex:1 1 0;text-align:right;padding-right:2rem}
 
 .copasteCard{margin-top:6rem;background:rgba(255,255,255,0.04);border:1rem solid rgba(255,255,255,0.06);border-radius:9rem;padding:6rem}
 .copasteCardFlush{padding:0}
-.copasteSectionTitle{font-size:10rem;font-weight:600;text-transform:uppercase;letter-spacing:1.2rem;color:rgba(255,255,255,0.4);margin:0 2rem 5rem}
+.copasteSectionTitle{font-size:0.769em;font-weight:600;text-transform:uppercase;letter-spacing:1.2rem;color:rgba(255,255,255,0.4);margin:0 2rem 5rem}
 
 .copasteStatsRow{display:flex;padding:7rem 10rem}
 .copasteStat{flex:1 1 0;display:flex;flex-direction:column}
 .copasteStatPad{padding-left:8rem}
-.copasteStatValue{font-size:17rem;font-weight:bold;line-height:1;color:rgba(255,255,255,0.55)}
+.copasteStatValue{font-size:1.308em;font-weight:bold;line-height:1;color:rgba(255,255,255,0.55)}
 .copasteStatValueLive{color:#8fe6b4}
-.copasteStatLabel{font-size:10rem;letter-spacing:0.8rem;text-transform:uppercase;color:rgba(255,255,255,0.42);margin-top:1rem}
+.copasteStatLabel{font-size:0.769em;letter-spacing:0.8rem;text-transform:uppercase;color:rgba(255,255,255,0.42);margin-top:1rem}
 .copasteStatDivider{width:1rem;background:rgba(255,255,255,0.08);margin:0 3rem}
 .copasteFilterRow{display:flex;align-items:center;padding:5rem 10rem;border-top:1rem solid rgba(255,255,255,0.07)}
 .copasteFilterRow img{width:10rem;height:10rem}
-.copasteFilterLabel{font-size:11rem;color:rgba(255,255,255,0.5);margin-left:5rem}
-.copasteFilterValue{font-size:11rem;font-weight:600;color:#8fe6b4;margin-left:5rem}
+.copasteFilterLabel{font-size:0.846em;color:rgba(255,255,255,0.5);margin-left:5rem}
+.copasteFilterValue{font-size:0.846em;font-weight:600;color:#8fe6b4;margin-left:5rem}
 .copastePropName{color:rgba(255,255,255,0.85);flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .copastePropRow{position:relative}
-.copasteNameTip{display:none;position:absolute;left:6rem;bottom:100%;margin-bottom:3rem;max-width:200rem;padding:4rem 7rem;border-radius:6rem;background-color:rgba(12,13,20,0.95);border:1rem solid rgba(255,255,255,0.15);color:#e8e9f2;font-size:11rem;line-height:1.35;z-index:50}
+.copasteNameTip{display:none;position:absolute;left:6rem;bottom:100%;margin-bottom:3rem;max-width:200rem;padding:4rem 7rem;border-radius:6rem;background-color:rgba(12,13,20,0.95);border:1rem solid rgba(255,255,255,0.15);color:#e8e9f2;font-size:0.846em;line-height:1.35;z-index:50}
 .copastePropRow:hover .copasteNameTip{display:block}
 .copasteFilterBtn{display:flex;align-items:center;height:18rem;padding:0 6rem;border:1rem solid rgba(255,255,255,0.13);border-radius:5rem;background:linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.03));cursor:pointer;transition:all .12s}
 .copasteFilterBtn:hover{border-color:rgba(111,211,154,0.5)}
 .copasteFilterBtn img{width:10rem;height:10rem}
-.copasteFilterBtn span{font-size:11rem;color:#e6e9f0;margin-left:4rem}
+.copasteFilterBtn span{font-size:0.846em;color:#e6e9f0;margin-left:4rem}
 .copasteFilterBtn + .copasteFilterValue{margin-left:6rem}
 .copasteFilterValueClip{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .copasteFilterValueOff{color:rgba(255,255,255,0.35);font-weight:normal}
 .copasteChipRow{display:flex;margin:0 -2rem}
-.copasteChip{flex:1 1 0;height:21rem;margin:2rem;display:flex;align-items:center;justify-content:center;border-radius:5rem;border:1rem solid rgba(255,255,255,0.10);background-color:rgba(255,255,255,0.03);font-size:10.5rem;color:rgba(255,255,255,0.4);cursor:pointer;transition:all .12s}
+.copasteChip{flex:1 1 0;height:21rem;margin:2rem;display:flex;align-items:center;justify-content:center;border-radius:5rem;border:1rem solid rgba(255,255,255,0.10);background-color:rgba(255,255,255,0.03);font-size:0.808em;color:rgba(255,255,255,0.4);cursor:pointer;transition:all .12s}
 .copasteChip:hover{color:rgba(255,255,255,0.85)}
 .copasteChip img{width:10rem;height:10rem;margin-right:4rem;opacity:0.45}
 .copasteChipOn img{opacity:0.9}
 .copasteChipOn{border-color:rgba(111,211,154,0.4);background-color:rgba(111,211,154,0.09);color:#8fe6b4}
-.copasteSwitch{min-width:34rem;height:18rem;padding:0 7rem;border:1rem solid rgba(255,255,255,0.13);border-radius:9rem;background-color:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font-size:10rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.copasteSwitch{min-width:34rem;height:18rem;padding:0 7rem;border:1rem solid rgba(255,255,255,0.13);border-radius:9rem;background-color:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font-size:0.769em;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
 .copasteSwitch:hover{color:rgba(255,255,255,0.85)}
 .copasteSwitchOn{border-color:rgba(111,211,154,0.4);background-color:rgba(111,211,154,0.09);color:#8fe6b4}
 
 .copasteBtns{display:flex;margin:0 -2rem}
-.copasteBtn{height:27rem;padding:0 6rem;margin:2rem;border-radius:6rem;font-size:12rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:1 1 0;background:linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.03));border:1rem solid rgba(255,255,255,0.13);color:#e6e9f0;transition:all .12s}
+.copasteBtn{height:27rem;padding:0 6rem;margin:2rem;border-radius:6rem;font-size:0.923em;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:1 1 0;background:linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.03));border:1rem solid rgba(255,255,255,0.13);color:#e6e9f0;transition:all .12s}
 .copasteBtn:hover{border-color:rgba(111,211,154,0.5)}
 .copasteBtn img{width:14rem;height:14rem}
 .copasteBtnPrimary{background:linear-gradient(180deg,#79dba3,#45a06c) !important;border-color:rgba(160,255,200,0.45) !important;color:#0b2114 !important;font-weight:bold}
@@ -69,26 +69,91 @@
 .copasteStepperBtn{width:16rem;height:20rem;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;transition:background-color .12s}
 .copasteStepperBtn img{width:9rem;height:9rem;opacity:0.7}
 .copasteStepperBtn:hover{background-color:rgba(111,211,154,0.25)}
-.copasteStepperInput{width:32rem;height:20rem;padding:0;margin:0;border:none;background:transparent;color:#e6e9f0;font-size:11rem;text-align:center;line-height:20rem;display:flex;align-items:center;justify-content:center}
+.copasteStepperInput{width:32rem;height:20rem;padding:0;margin:0;border:none;background:transparent;color:#e6e9f0;font-size:0.846em;text-align:center;line-height:20rem;display:flex;align-items:center;justify-content:center}
 .copasteToggleTrack{display:flex;background:rgba(0,0,0,0.35);border-radius:6rem;padding:2rem}
-.copasteToggleOpt{flex:1 1 0;height:22rem;display:flex;align-items:center;justify-content:center;border-radius:4rem;font-size:11rem;color:rgba(255,255,255,0.55);cursor:pointer;transition:color .12s}
+.copasteToggleOpt{flex:1 1 0;height:22rem;display:flex;align-items:center;justify-content:center;border-radius:4rem;font-size:0.846em;color:rgba(255,255,255,0.55);cursor:pointer;transition:color .12s}
 .copasteToggleOpt:hover{color:rgba(255,255,255,0.85)}
 .copasteToggleOptActive{background:linear-gradient(180deg,#79dba3,#45a06c);color:#0b2114;font-weight:bold}
 
-.copastePageLabel{min-width:26rem;height:20rem;display:flex;align-items:center;justify-content:center;font-size:11rem;color:rgba(255,255,255,0.6)}
+.copastePageLabel{min-width:26rem;height:20rem;display:flex;align-items:center;justify-content:center;font-size:0.846em;color:rgba(255,255,255,0.6)}
 .copasteStatValueRow{display:flex;align-items:center}
-.copasteStatClear{height:14rem;padding:0 5rem;margin-left:5rem;border:none;border-radius:3rem;background-color:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:9.5rem;letter-spacing:0.5rem;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .12s}
+.copasteStatClear{height:14rem;padding:0 5rem;margin-left:5rem;border:none;border-radius:3rem;background-color:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:0.731em;letter-spacing:0.5rem;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .12s}
 .copasteStatClear:hover{background-color:rgba(230,80,80,0.6);color:#fff}
 .copasteBpRow{display:flex;align-items:center;margin:1.5rem 0;position:relative}
 .copasteBpRow:hover .copasteNameTip{display:block}
 .copasteSelName{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.copasteBpLoad{flex:1;height:22rem;display:flex;align-items:center;text-align:left;padding:0 7rem;border:none;border-radius:5rem;background-color:rgba(255,255,255,0.06);color:#e8e9f2;font-size:12rem;cursor:pointer;transition:background-color .12s}
+.copasteBpLoad{flex:1;height:22rem;display:flex;align-items:center;text-align:left;padding:0 7rem;border:none;border-radius:5rem;background-color:rgba(255,255,255,0.06);color:#e8e9f2;font-size:0.923em;cursor:pointer;transition:background-color .12s}
 .copasteBpLoad:hover{background-color:rgba(111,211,154,0.22)}
 .copasteBpIcon{width:22rem;height:22rem;margin-left:3rem;border:none;border-radius:5rem;background-color:rgba(255,255,255,0.07);color:#fff;cursor:pointer;transition:background-color .12s;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .copasteBpIcon img{width:11rem;height:11rem}
 .copasteBpIcon:hover{background-color:rgba(111,211,154,0.3)}
 .copasteBpIconDelete:hover{background-color:rgba(230,80,80,0.6)}
-.copasteInput{flex:1;height:22rem;padding:0 6rem;border-radius:5rem;border:1rem solid #6fd39a;background-color:rgba(0,0,0,0.5);color:#fff;font-size:12rem;box-shadow:0 0 8rem rgba(111,211,154,0.35)}
-.copasteEmpty{color:rgba(255,255,255,0.5);font-size:12rem}
+.copasteInput{flex:1;height:22rem;padding:0 6rem;border-radius:5rem;border:1rem solid #6fd39a;background-color:rgba(0,0,0,0.5);color:#fff;font-size:0.923em;box-shadow:0 0 8rem rgba(111,211,154,0.35)}
+.copasteEmpty{color:rgba(255,255,255,0.5);font-size:0.923em}
 
-.copasteHint{margin:8rem 4rem 2rem;font-size:11rem;line-height:1.45;color:rgba(255,255,255,0.35)}
+.copasteHint{margin:8rem 4rem 2rem;font-size:0.846em;line-height:1.45;color:rgba(255,255,255,0.35)}
+
+/* ===== VANILA TEMA (Options → Panel theme → Vanilla) =====
+   Ista struktura panela, ali boje/pozadine/okviri dolaze iz IGRINIH CSS
+   varijabli (isti izvor koji koriste vanila paneli i modovi poput Node
+   Controller-a) — panel se stapa sa igrom i prati aktivni theme mod. */
+.copasteThemeVanilla{background:var(--panelColorNormal);border:1rem solid var(--menuControlBorder);border-radius:var(--panelRadius);color:var(--normalTextColor);box-shadow:none}
+.copasteThemeVanilla .copasteCard{background:var(--panelColorDark);border-color:transparent;border-radius:var(--panelRadius)}
+.copasteThemeVanilla .copasteSectionTitle{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteVersion{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteLogo{background:var(--accentColorNormal);box-shadow:none}
+.copasteThemeVanilla .copasteStatValue{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteStatValueLive{color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteStatLabel{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteFilterLabel{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteFilterValue{color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteFilterBtn{background:var(--panelColorDark);border-color:var(--menuControlBorder)}
+.copasteThemeVanilla .copasteFilterBtn:hover{border-color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteFilterBtn span{color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteChip{background-color:var(--panelColorDark);border-color:transparent;color:var(--textColorDim)}
+.copasteThemeVanilla .copasteChip:hover{color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteChipOn{background-color:var(--accentColorDark);border-color:var(--accentColorNormal);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteSwitch{background-color:var(--panelColorDark);border-color:var(--menuControlBorder);color:var(--textColorDim)}
+.copasteThemeVanilla .copasteSwitchOn{background-color:var(--accentColorDark);border-color:var(--accentColorNormal);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteBtn{background:var(--panelColorDark);border-color:var(--menuControlBorder);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteBtn:hover{border-color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteBtnPrimary{background:var(--accentColorNormal) !important;border-color:var(--accentColorLight) !important;color:#fff !important}
+.copasteThemeVanilla .copasteBtnActive{background:var(--accentColorNormal) !important;border-color:var(--accentColorLight) !important;color:#fff !important;box-shadow:none}
+.copasteThemeVanilla .copasteBtnInfo{background:var(--panelColorDark);border-color:var(--menuControlBorder);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteBtnActiveInfo{background:var(--accentColorNormal) !important;border-color:var(--accentColorLight) !important;color:#fff !important;box-shadow:none}
+.copasteThemeVanilla .copasteBtnDisabled{background:var(--panelColorDark) !important;border-color:transparent !important;color:var(--normalTextColorLocked) !important}
+.copasteThemeVanilla .copasteStatDivider{background:var(--menuControlBorder)}
+.copasteThemeVanilla .copasteFilterRow{border-top-color:var(--menuControlBorder)}
+.copasteThemeVanilla .copastePropName{color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteInput{background:var(--panelColorDark);border-color:var(--menuControlBorder);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteHint{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteEmpty{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteNameTip{background-color:var(--panelColorNormal);border-color:var(--menuControlBorder);color:var(--normalTextColor)}
+
+/* Nativna vanila: igrin Panel je okvir — spoljni dock nosi poziciju/drag,
+   telo gubi našu pozadinu (Panel donosi svoju), unutrašnji header je skriven
+   jer naslov živi u Panel header traci. */
+.copasteVanillaDock{position:absolute;top:80rem;left:10rem;width:240rem;pointer-events:auto}
+.copasteVanillaFrame{width:100%}
+.copasteVanillaHeader{display:flex;align-items:center;flex:1 1 auto;cursor:move;padding:2rem 4rem}
+.copasteVanillaHeader .copasteTitleLogo{margin-left:0}
+.copasteVanillaBody{position:static;top:auto;left:auto;width:auto;background:none;border:none;box-shadow:none;backdrop-filter:none;padding:4rem 6rem 6rem}
+.copasteVanillaBody .copasteHeader{display:none}
+
+/* Ikon-prekidači u naslovu Selection kartice (Building elements, Underground):
+   igrin Button + tinted Icon, aktivno stanje kroz igrine varijable — prati
+   temu i u Copaste i u vanila režimu. */
+.copasteSelTitleRow{align-items:center}
+.copasteSelTitleRow .copasteSectionTitle{flex:1 1 0}
+.copasteIconToggle{width:22rem;height:22rem;margin-left:4rem;border-radius:5rem;display:flex;align-items:center;justify-content:center;background:transparent;border:1rem solid transparent;cursor:pointer;opacity:0.55;transition:all .12s}
+.copasteIconToggle:hover{opacity:0.95}
+.copasteIconToggle img,.copasteIconToggle .icon{width:16rem;height:16rem}
+.copasteIconToggleOn{opacity:1;border-color:var(--accentColorNormal);background:var(--accentColorDark)}
+
+
+/* Underground dugme u stats redu: ikona bez pozadine; aktivan = akcenat
+   pozadina (igrine varijable — prati temu). */
+.copasteUndergroundBtn{width:26rem;align-self:stretch;margin-left:3rem;border-radius:6rem;border:1rem solid transparent;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.6;transition:all .12s}
+.copasteUndergroundBtn:hover{opacity:1}
+.copasteUndergroundBtn img,.copasteUndergroundBtn .icon{width:16rem;height:16rem}
+.copasteUndergroundBtnOn{opacity:1;background:var(--accentColorNormal);border-color:var(--accentColorLight)}

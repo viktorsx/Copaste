@@ -47,8 +47,9 @@ is load-bearing:
    through.
 4. **Press on a prop** → remember it (`m_LeftPressEntity`); on release it's a
    click-select, or if the mouse traveled > 0.4 m first it becomes a move drag.
-5. **Press on ground** → marquee start (never on buildings, so the box corner
-   can't anchor on a roof).
+5. **Press on ground, or on anything not selectable** → marquee start; when
+   the ray hit an object (a roof, a canopy), the corner is re-anchored to the
+   terrain under the cursor so the box never starts in the air.
 
 Pick modes are mutually exclusive (arming one disarms the other) and auto-disarm
 when the selection becomes empty, so a swallowed-click state can't persist.
@@ -95,10 +96,28 @@ expensive part.
 Membership uses each prop's **footprint radius** (from the prefab's geometry
 data, cached per prefab), not just its center, so props visually inside the box
 don't get skipped when only their center is outside. Selection is capped at
-`kMaxSelection = 1000`.
+1000 by default — the *Selection limit* slider in Options.
 
 Marquee-built selections are marked `m_SelectionFromMarquee = true`; the panel
 uses this to suppress the single-prop name row.
+
+## Network selection
+
+Same release-time geometric pick as fences, through the net quad tree
+(`TryPickNetAt`): the nearest selectable **node** wins inside its own
+radius (from `NodeGeometry` bounds, min 6 m), otherwise the nearest edge
+curve within 2.5 m. Only Road/Pathway/PublicTransportRoad/Train/Tram/
+Subway layers are selectable (`NetData.m_RequiredLayers`) — utility nets
+never. Everything lives in `src/CopasteToolSystem.Networks.cs`.
+
+## Fence selection
+
+Standalone fences have no `Game.Objects.Transform`, so the raycast never
+returns them. Clicking near one is handled on release (like surfaces): a
+net quad-tree search around the terrain hit picks the nearest container
+curve within 1.5 m (`TryPickLaneAt`). Marquee membership samples the bezier
+at 9 points against the camera-aligned box. Everything lives in
+`src/CopasteToolSystem.Fences.cs`; the raycast masks are untouched.
 
 ## Move drag
 
@@ -118,6 +137,12 @@ Two subtleties:
 
 **Alt+drag** moves only the grabbed prop (if it belongs to the selection)
 instead of the whole selection — used for touch-ups after align operations.
+
+**Grabbing without a prop:** pressing on an already-selected net node (its
+radius), segment or fence curve (proximity), or painted surface (inside the
+polygon) starts the same move drag with `m_LeftPressEntity = Entity.Null` —
+networks-, fence- and surface-only selections drag directly.
+Shift is excluded (it edits the selection).
 
 Height above terrain is preserved per prop: each `MoveItem` stores
 `heightOffset = y - terrainHeight(pos)` and the new y is re-sampled at the
@@ -161,7 +186,7 @@ display name is resolved once per change (not per frame).
 
 ## The "Selected props" panel list
 
-For small selections (2–50, `kSelectionListMax`) `GetSelectionList()` emits
+For small selections (2 up to the *Selected props list limit*, default 50) `GetSelectionList()` emits
 `entityIndex:entityVersion:prefabName` lines for the panel. Hovering a row sets
 `m_ListFocusEntity`, which `DrawSelectOverlays` rings in green so identical
 props can be told apart; clicking a row calls `SelectOnly(index, version)` which
@@ -172,7 +197,7 @@ so a stale ring can't survive the list unmounting.
 ## Overlays
 
 `DrawSelectOverlays` draws circles via `OverlayRenderSystem`: blue for selected
-props (capped at 400 circles), white for the hovered prop, green for the
+props (capped by the *Selection outline limit*, default 400), white for the hovered prop, green for the
 panel-focused prop, plus the marquee rectangle. Circle diameters come from the
 same cached footprint data as the marquee test.
 

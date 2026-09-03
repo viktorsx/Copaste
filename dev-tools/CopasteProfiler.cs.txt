@@ -1,0 +1,243 @@
+// Copaste — DEV-ONLY merenje cene po frejmu (Faza 1 optimizacije).
+//
+// Cilj: dokazati brojkama koliko mod košta igrača, umesto da se pretpostavlja.
+// Meri se trajanje OnUpdate-a alata i UI sistema, razvrstano po STANJU (alat
+// ugašen / upaljen bez selekcije / mala / velika selekcija / paste), plus
+// brojači alokacija u vrućim putanjama.
+//
+// Uzorkovanje je jeftino: Stopwatch.GetTimestamp() dvaput po sistemu i par
+// upisa u prealocirane nizove — bez alokacija do samog izveštaja.
+//
+// IZBACITI PRE OBJAVE zajedno sa CopasteToolSystem.Diagnostics.cs (Faza 5).
+
+namespace Copaste
+{
+    using System.Diagnostics;
+    using System.Globalization;
+    using System.Text;
+
+    internal static class CopasteProfiler
+    {
+        // Jedan prekidač: false = ni jedno merenje se ne izvršava.
+        public const bool Enabled = true;
+
+        // Izveštaj na svakih ~10 s pri 60 fps.
+        private const int kReportFrames = 600;
+
+        public const int SlotTool = 0;
+        public const int SlotUi = 1;
+        private const int kSlots = 2;
+
+        public const int StateToolOff = 0;
+        public const int StateIdle = 1;
+        public const int StateSmallSelection = 2;
+        public const int StateLargeSelection = 3;
+        public const int StatePaste = 4;
+        private const int kStates = 5;
+
+        private static readonly string[] kStateNames =
+        {
+            "alat ugasen", "upaljen, bez selekcije", "selekcija 1-100", "selekcija 100+", "paste mod",
+        };
+
+        private static readonly long[] s_Ticks = new long[kSlots * kStates];
+        private static readonly long[] s_MaxTicks = new long[kSlots * kStates];
+        private static readonly int[] s_Samples = new int[kSlots * kStates];
+        private static readonly int[] s_StateFrames = new int[kStates];
+
+        // Sekcije unutar alatovog OnUpdate — da se zna ŠTA troši, ne samo koliko.
+        public const int SectionRaycast = 0;
+        public const int SectionNetHover = 1;
+        public const int SectionOverlays = 2;
+        public const int SectionPending = 3;
+        public const int SectionMarquee = 4;
+        private const int kSections = 5;
+
+        private static readonly string[] kSectionNames =
+        {
+            "raycast", "hover mreza", "overlay", "odlozeni redovi", "marquee sken",
+        };
+
+        private static readonly long[] s_SectionTicks = new long[kSections];
+        private static readonly long[] s_SectionMax = new long[kSections];
+        private static readonly int[] s_SectionSamples = new int[kSections];
+
+        // Alokacije u vrućim putanjama (Faza 2 ih gađa).
+        private static int s_SelectionListBuilds;
+        private static int s_MarqueeScans;
+
+        private static int s_Frames;
+        private static bool s_HeaderWritten;
+
+        private static string ReportPath =>
+            System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "ModsData", "Copaste", "performance.txt");
+
+        public static long Begin()
+        {
+            return Enabled ? Stopwatch.GetTimestamp() : 0L;
+        }
+
+        public static void End(int slot, long start, int state)
+        {
+            if (!Enabled || start == 0L)
+            {
+                return;
+            }
+
+            long elapsed = Stopwatch.GetTimestamp() - start;
+            int index = (slot * kStates) + state;
+            s_Ticks[index] += elapsed;
+            s_Samples[index]++;
+            if (elapsed > s_MaxTicks[index])
+            {
+                s_MaxTicks[index] = elapsed;
+            }
+        }
+
+        public static void EndSection(int section, long start)
+        {
+            if (!Enabled || start == 0L)
+            {
+                return;
+            }
+
+            long elapsed = Stopwatch.GetTimestamp() - start;
+            s_SectionTicks[section] += elapsed;
+            s_SectionSamples[section]++;
+            if (elapsed > s_SectionMax[section])
+            {
+                s_SectionMax[section] = elapsed;
+            }
+        }
+
+        public static void CountSelectionListBuild()
+        {
+            if (Enabled)
+            {
+                s_SelectionListBuilds++;
+            }
+        }
+
+        public static void CountMarqueeScan()
+        {
+            if (Enabled)
+            {
+                s_MarqueeScans++;
+            }
+        }
+
+        // Zove se JEDNOM po frejmu (iz UI sistema — on jedini radi uvek).
+        public static void Tick(int state)
+        {
+            if (!Enabled)
+            {
+                return;
+            }
+
+            s_StateFrames[state]++;
+            if (++s_Frames < kReportFrames)
+            {
+                return;
+            }
+
+            Report();
+            Reset();
+        }
+
+        private static void Report()
+        {
+            try
+            {
+                double toMicros = 1000000.0 / Stopwatch.Frequency;
+                CultureInfo inv = CultureInfo.InvariantCulture;
+                StringBuilder text = new StringBuilder();
+
+                if (!s_HeaderWritten)
+                {
+                    text.AppendLine("Copaste — cena po frejmu (DEV). Svaki blok = ~600 frejmova.");
+                    text.AppendLine("alat = CopasteToolSystem.OnUpdate, ui = CopasteUISystem.OnUpdate.");
+                    s_HeaderWritten = true;
+                }
+
+                text.AppendLine("--------------------------------------------------");
+                for (int state = 0; state < kStates; state++)
+                {
+                    if (s_StateFrames[state] == 0)
+                    {
+                        continue;
+                    }
+
+                    int toolIndex = (SlotTool * kStates) + state;
+                    int uiIndex = (SlotUi * kStates) + state;
+                    double toolAvg = s_Samples[toolIndex] > 0 ? s_Ticks[toolIndex] * toMicros / s_Samples[toolIndex] : 0.0;
+                    double uiAvg = s_Samples[uiIndex] > 0 ? s_Ticks[uiIndex] * toMicros / s_Samples[uiIndex] : 0.0;
+                    double frameAvg = toolAvg + uiAvg;
+
+                    text.AppendLine(string.Format(inv,
+                        "{0,-24} frejmova={1,4}  alat {2,7:F2} us (max {3,8:F2})  ui {4,7:F2} us (max {5,8:F2})  ukupno {6,7:F2} us/frejm  = {7:F3} ms na 60 fps sekundu",
+                        kStateNames[state],
+                        s_StateFrames[state],
+                        toolAvg,
+                        s_MaxTicks[toolIndex] * toMicros,
+                        uiAvg,
+                        s_MaxTicks[uiIndex] * toMicros,
+                        frameAvg,
+                        frameAvg * 60.0 / 1000.0));
+                }
+
+                for (int section = 0; section < kSections; section++)
+                {
+                    if (s_SectionSamples[section] == 0)
+                    {
+                        continue;
+                    }
+
+                    text.AppendLine(string.Format(inv,
+                        "  sekcija {0,-16} {1,6}x  prosek {2,7:F2} us  max {3,8:F2} us  udeo u bloku {4,7:F2} us/frejm",
+                        kSectionNames[section],
+                        s_SectionSamples[section],
+                        s_SectionTicks[section] * toMicros / s_SectionSamples[section],
+                        s_SectionMax[section] * toMicros,
+                        s_SectionTicks[section] * toMicros / s_Frames));
+                }
+
+                text.AppendLine(string.Format(inv,
+                    "  alokacije: lista selekcije {0}x, marquee sken {1}x (na {2} frejmova)",
+                    s_SelectionListBuilds, s_MarqueeScans, s_Frames));
+
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ReportPath));
+                System.IO.File.AppendAllText(ReportPath, text.ToString());
+            }
+            catch (System.Exception e)
+            {
+                Mod.Log.Info($"Copaste PERF report failed: {e.Message}");
+            }
+        }
+
+        private static void Reset()
+        {
+            for (int i = 0; i < s_Ticks.Length; i++)
+            {
+                s_Ticks[i] = 0L;
+                s_MaxTicks[i] = 0L;
+                s_Samples[i] = 0;
+            }
+
+            for (int i = 0; i < s_StateFrames.Length; i++)
+            {
+                s_StateFrames[i] = 0;
+            }
+
+            for (int i = 0; i < kSections; i++)
+            {
+                s_SectionTicks[i] = 0L;
+                s_SectionMax[i] = 0L;
+                s_SectionSamples[i] = 0;
+            }
+
+            s_SelectionListBuilds = 0;
+            s_MarqueeScans = 0;
+            s_Frames = 0;
+        }
+    }
+}

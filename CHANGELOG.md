@@ -1,5 +1,78 @@
 # Changelog
 
+## [1.2.0] - 2026-09-03
+
+Fences & Networks update.
+
+### Curve bending
+- Select exactly one fence or one road segment and handles appear: two on its ends, and two control points off to the side, each tied to its end by a thin line. Dragging an end moves it while the rest keeps its shape (a fence end also re-links its chained neighbor, a road end keeps its junction updated); dragging a control point reshapes that half of the curve. Undo restores the whole curve
+- A click **selects** a handle first (it turns green) and only a press on the already-selected handle starts dragging, so an ordinary click can never bend the road by accident. PgUp/PgDn move the selected handle, which is how a sloped fence or a raised arc is made
+- **Grab the segment anywhere and bend it**: press on a selected segment's curve wherever you like and pull — it bends under your hand, and the movement is shared between both control points so the shape follows instead of whipping
+- The control points follow the mouse one to one. They used to sit on the curve itself and be solved for, which moved them more than twice as far as the cursor and made a smooth result hard to reach
+- Guide snapping is measured on screen rather than in meters, so it helps when zoomed out and gets out of the way when zoomed in for fine work, and it holds once caught instead of flickering at the edge
+- **Alt while dragging a fence joint** slides it along the straight line between its two neighbors, the same as Alt on a road node; the chain's outer end slides along its own link's line instead, which extends or shortens the fence without bending it
+- **Lane alignment**: with one road segment selected, a triangle sits next to each joint between two segments. Clicking it cycles the joint through center, left and right alignment — on a lane transition the through lanes line up exactly, which is the classic highway exit look in one click. On streets with sidewalks the targets come from the real driving lanes; on roads without them the roadway edges align
+
+### Networks
+- New Networks filter in the Selection card: road, path and track nodes and segments can be selected (click or box select) and **moved, rotated and nudged** — junctions keep their smooth curves, connected roads stretch to follow, pillars travel along, and the game reconnects buildings and traffic on its own
+- Box select grabs a segment as soon as the box touches its curve — no need to fit both junctions inside
+- Undo and redo restore moved networks exactly
+- Grab and drag directly: press a selected node, segment, fence or painted surface and pull — no prop needed in the selection
+- **Roads copy and paste**: selected segments go to the clipboard with their upgrades (tree rows, wide sidewalks...), paste shows the game's own ghost preview, pasted pieces weld back into one network — intersections stay intersections — and form junctions with existing roads; undo removes the stamp cleanly, and blueprints store road segments alongside everything else
+- **Delete works on networks**: selected segments are removed the way the bulldozer would, a selected node takes its connecting roads with it, and undo rebuilds the piece welded together, upgrades included
+- **Tap Alt to straighten**: a selected middle node (or a run of them) snaps onto the straight line between its neighbors and the road through it straightens out — junctions and dead ends stay put
+- **Junction state travels with the copy**: roundabouts, manual traffic lights and stop signs are captured with the roads and rebuilt on the paste, saved into blueprints, and undo of a deleted junction brings them back too
+- **Redo** re-applies an undone road paste or deletion, including pieces the game splits at tunnel portals and retaining walls
+- Moving a junction **keeps the lane alignment** of every road meeting it: an exit that was lined up by hand stays lined up instead of snapping back to center
+- **Alt while dragging a single selected node** slides it along a straight line: a middle node rides the line between its two neighbors, an end node rides the continuation of the road, which straightens a crooked final segment
+- **Underground mode (U, or the button next to the counters)**: the view switches to the game's underground look and selection reaches only what is below ground, so a box over a metro tunnel cannot grab the trees above it, and vice versa. Copy, paste and undo work the same in both worlds
+- Power lines and pipes stay untouched, and creating networks from scratch stays out of scope
+
+### Fences
+- New Fences filter in the Selection card: standalone fences and hedges (the ones drawn along a line) can now be selected with a click or box select, shown with a line along their curve. Off by default
+- Fences copy and paste with the group, ghost preview included, and keep their look. They follow the terrain when pasted or moved
+- Move, rotate and nudge work on fences; chained fences stay connected - moving one link stretches its neighbor to keep the joint
+- Delete removes a fence with its endpoints (shared joints of a chain are kept while another link still needs them); undo brings it back and reattaches it to the chain
+- Blueprints store fences alongside props, buildings and surfaces
+- PgUp/PgDn raise and lower fences (they hold the height on their own), End drops them back onto the terrain
+- Pasted fences no longer weld themselves to nearby existing fences — each paste stays its own piece, the same way the game keeps building fences separate
+- Fences owned by buildings are intentionally not selectable - the building manages those
+
+### Blueprints
+- Assets from Paradox Mods now load correctly from blueprints: lines carry the asset's identity, so a saved PDX prop, surface or fence finds its exact asset again. Older blueprint files keep working, and files stay readable by older mod versions
+
+### Options
+- The three safety limits are now sliders in Options: selection size (default 1000), selection outlines (default 400) and the Selected props list (default 50) - stronger machines can raise them
+- **Mod language**: the mod can speak its own language regardless of the game's, or follow the game as before
+- **Panel theme**: a Vanilla option draws the panel inside the game's own panel chrome so it blends in with the rest of the interface
+- **Panel size** (80–125%) scales the whole panel, and a separate **Text size** (90–130%) grows the lettering without changing the layout
+- The Options page is now split into named sections: Behavior, Panel, Limits, and the key bindings tab
+- The old "Anarchy while pasting" option is now called **Ignore placement errors when pasting**, and its description spells out what it does and does not cover - the name promised more than the option ever did
+
+### Panel
+- The panel now follows the game language: everything is translated in German, French and Serbian, with English as the fallback
+- The how-to hint moved from the panel's footer into the logo's tooltip, which makes the panel shorter without losing the explanation
+- The underground toggle sits next to the Selected and Clipboard counters, and lights up while it is on
+
+### Performance
+- Selecting large groups is far cheaper than it was. With more than a hundred road segments selected the mod's cost per frame dropped from about 6.6 ms, with spikes past 21 ms, to roughly 3 ms with spikes around 4.5 ms; spikes of that size were what showed up as stutter
+- Opening the tool with nothing selected costs about half of what it did, because the raycast now asks the game only for the layers the current filters can actually select
+- The panel no longer walks the whole selection every frame to refresh its counters, which was thousands of lookups per frame with a big selection
+- While the tool is switched off it does not run at all, which is unchanged and was confirmed by measurement
+- Switching a selection filter no longer stutters: saving the setting was reloading the game's whole localization dictionary every time
+
+### Fixes
+- **Loading another city clears the history.** Undo and redo used to carry over from the city you just left, where the same steps meant something else entirely — an undo could remove one of the new city's own buildings, or bring back one from the old city. The clipboard is deliberately kept, so copying in one city and pasting in another still works
+- Renaming a blueprint and then clicking somewhere else no longer leaves the tool deaf: clicks, Delete, undo and every shortcut kept being swallowed until the game was restarted
+- Undo of a paste no longer removes things that were already there. Pasting a road over one you had built could make the game split the old road, and undo then treated the pieces as part of the stamp
+- Deleting a painted surface with its plantings is reliable again; with a certain number of children it could stop partway
+- Deleting more than 500 objects in one go is refused with the error sound: a one-frame removal of that size can crash the game itself. Delete in parts instead - a batched delete that lifts this limit is planned
+- Relocating a tall building no longer makes it chase its own roof: when the cursor ray hits the building being carried, the target is taken from the terrain under the cursor, so the building follows the ground smoothly and road snap looks in the right place
+- Road snap now reaches buildings with deep lots: the search radius grows with the lot depth, where a fixed 30 m measured from the cursor rejected exactly the buildings that need snapping most
+- Alt+wheel spinning two different objects within a second no longer merges into one undo record - each selection change starts its own record, so undo restores the right object
+- A blueprint whose lot-surface asset is missing on this machine now falls back to the factory lot instead of stripping the building's paths and driveway
+- One broken line in a blueprint file no longer fails the whole load, and numbers with comma decimals are no longer misread a hundredfold - each bad line is skipped by itself
+
 ## [1.1.0] - 2026-08-17
 
 Buildings update.
@@ -9,11 +82,11 @@ Buildings update.
 - Building elements switch in the Selection card: when on, selection also reaches things that belong to buildings - props, trees, decals and lot surfaces, each following its filter. When off, nothing building-owned can be selected, not even by click. Copying is smart about it - a copied building brings its own props, so they are never duplicated
 - Deleting a building's lot decoration surface (with undo) also removes whatever it keeps spawning there - the clean way to permanently get rid of regenerating lot clutter like clotheslines, with nothing written into the save. Yard benches, chairs and bins are ordinary building props - select and delete them directly
 - Paste look "Original" now applies to lots too: the pasted building's lot surfaces are exact copies of the source's - same paths, same front walkway, deleted surfaces stay deleted, reshapes carry over - instead of a fresh random factory roll. "Random" keeps the game's roll. Undo/redo of a deleted building restores its lot exactly, and blueprints carry the lot as well
-- Copy and paste whole groups of buildings with their layout. Pasted buildings finish construction instantly and come complete with their pavements, driveways and attached props
+- Copy and paste whole groups of buildings with their layout. Pasted buildings finish construction instantly and come complete with their sidewalks, driveways and attached props
 - Painted surfaces are part of the selection too: box select outlines them, they copy, rotate and paste with the group, and stay fully editable afterwards
 - Blueprints can now store mini neighborhoods: buildings, props and painted surfaces together
 - Undo removes a pasted group cleanly, buildings and surfaces included
-- Buildings can now be moved like props: drag them, rotate with right drag, nudge with Ctrl+arrows, spin with Alt+wheel. Driveways, pavements and installed upgrades travel along, and the game reconnects everything to the road on its own
+- Buildings can now be moved like props: drag them, rotate with right drag, nudge with Ctrl+arrows, spin with Alt+wheel. Driveways, sidewalks and installed upgrades travel along, and the game reconnects everything to the road on its own
 - Painted surfaces in the selection move, nudge and rotate together with the group
 - Undo and redo cover building and surface moves; buildings under construction sit still until finished
 - Selected and hovered buildings show their lot rectangle instead of a big circle
@@ -31,7 +104,7 @@ Buildings update.
 - Panel layout refresh: new COPASTE logo in the header with the version tucked to the right, a Selection card with the five filters, the type filter now lives as an always-visible row with its own button, Paste look sits under Clipboard, and Ground/Match H joined the rotate and align tools in one Align card
 - Long prop and building names no longer overflow their row - they trim with "..." and hovering the row shows the full name
 - Buttons that cannot act on the current selection (align tools with only buildings or surfaces selected) now show as disabled instead of silently doing nothing
-- Delete works on buildings too, exactly like the game's bulldozer. Undo rebuilds the deleted building complete with its pavements and driveways - as a fresh building though: residents and workers don't come back
+- Delete works on buildings too, exactly like the game's bulldozer. Undo rebuilds the deleted building complete with its sidewalks and driveways - as a fresh building though: residents and workers don't come back
 - Options localization added for German and French (joining English and Serbian)
 
 ### Editing
@@ -69,7 +142,7 @@ Panel redesign and quality-of-life update.
 
 Toolbar button facelift.
 
-- The toolbar button now uses the game's standard floating button, the same one Traffic, Node Controller and other mods use - correct icon size and the default look
+- The toolbar button now uses the game's standard floating button, the same one other mods use - correct icon size and the default look
 - Removed the custom blue background (both idle and active) - the button now blends in with other mod buttons, and theme mods like Redesigned Top Buttons can restyle it just like the rest
 
 ## [1.0.4] - 2026-08-10

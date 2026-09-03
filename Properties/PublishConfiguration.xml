@@ -1,36 +1,62 @@
 <Publish>
  <ModId Value="154371" />
  <DisplayName Value="Copaste" />
- <ShortDescription Value="Copy paste tool for props, trees, decals, surfaces and buildings: select, move, rotate, delete, relocate, blueprints, undo redo" />
+ <ShortDescription Value="Copy &amp; paste tool for props, trees, decals, surfaces, buildings, fences and roads: select, move, rotate, bend, delete, blueprints, undo, redo" />
  <LongDescription>## Copaste
-Copy and paste for props and buildings. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors stay exactly as you built them.
+Copy and paste for the things you place by hand: props, trees, decals, painted surfaces, buildings, fences and roads. Select a group, copy it, stamp it anywhere. Layout, rotation, heights and colors come out exactly as you built them.
 
-**Save-game safe.** Copaste only ever writes the game's own vanilla components and stores **no custom data in your save file**. A city touched by Copaste loads identically with or without the mod, and unsubscribing leaves nothing behind.
+**Save-game safe.** Copaste writes only the game's own components and stores **no custom data in your save file**. A city touched by Copaste loads identically with or without the mod, and unsubscribing leaves nothing behind.
 
-## Features
-- **Click &amp; marquee selection**: click objects or drag a box on the ground, with live highlight while dragging
-- **Selection filters**: five independent switches decide what selection grabs - props, trees, decals, painted surfaces and buildings. Right-click a filter to solo it, right-click again to bring everything back
-- **Building elements**: a separate switch lets selection reach things owned by buildings - their props, trees, decals and lot surfaces, each following its filter. Deleting a lot decoration surface also removes what it keeps spawning - the clean, save-safe way to get rid of regenerating lot clutter. With the switch off, nothing building-owned can be selected
-- **Buildings**: copy and paste whole groups of buildings with their pavements, driveways and attached props. Move them by dragging, rotate them, or hit Relocate and the building follows your cursor and snaps to the nearest road like normal plopping. Delete works like the bulldozer, and undo rebuilds the building
-- **Road snap**: pasted buildings glide along the nearest road and face it exactly like hand plopping. One switch turns it off for free placement
-- **Painted surfaces**: box select outlines them, click selects them, they copy, move, rotate and delete with the group and stay fully editable afterwards
-- **Copy &amp; paste with preview**: the copied group follows your mouse as a ghost. Click to place, keep clicking to stamp more
-- **Original colors kept on paste**: pasted props keep their color variation and any custom color from the Customization tab, so a blue bench stays blue. If you want variety instead, flip the panel toggle to Random
-- **Align tools**: Line turns a messy selection into a clean row (equal gaps, everything facing the same way), To prop lines the row up on a reference prop you pick, Circle makes a circle. Grow or shrink the layout live with the [ and ] keys or the panel stepper
-- **Move**: drag a selected prop and the whole selection follows. Hold Alt to move just that one prop
-- **Group rotation**: hold right mouse button and drag (Alt snaps to 45 degrees), or use the panel buttons. Alt+scroll spins every selected prop around its own axis
-- **Ctrl+click picking**: grabs props stuck inside other objects or buildings where a normal click can't reach. Click the same spot again to cycle through the pile
-- **Height controls**: raise and lower with PgUp/PgDn, snap to ground with End, copy another prop's height with Home
-- **Delete**: removes the whole selection at once. Combined with the type filter it clears an overgrown forest in three clicks, and Ctrl+Z brings everything back with tree ages preserved
-- **Type filter**: press T and box selection only picks the prop type you point at. While active, clicking any prop switches the filter to its type
-- **Undo &amp; redo**: Ctrl+Z reverts move, rotate, align, height, delete and paste, up to 32 steps back; Ctrl+Y re-applies it - deletes and pastes included
-- **Blueprints**: save a group to disk and use it in any city or save, colors included. With buildings in the mix a blueprint holds a whole mini neighborhood
-- **Anarchy-style pasting**: overlap errors are ignored while pasting (toggleable). The Anarchy mod is not required, but if you have it installed they cooperate
-- **Toolbar button + panel**: the panel can be dragged around and remembers where you left it. It shows counters, the selected prop's name and, for small selections, a per-prop list where hovering a row highlights that prop in the world and clicking keeps only it
-- All hotkeys rebindable, options in English, German, French and Serbian
+## What you can select
+Seven filters in the panel decide what selection grabs: **Props, Trees, Decals, Surfaces, Buildings, Fences and Networks** (roads, paths and tracks). Any mix works. Buildings, Fences and Networks are off by default, so the classic prop workflow stays exactly as it was.
 
-## Usage
-Activate with Ctrl+Shift+C or the toolbar button. Select, Ctrl+C, Ctrl+V, click to place. A quick right-click always steps back. Buildings are opt-in: flip the Buildings filter in the panel's Selection card when you want them.
+- Click to select, or drag a box on the ground - everything inside highlights live
+- Shift+click adds and removes single items
+- **Ctrl+click** reaches props buried inside other objects; click the same spot again to cycle through the pile
+- **T** locks selection to one prop type, so a box over a mixed forest picks only pines
+- **Building elements** switch: when on, selection also reaches props, trees, decals and surfaces owned by buildings
+- **U** switches to underground mode: selection reaches only what is below ground, so a box over a metro tunnel cannot grab the trees above it
+
+## Move, rotate, arrange
+- Drag any selected item and the whole selection follows; hold **Alt** to move just that one
+- Right-drag rotates the group (**Alt** snaps to 45 degrees); **Alt+scroll** spins every item around its own axis
+- **Ctrl+arrows** nudge, **PgUp/PgDn** raise and lower, **End** drops to the ground, **Home** copies another object's height
+- **Align**: Line turns a messy selection into an even row, To prop lines it up on a reference you pick, Circle makes a circle. Grow or shrink the spacing live with **[** and **]**
+- **Delete** removes the whole selection at once - with the type filter, an overgrown forest is gone in three clicks
+
+## Copy and paste
+- The copied group follows your mouse as a ghost. Click to place, keep clicking to stamp more
+- Pasted props keep their color variation and any custom color, so a blue bench stays blue. Switch the panel to Random if you want variety instead
+- **Buildings** paste complete: sidewalks, driveways and attached props, with construction finished instantly. **Road snap** glides them along the nearest road and faces them, exactly like hand plopping
+- **Relocate** (Tab): the selected building follows your cursor and snaps to the road. Click places it, right-click cancels
+- **Blueprints**: save a group to disk and use it in any city or save. With buildings and roads in the mix, one blueprint holds a whole neighborhood
+
+## Roads and fences
+- Select road, path and track segments and nodes, then **move, rotate and nudge** them. Junctions keep their curves, connected roads stretch to follow, pillars travel along, and the game reconnects traffic on its own
+- **Copy and paste roads** with their upgrades - tree rows, wide sidewalks and the rest. Pasted pieces weld back into one network, so intersections stay intersections, and they form junctions with existing roads
+- Roundabouts, manual traffic lights and stop signs travel with the copy and are rebuilt on paste
+- **Delete** works like the bulldozer; a selected node takes its roads with it. Undo rebuilds the piece welded together
+- **Tap Alt** to straighten a node onto the line between its neighbors; **hold Alt** while dragging to slide it along that line
+- **Fences and hedges** - the ones drawn along a line - select, copy, paste, move and delete the same way. Chained fences stay connected: move one link and its neighbor stretches to keep the joint
+
+## Shaping curves
+Select exactly one road segment or one fence and handles appear: two on its ends, two control points beside them.
+
+- Drag an end to move it while the rest keeps its shape, or a control point to reshape that half
+- Grab the curve anywhere along its length and pull - it bends under your hand
+- A click **selects** a handle first; only a press on the already-selected handle starts dragging, so an ordinary click can never bend a road by accident
+- **Lane alignment**: a small triangle at each joint cycles it through center, left and right. On a lane transition the through lanes line up exactly - the highway exit look in one click
+
+## Undo
+**Ctrl+Z** reverts moves, rotations, alignment, height changes, deletes and pastes, up to 32 steps back. **Ctrl+Y** re-applies them, deletes and pastes included.
+
+## Getting started
+Open with **Ctrl+Shift+C** or the toolbar button. Select, **Ctrl+C**, **Ctrl+V**, click to place. A quick right-click always steps back. All hotkeys are rebindable, and the options are in English, German, French and Serbian.
+
+## Good to know
+- Deleting more than 500 objects at once is refused: a removal that large can crash the game itself. Delete in parts
+- Placement errors are ignored while pasting so the stamp goes down anywhere (toggleable). The Anarchy mod is not required, but when it is installed they cooperate
+- Power lines, pipes and building-owned fences are intentionally left alone, and Copaste does not create networks from scratch
 
 ## Transparency
 AI-assisted development: the code was written with heavy use of AI tools (Claude Fable), directed, reviewed and hand-tested in-game by the author through many iterations. Bug reports are read and fixed by a human.
@@ -61,34 +87,49 @@ A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNe
  <Screenshot Value="Properties/Screenshots/s10.jpg" />
  <Tag Value="Code Mod" />
  <ForumLink Value="https://forum.paradoxplaza.com/forum/threads/copaste-1-1-0-copy-paste-for-props-and-now-buildings.1938698/" />
- <ModVersion Value="1.1.0" />
+ <ModVersion Value="1.2.0" />
  <GameVersion Value="1.6.*" />
- <ChangeLog>Buildings update. Hand tested in game before publishing - that's the routine for every Copaste release.
+ <ChangeLog>Fences &amp; Networks update. Hand-tested in game before publishing - that's the routine for every Copaste release.
 
-Buildings
-- Buildings can be selected, copied and pasted in groups - service buildings, unique ones and grown homes alike. Pasted buildings finish construction instantly, complete with pavements, driveways and attached props
-- Buildings move like props: drag them, rotate with right drag, nudge with Ctrl+arrows, spin with Alt+wheel. Driveways, pavements and installed upgrades travel along and the game reconnects everything to the road
-- New Relocate button (keybind: Tab, rebindable): the selected building follows your cursor and snaps to the nearest road like normal plopping. Click places it, Tab or right click cancels
-- Road snap for pasting too: with the switch on, a pasted building glides along the nearest road and faces it. The rest of the group follows
-- Delete works on buildings exactly like the bulldozer. Undo rebuilds the deleted building, as a fresh one though - residents don't come back
-- Props you rearranged or deleted on a building stay that way when the building moves
-- Selected buildings show their lot rectangle instead of a circle
+Networks
+- New Networks filter: road, path and track nodes and segments can be selected and moved, rotated and nudged. Junctions keep their smooth curves, connected roads stretch to follow, pillars travel along, and the game reconnects buildings and traffic on its own
+- Roads copy and paste with their upgrades (tree rows, wide sidewalks...). Pasted pieces weld back into one network - intersections stay intersections - and form junctions with existing roads
+- Junction state travels with the copy: roundabouts, manual traffic lights and stop signs are captured with the roads and rebuilt on the paste
+- Delete works on networks the way the bulldozer would, and undo rebuilds the piece welded together, upgrades included. Redo re-applies an undone paste or deletion
+- Tap Alt to straighten a selected middle node onto the line between its neighbors; hold Alt while dragging one to slide it along that line
+- Underground mode (U): the view switches to the game's underground look and selection reaches only what is below ground, so a box over a metro tunnel cannot grab the trees above it
+- Blueprints store road segments alongside everything else
 
-Selection
-- New Selection card with five independent filters: Props, Trees, Decals, Surfaces, Buildings. Any mix works. Right-click a filter to solo it, right-click again to restore all. Buildings are off by default so the classic prop workflow stays untouched
-- Building elements switch: when on, selection also reaches things owned by buildings - props, trees, decals and lot surfaces, each following its filter. When off, nothing building-owned can be selected, not even by click
-- Deleting a building's lot decoration surface (with undo) also removes whatever it keeps spawning there - permanently, with nothing written into the save
-- Paste look "Original" now applies to lots too: the pasted building's lot surfaces are exact copies of the source's - same paths, same front walkway, deleted surfaces stay deleted - instead of a fresh random factory roll. Undo/redo of a deleted building restores its lot exactly, and blueprints carry the lot as well
-- Painted surfaces: box select outlines them, plain click selects them too. They copy, move, nudge, rotate and delete with the group, undo repaints them, and they stay fully editable
-- Blueprints can store mini neighborhoods: buildings, props and painted surfaces together
-- The marquee type filter is now an always-visible row with its own button in the panel
+Fences
+- New Fences filter: standalone fences and hedges can be selected, copied, pasted, moved, rotated and deleted. Chained fences stay connected - moving one link stretches its neighbor to keep the joint
+- PgUp/PgDn raise and lower them, End drops them back onto the terrain
+- Blueprints store fences too
 
-Editing
-- Redo (Ctrl+Y) brings back the last undone action - moves, rotations, aligns, heights, deletes and pastes alike
-- A Clear button next to the Clipboard counter empties the clipboard
+Curve bending
+- Select one fence or one road segment and handles appear: two on its ends and two control points off to the side. Drag an end to move it while the rest keeps its shape, or a control point to reshape that half
+- Grab the segment anywhere along its curve and pull - it bends under your hand
+- A click selects a handle first and only a press on the already-selected handle starts dragging, so an ordinary click can never bend a road by accident
+- Lane alignment: a triangle next to each joint cycles it through center, left and right. On a lane transition the through lanes line up exactly - the classic highway exit look in one click
 
-Panel
-- New COPASTE logo, bigger text everywhere, version tucked to the right, refreshed layout: Paste look and Road snap live under Clipboard, Ground and Match H joined the Align card
-- The Selected props list now covers selections up to 50 (was 15)</ChangeLog>
+Options and panel
+- Mod language, panel theme (a Vanilla option draws the panel in the game's own chrome), panel size and text size
+- The three safety limits are sliders now: selection size, selection outlines and the Selected props list
+- The panel is translated in German, French and Serbian
+
+Performance
+- Selecting large groups is far cheaper: with over a hundred road segments selected the cost per frame dropped from about 6.6 ms with spikes past 21 ms to roughly 3 ms with spikes around 4.5 ms
+- Opening the tool with nothing selected costs about half of what it did
+- While the tool is off it does not run at all
+
+Fixes
+- Loading another city clears the undo history, which used to carry over and could remove one of the new city's own buildings
+- Renaming a blueprint and clicking elsewhere no longer leaves the tool deaf to input
+- Undo of a paste no longer removes roads that were already there
+- Relocating a tall building no longer makes it chase its own roof, and road snap now reaches buildings with deep lots
+- Alt+wheel spinning two objects within a second no longer merges into one undo record
+- A blueprint whose asset is missing falls back to the factory lot instead of stripping the building's paths, and one broken line no longer fails the whole file
+- Deleting more than 500 objects at once is refused with the error sound: a removal that large can crash the game itself. Delete in parts</ChangeLog>
  <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
+ <ExternalLink Type="discord" Url="https://discord.gg/HTav7ARPs2" />
+ <ExternalLink Type="kofi" Url="https://ko-fi.com/viktorsx" />
 </Publish>

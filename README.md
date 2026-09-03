@@ -13,7 +13,7 @@
  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8a67c0" alt="MIT license"></a>
 </p>
 
-A copy & paste tool for **Cities: Skylines II** - select props, trees, decals, painted surfaces and (since 1.1.0) whole buildings; copy them and stamp them anywhere with preserved layout, rotation, and height.
+A copy & paste tool for **Cities: Skylines II** - select props, trees, decals, painted surfaces, whole buildings (since 1.1.0) and fences and road networks (since 1.2.0); copy them and stamp them anywhere with preserved layout, rotation, and height.
 
 > **Save-game safe.** Copaste only ever writes the game's own (vanilla) components - it stores **no custom data in your save file**. A city touched by Copaste loads identically with or without the mod, and unsubscribing leaves nothing behind. Undo history and session data live in memory only.
 
@@ -25,32 +25,54 @@ It was built by studying the source code of the excellent open-source mods credi
 
 ## ✨ Features
 
-The short version. The complete reference with every detail is in
-[docs/features.md](docs/features.md).
+The short version, grouped by what you are doing. The complete reference
+with every detail is in [docs/features.md](docs/features.md).
+
+### 🖱️ Selection
 
 - **Click & marquee selection** - click individual items, or drag a camera-aligned box on the ground to select whole groups at once (live highlight while dragging). Works on props, decals, trees, painted surfaces **and buildings**
-- **Selection filters** - five toggle chips in the panel (Props, Trees, Decals, Surfaces, Buildings) control what selection picks up; right-click a chip to solo it (right-click again to bring all back). Buildings are off by default
+- **Selection filters** - seven toggle chips in the panel (Props, Trees, Decals, Surfaces, Buildings, Fences, Networks) control what selection picks up; right-click a chip to solo it (right-click again to bring all back). Buildings, Fences and Networks are off by default
+- **Ctrl+click picking** - selects props partially buried in other objects or buildings that a normal click can never reach; repeated Ctrl+clicks on the same spot cycle through everything piled up there
+- **Type filter ("Same")** - press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too)
+
+### 📋 Copy, paste & blueprints
+
+- **Copy & paste with preview** - the copied group follows your mouse as a ghost preview; click to place, as many times as you like
+- **Layout preserved** - relative positions, rotations, and heights above terrain are kept exactly as in the original group
+- **Original colors kept on paste** - pasted props keep the source prop's color variation *and* any custom color picked in the game's Customization tab; a blue bench stays blue. An Original/Random toggle in the panel restores the old randomized behavior. The ghost preview shows the real colors too
+- **Paste onto roads & paths** - the group lifts to the surface you point at
+- **Placement errors ignored while pasting** - overlaps and collisions do not block the stamp (toggleable in options); pasted props and fences are protected from being hidden by the game when the [Anarchy](https://mods.paradoxplaza.com/mods/74604/Windows) mod is installed
+- **Blueprints** - save the copied group to disk and reuse it in any city or save; managed from the in-game panel (paged list, inline rename); colors are stored too, older blueprint files still load
+
+### 🛠️ Editing
+
+- **Move** - drag a selected prop to move the whole selection, layout and heights preserved
+- **Group rotation** - hold right mouse button and drag to rotate a selection (or the paste preview) around its center
+- **Per-prop touch-ups** - **Alt+drag** moves a single prop out of the selection; **Alt+mouse wheel** spins every selected prop around its own axis (great after a Line align)
+- **Align tools** - **Line** turns a messy selection into a tidy row (straight line, equal gaps, all props rotated the same way); **To prop** does the same anchored to a reference prop you click; **Circle** arranges the selection evenly on a circle. Afterwards, `[` and `]` (or the panel stepper) resize the layout live - the gap can also be typed in exact meters
+- **Nudge & snap** - fine-position the selection with Ctrl+arrows, drop it back to terrain with End
+- **Delete** - remove the whole selection with one key. Combined with marquee + type filter it makes bulk cleanup trivial: box-select an area, press **T** on a tree to keep only that tree type, hit **Delete** - a whole overgrown forest gone in three clicks (Ctrl+Z brings it back, growth stages preserved). Up to 500 objects per press; a larger selection is refused with the error sound, because a one-frame removal that big can crash the game itself
+- **Undo & Redo** - Ctrl+Z reverts the last action (move, rotate, align, height change, delete, paste, relocate), up to 32 steps back; Ctrl+Y re-applies it. Deleted trees come back with their original growth stage and colors; deleted buildings are rebuilt complete with pavement and driveways (fresh residents move in - simulation state is not copied)
+
+### 🏠 Buildings & surfaces
+
 - **Buildings** *(new in 1.1.0)* - move, rotate, raise/lower, copy, paste, blueprint and delete whole buildings **with everything they own**: driveways, pavements, purchased upgrades and attached props move as one piece. A **Relocate** mode walks the selected building to a new spot with live road snapping; **Road snap** also auto-faces pasted buildings to the nearest road. Buildings under construction can be deleted (with undo) but not moved
 - **Building elements toggle** - lets selection reach elements owned by buildings, each following its filter chip: props, trees and decals (delete or rearrange them - deleted ones stay deleted for the whole session even when the building is moved or relocated) and **lot surfaces** (select and delete with undo - deleting a decoration surface also removes whatever it keeps spawning on the lot). With the toggle off, nothing building-owned can be selected, not even by click
 - **Painted surfaces** - select by click or marquee, move with the selection, copy/paste, delete with undo, and save into blueprints
-- **Copy & paste with preview** - the copied group follows your mouse as a ghost preview; click to place, as many times as you like
-- **Layout preserved** - relative positions, rotations, and heights above terrain are kept exactly as in the original group
-- **Group rotation** - hold right mouse button and drag to rotate a selection (or the paste preview) around its center
-- **Move** - drag a selected prop to move the whole selection, layout and heights preserved
-- **Delete** - remove the whole selection with one key. Combined with marquee + type filter it makes bulk cleanup trivial: box-select an area, press **T** on a tree to keep only that tree type, hit **Delete** - a whole overgrown forest gone in three clicks (Ctrl+Z brings it back, growth stages preserved)
-- **Paste onto roads & paths** - the group lifts to the surface you point at
-- **Original colors kept on paste** - pasted props keep the source prop's color variation *and* any custom color picked in the game's Customization tab; a blue bench stays blue. An Original/Random toggle in the panel restores the old randomized behavior. The ghost preview shows the real colors too
-- **Align tools** - **Line** turns a messy selection into a tidy row (straight line, equal gaps, all props rotated the same way); **To prop** does the same anchored to a reference prop you click; **Circle** arranges the selection evenly on a circle. Afterwards, `[` and `]` (or the panel stepper) resize the layout live - the gap can also be typed in exact meters
-- **Per-prop touch-ups** - **Alt+drag** moves a single prop out of the selection; **Alt+mouse wheel** spins every selected prop around its own axis (great after a Line align)
-- **Ctrl+click picking** - selects props partially buried in other objects or buildings that a normal click can never reach; repeated Ctrl+clicks on the same spot cycle through everything piled up there
-- **Anarchy-style pasting** - placement errors (overlapping items etc.) are ignored while pasting (toggleable in options); pasted props are protected from being hidden by the game when the [Anarchy](https://mods.paradoxplaza.com/mods/74604/Windows) mod is installed
-- **Undo & Redo** - Ctrl+Z reverts the last action (move, rotate, align, height change, delete, paste, relocate), up to 32 steps back; Ctrl+Y re-applies it. Deleted trees come back with their original growth stage and colors; deleted buildings are rebuilt complete with pavement and driveways (fresh residents move in - simulation state is not copied)
-- **Blueprints** - save the copied group to disk and reuse it in any city or save; managed from the in-game panel (paged list, inline rename); colors are stored too, older blueprint files still load
-- **Type filter ("Same")** - press T to toggle a filter taken from the hovered/selected prop: marquee then only picks that exact type (works for trees too)
-- **Nudge & snap** - fine-position the selection with Ctrl+arrows, drop it back to terrain with End
+
+### 🛣️ Fences, roads & networks
+
+- **Fences** *(new in 1.2.0)* - standalone fences and hedges select, move, copy/paste, blueprint and delete like everything else; chained fences stay connected while moving, and curve handles bend them into any shape
+- **Roads & networks** *(new in 1.2.0)* - select nodes and segments, move whole interchanges with curvature preserved, and copy/paste roads that **weld into a real network**: intersections form, upgrades (tree rows, wide sidewalks...) come along, and junction state - roundabouts, traffic lights, stop signs - is rebuilt on the copy. Undo/redo covers it all, including pieces the game splits at tunnel portals
+- **Curve editing** - select a single fence or road segment and handles appear on its curve: click one to select it, drag to bend or move the end, PgUp/PgDn to raise exactly that point. A **tap on Alt** straightens selected middle nodes into a perfect line, **Alt+drag** slides a node along it, and a small **triangle at each joint between two segments** cycles it through center/left/right lane alignment - on a lane transition that gives the classic highway-exit look in one click
+- **Underground mode** *(new in 1.2.0)* - press **U** and the view flips to the game's underground look: selection reaches only what is below ground (metro, tunnels), so a box over a tunnel can never grab the trees above it - and vice versa
+
+### 🎛️ Interface & languages
+
 - **Toolbar button + panel** - a top-left toolbar button toggles the tool; the panel (draggable, remembers its position) shows counters, the selected prop's name, a per-prop list for selections up to 50 (hover rings the prop in the world, click isolates it), align controls and your blueprints
+- **Panel your way** - a **Vanilla theme** option renders the panel in the game's own look, **Panel size** (80–125%) scales the whole panel and a separate **Text size** (90–130%) grows just the lettering
 - **Rebindable hotkeys** - all shortcuts can be changed in Options → Copaste → Key bindings
-- **English, German, French and Serbian** options localization
+- **English, German, French and Serbian** localization - and a **Mod language** option that pins the mod to its own language, independent of the game's
 
 ## 🎮 Controls (defaults)
 
@@ -79,6 +101,11 @@ included, is in [docs/commands.md](docs/commands.md).
 | Delete selection | **Delete** |
 | Undo last action | **Ctrl+Z** (works in paste mode too - removes the last stamp) |
 | Redo | **Ctrl+Y** |
+| Underground view | **U** or the panel button - selection reaches only what is below ground |
+| Straighten road nodes | **Tap Alt** (clean press-and-release) - selected middle nodes snap onto the line between their neighbours, segments straighten |
+| Slide a road node | **Alt + drag the selected node** - a middle node slides along the line between its neighbours, an end node along the road's own direction |
+| Bend a curve | Select one fence/road segment - **click a handle** to select it (green), **drag the selected handle** to bend/move; **PgUp/PgDn** move that point |
+| Align lanes at a transition | **Click the triangle** next to the joint of the selected segment - cycles center → left → right |
 | Relocate a building | **Tab** or the **Relocate** panel button (single building selected, Buildings filter on) - building follows the mouse with road snap; click places, **Tab**/right-click cancels |
 | Type filter ("Same") | **T** - toggles a filter taken from the hovered/selected prop: while active, marquee only picks that prop type; clicking any prop switches the filter to its type; press again to clear |
 | Match height | **Home** - arms height picking: the next prop you click sets the height for the whole selection |
@@ -89,11 +116,38 @@ included, is in [docs/commands.md](docs/commands.md).
 
 Blueprints are stored as text files in `...\Colossal Order\Cities Skylines II\ModsData\Copaste\Blueprints\` - rename or delete them freely. Props from missing mods are skipped on load.
 
+Fences and road networks are selectable since 1.2.0 behind the **Fences** and **Networks** filter chips (both off by default). Roads copy and paste with their intersections, junction state and upgrades, and undo puts everything back exactly - split pieces included.
+
 Buildings are selectable since 1.1.0 behind the **Buildings** filter chip (off by default - with it off the tool behaves exactly like the prop-only versions). Vehicles and citizens are never selectable. By default selection only reaches free-standing objects; the **Building elements** toggle extends it to things owned by buildings - props, trees, decals and lot surfaces. Individual lot decorations that the game re-generates randomly on every lot update (clotheslines and similar) stay excluded on purpose - deleting them one by one could not stick without writing mod data into save files, which Copaste never does. Deleting the **decoration surface they spawn from** does stick, and that path is supported.
+
+## ⚙️ Options
+
+Everything in **Options → Copaste**, on two tabs. Defaults are in bold - the mod works out of the box without touching any of it.
+
+| General → Behavior | What it does |
+|---|---|
+| **Mod language** | Which language the mod itself speaks: **Auto** (follows the game), English, German, French or Serbian. Handy if you play the game in one language but want the mod in another |
+| **Ignore placement errors when pasting** | **On**: the paste stamp ignores placement errors (overlaps, collisions) and goes down anywhere. Off: the game's normal placement rules apply. Pasting only - it does not protect overlapping buildings from the game's override rules; the Anarchy mod does that |
+
+| General → Panel | What it does |
+|---|---|
+| **Panel theme** | **Copaste** (the mod's own look) or **Vanilla** - the panel is drawn inside the game's own panel chrome, so it blends in with the rest of the interface |
+| **Panel size** | Scales the whole panel, 80–125% (**100**) - for 4K screens or if you like it compact |
+| **Text size** | Scales only the lettering, 90–130% (**100**), leaving the panel layout as it is |
+
+| General → Limits | What it does |
+|---|---|
+| **Selection limit** | How many objects one selection may hold: 500–5000 (**1000**). Raise it on a strong machine, lower it if huge selections stutter |
+| **Selection outline limit** | How many selection circles are drawn at once: 100–1000 (**400**). Everything selected stays selected - this only limits the drawing |
+| **Selected props list limit** | Up to how many objects the panel lists by name: 10–100 (**50**) |
+
+**Key bindings** is the second tab: every shortcut is rebindable, grouped by purpose (Tool, Clipboard, Editing, Nudge, Align).
 
 ## 🛡️ Safety limits
 
-To keep the game responsive, selection is capped at **1000 props** and selection circles are drawn for at most 400 at a time (everything selected is still highlighted). The tool guards its own update loop, so an unexpected error disables the current action instead of crashing the game.
+To keep the game responsive, selection is capped at **1000 props** and selection circles are drawn for at most 400 at a time (everything selected is still highlighted) - both caps are sliders in Options if your machine can take more. The tool guards its own update loop, so an unexpected error disables the current action instead of crashing the game.
+
+The mod's own cost is measured rather than estimated, over several dozen measure-and-optimize iterations per release: with the tool switched off it does not run at all (about 0.02% of a frame), and the frame cost of working with large selections was cut several times over for 1.2.0. The numbers are in [docs/performance.md](docs/performance.md).
 
 ## 🐛 Bug reports & feedback
 

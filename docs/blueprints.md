@@ -26,11 +26,22 @@ Line 1 is the magic header `COPASTE1`. Every following line is one prop,
 | 13 | tree growth (byte) | |
 | 14 | pseudo-random seed | since v1.0.6; `-1` = none |
 | 15 | custom color | since v1.0.6; `-` = none, else `r,g,b,a;r,g,b,a;r,g,b,a` (three ColorSet channels) |
+| 16 | prefab hash | since v1.2.0, written only for Paradox Mods assets (vanilla lines stay 16 fields) |
 
 **Backward compatibility:** the loader accepts line lengths 11 (v1.0.0), 14
-(v1.0.4), 15 and 16 (v1.0.6). Fields that a shorter format lacks simply stay at
-their defaults. The writer always emits the newest format. Names containing
-`|` are skipped at save time.
+(v1.0.4), 15 and 16 (v1.0.6), and 17 (v1.2.0). Fields that a shorter format
+lacks simply stay at their defaults. The writer always emits the newest
+format. Names containing `|` are skipped at save time.
+
+**Asset hashes (v1.2.0):** the game identifies a prefab by type + name +
+asset hash, and Paradox Mods assets register with a non-empty hash — a
+name-only lookup misses them. Lines referencing such assets carry the hash
+(field 16 for props; an extra field before the polygon for `AREA`/`BSURF`);
+loading tries the hashed lookup first and falls back to name-only, so old
+files still resolve and a hash mismatch is logged. Field 16 is reserved:
+any future prop field must come after it. Hashed `BSURF` lines are written
+at the end of their lot block so the 1.1.0 loader skips only them, not the
+rest of the block.
 
 **Painted surfaces (v1.1.0):** serialized as their own line type,
 `AREA|prefabType|prefabName|x,z;x,z;...` — the polygon as centroid-relative
@@ -47,6 +58,29 @@ by exact copies of these, so the copy's lot looks like the source's
 BSURF lines means the source had none left — the copy's factory surfaces
 are all removed. Old loaders skip both line types (field counts and type
 tags match no known format).
+
+**Fences (v1.2.0):** their own line type,
+`LANE|prefabType|prefabName|hash|seed|x,z,h;x,z,h;x,z,h;x,z,h` — the four
+bezier control points as centroid-relative XZ plus each point's height
+above terrain (`-` = no hash, `-1` = no seed). Pasting rebuilds the curve
+on the destination terrain. Old loaders skip the line.
+
+**Roads (v1.2.0):** two line types. `NETNODE|x,z,h|g,l,r` — one per source
+junction node, in order: centroid-relative XZ + height above terrain, then
+the node's upgrade flags (three uints, or `-`). The node table is what lets
+a pasted blueprint weld its segments back together (welding needs a
+bit-identical shared point).
+`ROAD|prefabType|prefabName|hash|upgrades|x,z,h;×4|start,end` — the
+four-point curve encoding as fences; `upgrades` is three uints `g,l,r`
+(composition flags general/left/right) or `-`; `start,end` are indices
+into the NETNODE table (`-1` = unknown, falls back to proximity welding).
+`NETMARK|index|prefabType|prefabName|hash` — one line per junction marker
+(roundabout, manual traffic light, stop sign), pointing at its NETNODE by
+index. These are sub-objects of the node rather than upgrade flags, so they
+cannot ride in the NETNODE line, and a node can carry several.
+Malformed NETNODE lines keep their slot as a placeholder so later indices
+stay valid, and a NETMARK pointing at such a slot is dropped on load. Old
+loaders skip all three line types.
 
 ## Saving
 

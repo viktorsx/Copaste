@@ -47,6 +47,12 @@ namespace Copaste
                 }
             }
 
+            // Jezik moda nezavisno od igre: izabrani rečnik se doda kao
+            // POSLEDNJI izvor za aktivni locale (poslednji upis pobeđuje),
+            // i ponovo primeni na svaku promenu jezika igre.
+            ApplyLanguageOverride();
+            GameManager.instance.localizationManager.onActiveDictionaryChanged += ApplyLanguageOverride;
+
             // coui://copaste/ host za ikonicu dugmeta.
             string modPath = GetAssemblyDirectory();
             if (modPath != null)
@@ -61,6 +67,76 @@ namespace Copaste
 
             updateSystem.UpdateAt<CopasteToolSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<CopasteUISystem>(SystemUpdatePhase.UIUpdate);
+        }
+
+        // Aktivni override izvor — da se pri promeni ukloni pre novog.
+        private static MemorySource s_LanguageOverrideSource;
+        private static string s_LanguageOverrideLocale;
+        private static bool s_ReapplyingLanguage;
+
+        // Poslednje PRIMENJENO stanje — bez ovoga se posao radio i kad se
+        // ništa nije promenilo.
+        private static ModLanguageOption s_AppliedLanguage = (ModLanguageOption)(-1);
+        private static string s_AppliedLocale;
+
+        public static void ApplyLanguageOverride()
+        {
+            if (Settings == null || GameManager.instance == null || s_ReapplyingLanguage)
+            {
+                return;
+            }
+
+            // Ovo se zove iz Settings.Apply(), a Apply() ide na SVAKI klik na
+            // filter čip u panelu — a posao unutra je ReloadActiveLocale, pun
+            // reload rečnika igre. Otud vidljivo kočenje pri prebacivanju
+            // Props/Decals. Kad se ni jezik ni aktivni locale nisu promenili,
+            // nema šta da se radi.
+            string activeLocale = GameManager.instance.localizationManager.activeLocaleId;
+            if (Settings.ModLanguage == s_AppliedLanguage && activeLocale == s_AppliedLocale)
+            {
+                return;
+            }
+
+            s_AppliedLanguage = Settings.ModLanguage;
+            s_AppliedLocale = activeLocale;
+
+            // Guard oko CELE funkcije: i AddSource i RemoveSource SAMI okidaju
+            // onActiveDictionaryChanged (dokazano crash-om: beskonačna
+            // rekurzija kroz naš handler) — dok mi menjamo izvore, event se
+            // ignoriše.
+            s_ReapplyingLanguage = true;
+            try
+            {
+                var manager = GameManager.instance.localizationManager;
+                if (s_LanguageOverrideSource != null)
+                {
+                    manager.RemoveSource(s_LanguageOverrideLocale, s_LanguageOverrideSource);
+                    s_LanguageOverrideSource = null;
+                }
+
+                if (Settings.ModLanguage != ModLanguageOption.Auto)
+                {
+                    System.Collections.Generic.Dictionary<string, string> dictionary = Settings.ModLanguage switch
+                    {
+                        ModLanguageOption.German => Localization.BuildGerman(Settings),
+                        ModLanguageOption.French => Localization.BuildFrench(Settings),
+                        ModLanguageOption.Serbian => Localization.BuildSerbian(Settings),
+                        _ => Localization.BuildEnglish(Settings),
+                    };
+
+                    s_LanguageOverrideLocale = manager.activeLocaleId;
+                    s_LanguageOverrideSource = new MemorySource(dictionary);
+                    manager.AddSource(s_LanguageOverrideLocale, s_LanguageOverrideSource);
+                }
+
+                // Reload gura novo stanje u aktivni rečnik (bitno pri povratku
+                // na Auto, kad RemoveSource mora da OČISTI naše ključeve).
+                manager.ReloadActiveLocale();
+            }
+            finally
+            {
+                s_ReapplyingLanguage = false;
+            }
         }
 
         private static string GetAssemblyDirectory()

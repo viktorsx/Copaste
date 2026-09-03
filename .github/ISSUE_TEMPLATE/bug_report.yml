@@ -24,8 +24,8 @@ body:
     id: mod-version
     attributes:
       label: Copaste version
-      description: Shown in the panel header (e.g. 1.1.0)
-      placeholder: "1.1.0"
+      description: Shown in the panel header (e.g. 1.2.0)
+      placeholder: "1.2.0"
     validations:
       required: true
 

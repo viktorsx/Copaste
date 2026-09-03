@@ -9,6 +9,17 @@ namespace Copaste
         private ValueBinding<bool> m_ToolActive;
         private ValueBinding<bool> m_PasteMode;
         private ValueBinding<int> m_SelectedCount;
+        private ValueBinding<int> m_CopyableCount;
+        private ValueBinding<int> m_DeletableCount;
+        private ValueBinding<int> m_UiTheme;
+        private ValueBinding<bool> m_Underground;
+        private ValueBinding<int> m_PanelScale;
+        private ValueBinding<int> m_TextScale;
+
+        // Maska filtera od pre poslednjeg solo-a. Zastavica je odvojena jer je
+        // 0 VALIDNA maska (svi čipovi ugašeni) — sentinel bi je pojeo.
+        private int m_PreSoloMask;
+        private bool m_HasPreSoloMask;
         private ValueBinding<int> m_PropCount;
         private ValueBinding<int> m_HeightCount;
         private ValueBinding<int> m_ClipboardCount;
@@ -38,7 +49,9 @@ namespace Copaste
                 (Mod.Settings.SelectTrees ? 2 : 0) |
                 (Mod.Settings.SelectDecals ? 4 : 0) |
                 (Mod.Settings.SelectSurfaces ? 8 : 0) |
-                (Mod.Settings.SelectBuildings ? 16 : 0);
+                (Mod.Settings.SelectBuildings ? 16 : 0) |
+                (Mod.Settings.SelectFences ? 32 : 0) |
+                (Mod.Settings.SelectNetworks ? 64 : 0);
         }
         private ValueBinding<float> m_AlignGapLive;
         private ValueBinding<bool> m_AlignPickArmed;
@@ -90,6 +103,16 @@ namespace Copaste
             AddBinding(m_ToolActive = new ValueBinding<bool>("copaste", "toolActive", false));
             AddBinding(m_PasteMode = new ValueBinding<bool>("copaste", "pasteMode", false));
             AddBinding(m_SelectedCount = new ValueBinding<int>("copaste", "selectedCount", 0));
+            AddBinding(m_CopyableCount = new ValueBinding<int>("copaste", "copyableCount", 0));
+            AddBinding(m_DeletableCount = new ValueBinding<int>("copaste", "deletableCount", 0));
+            AddBinding(m_UiTheme = new ValueBinding<int>("copaste", "uiTheme", 0));
+            AddBinding(m_Underground = new ValueBinding<bool>("copaste", "underground", false));
+            AddBinding(m_PanelScale = new ValueBinding<int>("copaste", "panelScale", 100));
+            AddBinding(m_TextScale = new ValueBinding<int>("copaste", "textScale", 100));
+            AddBinding(new TriggerBinding("copaste", "toggleUnderground", () =>
+            {
+                m_CopasteToolSystem.UndergroundMode = !m_CopasteToolSystem.UndergroundMode;
+            }));
             AddBinding(m_PropCount = new ValueBinding<int>("copaste", "propCount", 0));
             AddBinding(m_HeightCount = new ValueBinding<int>("copaste", "heightCount", 0));
             AddBinding(m_ClipboardCount = new ValueBinding<int>("copaste", "clipboardCount", 0));
@@ -118,15 +141,19 @@ namespace Copaste
                     case 4: Mod.Settings.SelectDecals = !Mod.Settings.SelectDecals; break;
                     case 8: Mod.Settings.SelectSurfaces = !Mod.Settings.SelectSurfaces; break;
                     case 16: Mod.Settings.SelectBuildings = !Mod.Settings.SelectBuildings; break;
+                    case 32: Mod.Settings.SelectFences = !Mod.Settings.SelectFences; break;
+                    case 64: Mod.Settings.SelectNetworks = !Mod.Settings.SelectNetworks; break;
                     default: return;
                 }
 
+                // Ručna promena čipova poništava zapamćeno pre-solo stanje.
+                m_HasPreSoloMask = false;
                 Mod.Settings.ApplyAndSave();
                 m_SelectionFilters.Update(CurrentFilterMask());
             }));
 
             // Desni klik na čip: "solo" — samo ta kategorija; ako je već jedina
-            // uključena, vrati sve (Photoshop layer ponašanje).
+            // uključena, vrati stanje od PRE solo-a (Photoshop layer ponašanje).
             AddBinding(new TriggerBinding<int>("copaste", "soloSelectionFilter", (bit) =>
             {
                 if (Mod.Settings == null)
@@ -134,12 +161,37 @@ namespace Copaste
                     return;
                 }
 
-                int target = CurrentFilterMask() == bit ? 31 : bit;
+                // Un-solo vraća zapamćenu masku od pre solo-a; fallback je
+                // FABRIČKI skup (props, drveće, dekali, površine). Zgrade,
+                // ograde i putevi su svi strogo opt-in i nijedan ne sme da se
+                // upali kao nuspojava vraćanja filtera — ranije je fallback
+                // bio 63, pa je palio zgrade i ograde prvi put u životu.
+                int current = CurrentFilterMask();
+                int target;
+                if (current == bit)
+                {
+                    target = m_HasPreSoloMask ? m_PreSoloMask : 15;
+                    m_HasPreSoloMask = false;
+                }
+                else
+                {
+                    // Pamti se samo PRVI solo — solo A pa solo B pa un-solo
+                    // vraća originalno stanje, ne međukorak.
+                    if (!m_HasPreSoloMask)
+                    {
+                        m_PreSoloMask = current;
+                        m_HasPreSoloMask = true;
+                    }
+
+                    target = bit;
+                }
                 Mod.Settings.SelectProps = (target & 1) != 0;
                 Mod.Settings.SelectTrees = (target & 2) != 0;
                 Mod.Settings.SelectDecals = (target & 4) != 0;
                 Mod.Settings.SelectSurfaces = (target & 8) != 0;
                 Mod.Settings.SelectBuildings = (target & 16) != 0;
+                Mod.Settings.SelectFences = (target & 32) != 0;
+                Mod.Settings.SelectNetworks = (target & 64) != 0;
                 Mod.Settings.ApplyAndSave();
                 m_SelectionFilters.Update(CurrentFilterMask());
             }));
@@ -303,6 +355,12 @@ namespace Copaste
             // (npr. Paste dugme "svetli" iako je alat u Select modu).
             m_PasteMode.Update(m_CopasteToolSystem.IsPasteMode);
             m_SelectedCount.Update(m_CopasteToolSystem.SelectedCount);
+            m_CopyableCount.Update(m_CopasteToolSystem.CopyableSelectedCount);
+            m_DeletableCount.Update(m_CopasteToolSystem.DeletableSelectedCount);
+            m_UiTheme.Update(Mod.Settings != null ? (int)Mod.Settings.PanelTheme : 0);
+            m_Underground.Update(m_CopasteToolSystem.UndergroundMode);
+            m_PanelScale.Update(Mod.Settings != null ? Mod.Settings.PanelScale : 100);
+            m_TextScale.Update(Mod.Settings != null ? Mod.Settings.TextScale : 100);
             m_PropCount.Update(m_CopasteToolSystem.PropTargetCount);
             m_HeightCount.Update(m_CopasteToolSystem.HeightTargetCount);
             m_ClipboardCount.Update(m_CopasteToolSystem.ClipboardCount);

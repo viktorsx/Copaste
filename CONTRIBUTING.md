@@ -10,7 +10,7 @@ Open a [bug report](https://github.com/viktorsx/Copaste/issues/new?template=bug_
 
 Post it in [Ideas](https://github.com/viktorsx/Copaste/discussions/categories/ideas) to talk it through, or open a [feature request](https://github.com/viktorsx/Copaste/issues/new?template=feature_request.yml) if it is already well defined. Describe the situation in your city where the current tool falls short; that is more useful than a solution.
 
-A few things are out of scope on purpose: anything that writes custom data into save files, and copying road networks (that is Move It territory).
+One thing is out of scope on purpose: anything that writes custom data into save files. That limit is why an uninstall leaves nothing behind.
 
 ## Sending code
 

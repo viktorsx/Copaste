@@ -1,6 +1,6 @@
 // Pomeranje i rotacija ZGRADA i farbanih površina.
 //
-// Pristup po uzoru na MoveIt (MIT, github.com/Quboid/CS2-MoveIt): zgrada i ceo
+// Pristup: zgrada i ceo
 // njen pod-tree (prilazi i staze kao pod-mreže, pločnici kao pod-površine,
 // instalirane nadogradnje) pomeraju se direktnim upisom u VANILA komponente za
 // istu deltu, pa se sve označi Updated — igra sama regeneriše geometriju, trake
@@ -96,7 +96,7 @@ namespace Copaste
 
         // Delovi zgrade sa world-space geometrijom koje pomeramo ručno.
         // SubObject deca se preskaču (igra ih sama vodi) osim stubova (Pillar,
-        // npr. nadzemne stanice) — isto pravilo kao MoveIt.
+        // npr. nadzemne stanice).
         private void CollectBuildingParts(Entity owner, HashSet<Entity> visited, List<Entity> parts, int depth)
         {
             if (depth > 3)
@@ -439,9 +439,17 @@ namespace Copaste
                 return;
             }
 
+            // Popis PRE mutacija: vlasnik i dete su oba Game.Objects.Object
+            // sa Owner+SubObject, pa realno dele chunk — AddComponent na dete
+            // ume da pomeri i vlasnika, a bafer se u petlji i dalje čita.
+            List<Entity> children = new List<Entity>(subObjects.Length);
             for (int i = 0; i < subObjects.Length; i++)
             {
-                Entity sub = subObjects[i].m_SubObject;
+                children.Add(subObjects[i].m_SubObject);
+            }
+
+            foreach (Entity sub in children)
+            {
                 if (EntityManager.Exists(sub))
                 {
                     EntityManager.AddComponent<Updated>(sub);
@@ -516,11 +524,22 @@ namespace Copaste
             center = default;
             targetYaw = 0f;
 
+            // Dubina placa PRE pretrage: kod velike zgrade kursor (centar)
+            // legitimno stoji i 40+ m od ose puta kad je zgrada savršeno uz
+            // put — fiksni domet od 30 m je baš njima odbijao snap
+            // (promašaji u logu na 30-38 m).
+            float halfDepth = 8f;
+            if (EntityManager.TryGetComponent(buildingPrefab, out BuildingData buildingData) &&
+                buildingData.m_LotSize.y > 0)
+            {
+                halfDepth = buildingData.m_LotSize.y * 4f;
+            }
+
             // Pretraga stabla samo kad se kursor stvarno pomeri.
             if (!m_SnapHasResult || math.distancesq(cursor.xz, m_SnapLastSearchPos.xz) > 0.25f)
             {
                 m_SnapLastSearchPos = cursor;
-                m_SnapHasResult = TryFindNearestRoad(cursor, out m_SnapEdge);
+                m_SnapHasResult = TryFindNearestRoad(cursor, kRoadSnapRadius + halfDepth, out m_SnapEdge);
             }
 
             if (!m_SnapHasResult)
@@ -556,13 +575,6 @@ namespace Copaste
                 EntityManager.TryGetComponent(edgePrefab.m_Prefab, out NetGeometryData geometry))
             {
                 halfWidth = geometry.m_DefaultWidth * 0.5f;
-            }
-
-            float halfDepth = 8f;
-            if (EntityManager.TryGetComponent(buildingPrefab, out BuildingData buildingData) &&
-                buildingData.m_LotSize.y > 0)
-            {
-                halfDepth = buildingData.m_LotSize.y * 4f;
             }
 
             // Centar zgrade: od ivice puta ka kursoru, front placa uz put;
@@ -628,6 +640,9 @@ namespace Copaste
             m_Mode == Mode.Select &&
             m_Selected.Count == 1 &&
             m_SelectedSurfaces.Count == 0 &&
+            m_SelectedLanes.Count == 0 &&
+            m_SelectedNodes.Count == 0 &&
+            m_SelectedNetEdges.Count == 0 &&
             IsBuilding(m_Selected[0]) &&
             IsMovableBuilding(m_Selected[0]);
 
@@ -661,17 +676,38 @@ namespace Copaste
             }
 
             EndAlignSession();
+
+            // Isti skup flegova koji čisti EnterPasteMode. Dok traje Relocate
+            // UpdateSelectMode ne radi, pa se puštanje tastera nikad ne vidi:
+            // pritisak zadržan pre Tab-a bi posle spuštanja zgrade odradio
+            // pik na ustajaloj tački (ili obrisao selekciju), a u varijanti
+            // sa m_LeftHeldOnProp pokrenuo netraženo prevlačenje tek
+            // spuštene zgrade, sa sopstvenim undo zapisom.
+            CancelMarquee();
+            m_MarqueeHeld = false;
+            m_LeftHeldOnProp = false;
+            m_MoveDragging = false;
+            m_MoveOffsetsPending = false;
+            m_LeftPressEntity = Entity.Null;
+            m_LeftPressShift = false;
+            m_LeftPressAlt = false;
+            m_HeightPickArmed = false;
+            m_AlignPickArmed = false;
+
             m_RelocateEntity = m_Selected[0];
             m_RelocateOriginal = transform;
 
             // Undo zapis + snimak rasporeda pod-propova idu na ulazu; redo stek
             // se stavlja na stranu — odustajanje ga vraća netaknutog.
             m_RelocateRedoBackup = m_RedoStack.Count > 0 ? new List<UndoRecord>(m_RedoStack) : null;
-            int stackBefore = m_UndoStack.Count;
+
+            // Sopstveni zapis se prepoznaje poređenjem VRHA steka pre/posle —
+            // brojanje ne radi na punom steku (PushUndo tada izbaci najstariji
+            // pa Count ostane isti).
+            UndoRecord topBefore = m_UndoStack.Count > 0 ? m_UndoStack[m_UndoStack.Count - 1] : null;
             PushTransformUndo();
-            m_RelocateUndoRecord = m_UndoStack.Count > stackBefore
-                ? m_UndoStack[m_UndoStack.Count - 1]
-                : null;
+            UndoRecord topAfter = m_UndoStack.Count > 0 ? m_UndoStack[m_UndoStack.Count - 1] : null;
+            m_RelocateUndoRecord = !ReferenceEquals(topBefore, topAfter) ? topAfter : null;
             m_SnapHasResult = false;
             m_SnapEdge = Entity.Null;
             m_RelocateSnapLogged = false;
@@ -739,18 +775,38 @@ namespace Copaste
                 return;
             }
 
-            if (!GetRaycastResult(out Entity _, out RaycastHit hit) ||
+            if (!GetRaycastResult(out Entity rayEntity, out RaycastHit hit) ||
                 !EntityManager.TryGetComponent(m_RelocateEntity, out Game.Objects.Transform current))
             {
                 return;
             }
 
-            float3 target = hit.m_HitPosition;
+            float3 pointer = hit.m_HitPosition;
+
+            // VISOKA zgrada pod kursorom: zrak pogodi NJU (ili njen pod-objekat)
+            // dok je pomeramo, a pogodak na krovu je zbog ugla kamere desetine
+            // metara od tačke na tlu — zgrada bi jurila sopstveni krov i
+            // skakala, a snap bi tražio put na pogrešnom mestu (log: nearest
+            // 57–142 m, pa i tree=0). Tada se kursor projektuje na ravan
+            // terena na visini zgrade — isti trik kao kod ručki na mostu.
+            if (rayEntity != Entity.Null && RelocateRayHitSelf(rayEntity))
+            {
+                TerrainHeightData selfHitTerrain = m_TerrainSystem.GetHeightData();
+                float planeY = TerrainUtils.SampleHeight(ref selfHitTerrain, current.m_Position);
+                if (!TryCursorAtHeight(planeY, out float2 flatCursor))
+                {
+                    return;
+                }
+
+                pointer = new float3(flatCursor.x, planeY, flatCursor.y);
+            }
+
+            float3 target = pointer;
             float yawDelta = 0f;
             bool snapped = false;
             if (RoadSnapEnabled &&
                 EntityManager.TryGetComponent(m_RelocateEntity, out PrefabRef prefabRef) &&
-                TryComputeRoadSnap(hit.m_HitPosition, prefabRef.m_Prefab, out float3 snapCenter, out float targetYaw))
+                TryComputeRoadSnap(pointer, prefabRef.m_Prefab, out float3 snapCenter, out float targetYaw))
             {
                 snapped = true;
                 target = snapCenter;
@@ -800,7 +856,30 @@ namespace Copaste
             }
         }
 
-        private bool TryFindNearestRoad(float3 position, out Entity edge)
+        // Da li raycast pogodak pripada zgradi koja se upravo premešta —
+        // direktno ili kroz lanac vlasništva (pod-prop, pod-mreža placa).
+        private bool RelocateRayHitSelf(Entity hitEntity)
+        {
+            Entity cursorEntity = hitEntity;
+            for (int depth = 0; depth < 6 && cursorEntity != Entity.Null; depth++)
+            {
+                if (cursorEntity == m_RelocateEntity)
+                {
+                    return true;
+                }
+
+                if (!EntityManager.TryGetComponent(cursorEntity, out Owner owner))
+                {
+                    return false;
+                }
+
+                cursorEntity = owner.m_Owner;
+            }
+
+            return false;
+        }
+
+        private bool TryFindNearestRoad(float3 position, float radius, out Entity edge)
         {
             edge = Entity.Null;
             if (m_NetSearchSystem == null)
@@ -814,13 +893,13 @@ namespace Copaste
             RoadIterator iterator = new RoadIterator
             {
                 m_Bounds = new Bounds3(
-                    position - new float3(kRoadSnapRadius, 1000f, kRoadSnapRadius),
-                    position + new float3(kRoadSnapRadius, 1000f, kRoadSnapRadius)),
+                    position - new float3(radius, 1000f, radius),
+                    position + new float3(radius, 1000f, radius)),
                 m_Results = new NativeList<Entity>(16, Allocator.Temp),
             };
             tree.Iterate(ref iterator, 0);
 
-            float bestDistance = kRoadSnapRadius;
+            float bestDistance = radius;
             for (int i = 0; i < iterator.m_Results.Length; i++)
             {
                 Entity candidate = iterator.m_Results[i];
@@ -1358,9 +1437,18 @@ namespace Copaste
 
             if (EntityManager.TryGetBuffer(owner, true, out DynamicBuffer<Game.Objects.SubObject> subObjects))
             {
+                // Popis PRE mutacija: i Deleted i rekurzija menjaju strukturu,
+                // a vlasnik i dete su oba Game.Objects.Object sa Owner+SubObject
+                // (realno isti chunk), pa bafer ume da postane ustajao usred
+                // petlje — deo regenerisanih propova bi ostao neočišćen.
+                List<Entity> children = new List<Entity>(subObjects.Length);
                 for (int i = 0; i < subObjects.Length; i++)
                 {
-                    Entity sub = subObjects[i].m_SubObject;
+                    children.Add(subObjects[i].m_SubObject);
+                }
+
+                foreach (Entity sub in children)
+                {
                     if (!EntityManager.Exists(sub))
                     {
                         continue;
@@ -1479,7 +1567,7 @@ namespace Copaste
             m_DelayedSettleSecondDone.Clear();
         }
 
-        // Obris PLACA zgrade umesto kruga (kao MoveIt): pravougaonik iz
+        // Obris PLACA zgrade umesto kruga: pravougaonik iz
         // BuildingData.m_LotSize prefaba (ćelija zone je 8 m), rotiran po
         // transformu i prislonjen na teren. False ako prefab nema lot podatke
         // (pozivalac tada crta običan krug).
@@ -1619,6 +1707,10 @@ namespace Copaste
         {
             public int m_Frames;
             public List<SurfaceSig> m_Sigs;
+
+            // Sesija alata u kojoj je zakazana — zapis ne sme da tinja kroz
+            // proizvoljno mnogo paljenja i gašenja.
+            public int m_Session;
         }
 
         // Zgrade koje čekaju čišćenje viška površina posle construction-a
@@ -1724,6 +1816,11 @@ namespace Copaste
                     {
                         m_Frames = pending.m_Frames,
                         m_Sigs = reduced,
+
+                        // Prepis MORA da ponese i pečat sesije — default 0 bi
+                        // ceo zapis sledeći tik proglasio ustajalim i sync
+                        // placa bi tiho otpao.
+                        m_Session = pending.m_Session,
                     };
                     return;
                 }
@@ -1752,7 +1849,12 @@ namespace Copaste
             // Odbrojavanje kreće tek kad izgradnja prođe (guard u tiku); 12
             // frejmova posle nje su sve fabričke površine tu. JEDNOKRATNO —
             // transplantacija se ne sme ponoviti (duplirala bi površine).
-            m_PendingSurfacePrune[building] = new PendingSurfacePrune { m_Frames = 12, m_Sigs = sigs };
+            m_PendingSurfacePrune[building] = new PendingSurfacePrune
+            {
+                m_Frames = 12,
+                m_Sigs = sigs,
+                m_Session = m_ToolSessionId,
+            };
             Mod.Log.Info($"Copaste: lot sync scheduled for e{building.Index} ({sigs.Count} source surfaces)");
         }
 
@@ -1857,10 +1959,21 @@ namespace Copaste
 
                 PendingSurfacePrune pending = m_PendingSurfacePrune[building];
 
+                // Zapis sme da preživi JEDNO gašenje alata (fabričke površine
+                // nastaju par frejmova posle izgradnje, pa se ne forsira) — ali
+                // ne više od toga. Inače bi se odbrojavanje nastavilo sat
+                // vremena kasnije i pregazilo površine koje je igrač u
+                // međuvremenu sam nafarbao, i to bez undo zapisa.
+                if (m_ToolSessionId - pending.m_Session > 1)
+                {
+                    Mod.Log.Info($"Copaste: lot sync for e{building.Index} dropped — stale across tool sessions");
+                    m_PendingSurfacePrune.Remove(building);
+                    continue;
+                }
+
                 // Izgradnja još traje — pauzirana simulacija je drži proizvoljno
                 // dugo, a površine nastaju tek po završetku. Odbrojavanje se
-                // resetuje i kreće tek kad kuća bude gotova (isti princip kao
-                // BB-ov tajmer koji čeka da se vlasnik smiri).
+                // resetuje i kreće tek kad kuća bude gotova.
                 if (EntityManager.HasComponent<Game.Objects.UnderConstruction>(building))
                 {
                     pending.m_Frames = 12;
@@ -2105,6 +2218,10 @@ namespace Copaste
                         {
                             m_Frames = pendingSync.m_Frames,
                             m_Sigs = extended,
+
+                            // Isto kao kod skidanja potpisa: pečat sesije ide
+                            // uz prepis, inače se zapis odmah odbaci.
+                            m_Session = pendingSync.m_Session,
                         };
                     }
                 }
