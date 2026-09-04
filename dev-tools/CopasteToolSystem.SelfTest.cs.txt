@@ -77,12 +77,27 @@ namespace Copaste
 
         private void SelfTestTickCore()
         {
+            SelfTestFollowUp();
+            SelfTestRecheck();
+
             if (m_SelfTestPhase == 0)
             {
                 UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
-                if (keyboard == null || m_Mode != Mode.Select || m_HandleDragging ||
-                    !keyboard.ctrlKey.isPressed || !keyboard.shiftKey.isPressed ||
-                    !keyboard.f9Key.wasPressedThisFrame)
+                if (keyboard == null || m_Mode != Mode.Select ||
+                    !keyboard.ctrlKey.isPressed || !keyboard.shiftKey.isPressed)
+                {
+                    return;
+                }
+
+                // F10: sonda nad STVARNOM selekcijom u gradu (bez pravljenja
+                // testnog puta) — dopisuje snimak u probe.txt.
+                if (keyboard.f10Key.wasPressedThisFrame)
+                {
+                    SelfTestProbeSelection();
+                    return;
+                }
+
+                if (m_HandleDragging || !keyboard.f9Key.wasPressedThisFrame)
                 {
                     return;
                 }
@@ -106,8 +121,15 @@ namespace Copaste
                 case 5: SelfTestPhaseStraighten(); break;
                 case 6: SelfTestPhaseAssertStraighten(); break;
                 case 7: SelfTestPhaseFilterAndHistory(); break;
-                case 8: SelfTestPhaseCleanup(); break;
-                case 9: SelfTestPhaseVerifyCleanup(); break;
+                case 8: SelfTestPhaseTrafficBaseline(); break;
+                case 9: SelfTestPhaseTrafficMoveNode(); break;
+                case 10: SelfTestPhaseTrafficAfterMove(); break;
+                case 11: SelfTestPhaseTrafficHandleCurrent(); break;
+                case 12: SelfTestPhaseTrafficAfterCurrent(); break;
+                case 13: SelfTestPhaseTrafficHandleFixed(); break;
+                case 14: SelfTestPhaseTrafficAfterFixed(); break;
+                case 15: SelfTestPhaseCleanup(); break;
+                case 16: SelfTestPhaseVerifyCleanup(); break;
                 default: m_SelfTestPhase = 0; break;
             }
         }
@@ -277,7 +299,7 @@ namespace Copaste
             SelfTestCheck(m_SelfTestNodeB != Entity.Null, "ŠAV: deonice dele čvor B", string.Empty);
             if (edges.Count != 2 || m_SelfTestNodeB == Entity.Null)
             {
-                m_SelfTestPhase = 8;
+                m_SelfTestPhase = 15;
                 m_SelfTestWait = 2;
                 return;
             }
@@ -331,7 +353,7 @@ namespace Copaste
             }
             else
             {
-                m_SelfTestPhase = 8;
+                m_SelfTestPhase = 15;
             }
 
             m_SelfTestWait = 4;
@@ -439,7 +461,790 @@ namespace Copaste
                 "ISTORIJA: pražnjenje pri učitavanju grada", string.Empty);
 
             m_SelfTestPhase = 8;
+            m_SelfTestWait = 12;
+        }
+
+        // ---------- SAOBRACAJ: pun snimak raskrsnice ----------
+        //
+        // Prijava (Viktor, 03.09): posle pomeranja cvora ili vuce rucke vozila
+        // se ponasaju kao da je slepa ulica dok se put ne pomeri drugim alatom.
+        //
+        // Trake NE nestaju (izmereno u prvom prolazu). Zato se ovde gleda
+        // dublje: igra na Updated unisti i ponovo napravi trake VLASNIKA, a
+        // svaka traka u Lane.m_StartNode/m_EndNode drzi PathNode koji pokazuje
+        // na vlasnika druge trake. Ako se oznaci samo IVICA, njene trake dobiju
+        // nove entitete, a trake CVORA i dalje pokazuju na stare -> raskrsnica
+        // je za pathfinding pokidana, iako je geometrija savrsena.
+        //
+        // Ispisuje se pun snimak i broj USTAJALIH referenci posle svakog poteza.
+
+        private readonly Dictionary<int, string> m_TrafficLabels = new Dictionary<int, string>();
+        private readonly List<Entity> m_TrafficNodeLanes = new List<Entity>();
+        private readonly List<Entity> m_TrafficEdge1Lanes = new List<Entity>();
+
+        private static string SelfTestLaneKind(EntityManager em, Entity lane)
+        {
+            if (em.HasComponent<Game.Net.CarLane>(lane)) { return "car"; }
+            if (em.HasComponent<Game.Net.PedestrianLane>(lane)) { return "ped"; }
+            if (em.HasComponent<Game.Net.TrackLane>(lane)) { return "track"; }
+            if (em.HasComponent<Game.Net.ConnectionLane>(lane)) { return "conn"; }
+            if (em.HasComponent<Game.Net.ParkingLane>(lane)) { return "park"; }
+            if (em.HasComponent<Game.Net.UtilityLane>(lane)) { return "util"; }
+            return "?";
+        }
+
+        private void SelfTestCollectLanes(Entity owner, List<Entity> into)
+        {
+            into.Clear();
+            if (EntityManager.TryGetBuffer(owner, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+            {
+                for (int i = 0; i < lanes.Length; i++)
+                {
+                    into.Add(lanes[i].m_SubLane);
+                }
+            }
+        }
+
+        // Popis svega sto u ovom trenutku postoji u testnom skupu — po INDEKSU
+        // entiteta, jer PathNode nosi samo indeks vlasnika.
+        private void SelfTestBuildLabels()
+        {
+            m_TrafficLabels.Clear();
+            m_TrafficLabels[m_SelfTestNodeB.Index] = "cvorB";
+            m_TrafficLabels[m_SelfTestEdge1.Index] = "ivica1";
+            m_TrafficLabels[m_SelfTestEdge2.Index] = "ivica2";
+
+            foreach (Entity owner in new[] { m_SelfTestNodeB, m_SelfTestEdge1, m_SelfTestEdge2 })
+            {
+                if (!EntityManager.TryGetBuffer(owner, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+                {
+                    continue;
+                }
+
+                string prefix = owner == m_SelfTestNodeB ? "cvorB" : (owner == m_SelfTestEdge1 ? "ivica1" : "ivica2");
+                for (int i = 0; i < lanes.Length; i++)
+                {
+                    m_TrafficLabels[lanes[i].m_SubLane.Index] = prefix + ".traka" + i;
+                }
+            }
+        }
+
+        private string SelfTestOwnerLabel(int index)
+        {
+            return m_TrafficLabels.TryGetValue(index, out string label) ? label : ("e" + index + " ??? NEPOZNAT");
+        }
+
+        // Ispis svih traka jednog vlasnika + brojanje ustajalih referenci.
+        private int SelfTestDumpOwner(string title, Entity owner)
+        {
+            if (!EntityManager.TryGetBuffer(owner, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+            {
+                m_SelfTestReport.AppendLine("    " + title + ": nema SubLane bafera");
+                return 0;
+            }
+
+            int stale = 0;
+            m_SelfTestReport.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "    {0} (e{1}) — {2} traka", title, owner.Index, lanes.Length));
+
+            for (int i = 0; i < lanes.Length; i++)
+            {
+                Entity lane = lanes[i].m_SubLane;
+                string kind = SelfTestLaneKind(EntityManager, lane);
+                if (!EntityManager.TryGetComponent(lane, out Game.Net.Lane laneData))
+                {
+                    m_SelfTestReport.AppendLine("      #" + i + " e" + lane.Index + " " + kind + " — bez Lane komponente");
+                    continue;
+                }
+
+                int startOwner = laneData.m_StartNode.GetOwnerIndex();
+                int endOwner = laneData.m_EndNode.GetOwnerIndex();
+                bool startBad = !m_TrafficLabels.ContainsKey(startOwner);
+                bool endBad = !m_TrafficLabels.ContainsKey(endOwner);
+                if (startBad || endBad)
+                {
+                    stale++;
+                }
+
+                m_SelfTestReport.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "      #{0} e{1} {2}  start={3}#{4}  end={5}#{6}{7}",
+                    i, lane.Index, kind,
+                    SelfTestOwnerLabel(startOwner), laneData.m_StartNode.GetLaneIndex(),
+                    SelfTestOwnerLabel(endOwner), laneData.m_EndNode.GetLaneIndex(),
+                    (startBad || endBad) ? "   << USTAJALO" : string.Empty));
+            }
+
+            return stale;
+        }
+
+        private void SelfTestDumpTraffic(string label)
+        {
+            SelfTestBuildLabels();
+            m_SelfTestReport.AppendLine();
+            m_SelfTestReport.AppendLine("  === " + label + " ===");
+
+            if (EntityManager.TryGetBuffer(m_SelfTestNodeB, true, out DynamicBuffer<Game.Net.ConnectedEdge> connected))
+            {
+                m_SelfTestReport.AppendLine("    cvorB krakova: " + connected.Length);
+            }
+
+            // Kompozicija cvora zivi na IVICI (Composition.m_StartNode/m_EndNode
+            // su prefab entiteti sa NetCompositionData) — otud se cita DeadEnd.
+            if (EntityManager.TryGetComponent(m_SelfTestEdge1, out Game.Net.Composition composition) &&
+                EntityManager.TryGetComponent(m_SelfTestEdge1, out Game.Net.Edge edge1Data))
+            {
+                Entity nodePrefab = edge1Data.m_End == m_SelfTestNodeB ? composition.m_EndNode : composition.m_StartNode;
+                if (EntityManager.TryGetComponent(nodePrefab, out NetCompositionData compositionData))
+                {
+                    bool deadEnd = (compositionData.m_Flags.m_General & CompositionFlags.General.DeadEnd) != 0;
+                    bool intersection = (compositionData.m_Flags.m_General & CompositionFlags.General.Intersection) != 0;
+                    m_SelfTestReport.AppendLine("    kompozicija cvora: deadEnd=" + deadEnd + " intersection=" + intersection);
+                    if (deadEnd)
+                    {
+                        m_SelfTestFailures++;
+                        m_SelfTestReport.AppendLine("    !!! CVOR SA DVA KRAKA JE PROGLASEN SLEPOM ULICOM");
+                    }
+                }
+                else
+                {
+                    m_SelfTestReport.AppendLine("    kompozicija cvora: nema NetCompositionData");
+                }
+            }
+            else
+            {
+                m_SelfTestReport.AppendLine("    kompozicija: ivica1 nema Composition (jos nije preracunata)");
+            }
+
+            int stale = 0;
+            stale += SelfTestDumpOwner("cvorB", m_SelfTestNodeB);
+            stale += SelfTestDumpOwner("ivica1", m_SelfTestEdge1);
+            stale += SelfTestDumpOwner("ivica2", m_SelfTestEdge2);
+
+            m_SelfTestReport.AppendLine("    USTAJALIH REFERENCI: " + stale);
+            if (stale > 0)
+            {
+                m_SelfTestFailures++;
+            }
+        }
+
+        private void SelfTestPhaseTrafficBaseline()
+        {
+            SelfTestDumpTraffic("POCETNO STANJE (nista nije dirano)");
+            SelfTestCollectLanes(m_SelfTestNodeB, m_TrafficNodeLanes);
+            SelfTestCollectLanes(m_SelfTestEdge1, m_TrafficEdge1Lanes);
+
+            m_SelfTestPhase = 9;
             m_SelfTestWait = 2;
+        }
+
+        private int SelfTestKept(Entity owner, List<Entity> before)
+        {
+            m_SelfTestLaneScratch.Clear();
+            if (EntityManager.TryGetBuffer(owner, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+            {
+                for (int i = 0; i < lanes.Length; i++)
+                {
+                    m_SelfTestLaneScratch.Add(lanes[i].m_SubLane);
+                }
+            }
+
+            int kept = 0;
+            foreach (Entity e in before)
+            {
+                if (m_SelfTestLaneScratch.Contains(e))
+                {
+                    kept++;
+                }
+            }
+
+            return kept;
+        }
+
+        private readonly HashSet<Entity> m_SelfTestLaneScratch = new HashSet<Entity>();
+
+        private void SelfTestIdentityLine()
+        {
+            int nodeKept = SelfTestKept(m_SelfTestNodeB, m_TrafficNodeLanes);
+            int edgeKept = SelfTestKept(m_SelfTestEdge1, m_TrafficEdge1Lanes);
+            bool edgeRebuilt = m_TrafficEdge1Lanes.Count > 0 && edgeKept == 0;
+            bool nodeRebuilt = m_TrafficNodeLanes.Count > 0 && nodeKept == 0;
+            m_SelfTestReport.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "    identitet: ivica1 zadrzala {0}/{1} (nove trake={2}), cvorB zadrzao {3}/{4} (nove trake={5}){6}",
+                edgeKept, m_TrafficEdge1Lanes.Count, edgeRebuilt,
+                nodeKept, m_TrafficNodeLanes.Count, nodeRebuilt,
+                (edgeRebuilt && !nodeRebuilt) ? "   << IVICA OBNOVLJENA, CVOR NIJE" : string.Empty));
+
+            SelfTestCollectLanes(m_SelfTestNodeB, m_TrafficNodeLanes);
+            SelfTestCollectLanes(m_SelfTestEdge1, m_TrafficEdge1Lanes);
+        }
+
+        private void SelfTestPhaseTrafficMoveNode()
+        {
+            ClearSelection();
+            m_SelectedNodes.Add(m_SelfTestNodeB);
+            TransformNetSelection(quaternion.identity, m_SelfTestB, new float3(0f, 0f, 4f), tick: true);
+            SettleNetworks();
+
+            m_SelfTestPhase = 10;
+            m_SelfTestWait = 25;
+        }
+
+        private void SelfTestPhaseTrafficAfterMove()
+        {
+            SelfTestDumpTraffic("POSLE POMERANJA CVORA");
+            SelfTestIdentityLine();
+
+            m_SelfTestPhase = 11;
+            m_SelfTestWait = 2;
+        }
+
+        private void SelfTestPhaseTrafficHandleCurrent()
+        {
+            // Postojeci kod: vuca kontrolne tacke oznacava SAMO ivicu.
+            ClearSelection();
+            m_SelectedNetEdges.Add(m_SelfTestEdge1);
+            if (EntityManager.TryGetComponent(m_SelfTestEdge1, out Game.Net.Curve curve))
+            {
+                ApplyHandleTarget(m_SelfTestEdge1, isLane: false, index: 1,
+                    target: curve.m_Bezier.b + new float3(0f, 0f, 3f), allowSnaps: false);
+            }
+
+            m_SelfTestPhase = 12;
+            m_SelfTestWait = 25;
+        }
+
+        private void SelfTestPhaseTrafficAfterCurrent()
+        {
+            SelfTestDumpTraffic("POSLE VUCE RUCKE — postojeci kod (oznacena samo ivica)");
+            SelfTestIdentityLine();
+
+            m_SelfTestPhase = 13;
+            m_SelfTestWait = 2;
+        }
+
+        private void SelfTestPhaseTrafficHandleFixed()
+        {
+            // Isti potez, ali se dodatno oznace OBA kraja ivice.
+            ClearSelection();
+            m_SelectedNetEdges.Add(m_SelfTestEdge1);
+            if (EntityManager.TryGetComponent(m_SelfTestEdge1, out Game.Net.Curve curve))
+            {
+                ApplyHandleTarget(m_SelfTestEdge1, isLane: false, index: 1,
+                    target: curve.m_Bezier.b - new float3(0f, 0f, 3f), allowSnaps: false);
+            }
+
+            if (EntityManager.TryGetComponent(m_SelfTestEdge1, out Game.Net.Edge edgeData))
+            {
+                if (EntityManager.Exists(edgeData.m_Start))
+                {
+                    EntityManager.AddComponent<Updated>(edgeData.m_Start);
+                }
+
+                if (EntityManager.Exists(edgeData.m_End))
+                {
+                    EntityManager.AddComponent<Updated>(edgeData.m_End);
+                }
+            }
+
+            m_SelfTestPhase = 14;
+            m_SelfTestWait = 25;
+        }
+
+        private void SelfTestPhaseTrafficAfterFixed()
+        {
+            SelfTestDumpTraffic("POSLE VUCE RUCKE — uz oznacena OBA cvora");
+            SelfTestIdentityLine();
+
+            m_SelfTestPhase = 15;
+            m_SelfTestWait = 2;
+        }
+
+        // ---------- SONDA NAD STVARNIM PUTEM (Ctrl+Shift+F10) ----------
+
+        private static string ProbePath =>
+            System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "ModsData", "Copaste", "probe.txt");
+
+        private int m_ProbeCounter;
+
+        // Automatski, bez prečice: posle svakog poteza nad mrezom. Kapa od 40
+        // snimaka po sesiji da fajl ostane citljiv.
+        partial void NetProbe(string reason)
+        {
+            if (m_ProbeCounter >= 40 || (m_SelectedNetEdges.Count == 0 && m_SelectedNodes.Count == 0))
+            {
+                return;
+            }
+
+            SelfTestProbeSelection(reason);
+
+            // Zapamti pogodjene ivice i prati ih narednih 6 frejmova.
+            m_FollowEdges.Clear();
+            foreach (Entity edge in m_SelectedNetEdges)
+            {
+                m_FollowEdges.Add(edge);
+            }
+
+            foreach (Entity node in m_SelectedNodes)
+            {
+                if (EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.ConnectedEdge> connected))
+                {
+                    for (int i = 0; i < connected.Length; i++)
+                    {
+                        m_FollowEdges.Add(connected[i].m_Edge);
+                    }
+                }
+            }
+
+            m_FollowFrames = m_FollowEdges.Count > 0 ? 6 : 0;
+            m_FollowLine.Clear();
+
+            // Kasna provera: isti cvorovi ponovo za ~2 sekunde. Bez toga se ne
+            // razlikuje trenutak usred preracunavanja od stvarno izgubljenih
+            // traka — a bas to je pitanje.
+            m_RecheckNodes.Clear();
+            foreach (Entity node in m_SelectedNodes)
+            {
+                m_RecheckNodes.Add(node);
+            }
+
+            m_RecheckFrames = m_RecheckNodes.Count > 0 ? 120 : 0;
+        }
+
+        private readonly List<Entity> m_RecheckNodes = new List<Entity>();
+        private int m_RecheckFrames;
+
+        private void SelfTestRecheck()
+        {
+            if (m_RecheckFrames <= 0)
+            {
+                return;
+            }
+
+            if (--m_RecheckFrames > 0)
+            {
+                return;
+            }
+
+            try
+            {
+                StringBuilder text = new StringBuilder();
+                text.AppendLine("    --- kasna provera (~2s kasnije) ---");
+                foreach (Entity node in m_RecheckNodes)
+                {
+                    if (!EntityManager.Exists(node))
+                    {
+                        text.AppendLine("      cvor e" + node.Index + ": VISE NE POSTOJI");
+                        continue;
+                    }
+
+                    int arms = EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.ConnectedEdge> connected)
+                        ? connected.Length : -1;
+                    int total = 0;
+                    int cars = 0;
+                    if (EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+                    {
+                        total = lanes.Length;
+                        for (int i = 0; i < lanes.Length; i++)
+                        {
+                            if (EntityManager.HasComponent<Game.Net.CarLane>(lanes[i].m_SubLane))
+                            {
+                                cars++;
+                            }
+                        }
+                    }
+
+                    bool broken = arms >= 2 && cars == 0;
+                    float maxGap = 0f;
+                    if (connected.IsCreated && EntityManager.TryGetComponent(node, out Game.Net.Node np))
+                    {
+                        for (int i = 0; i < connected.Length; i++)
+                        {
+                            if (EntityManager.TryGetComponent(connected[i].m_Edge, out Game.Net.Curve c) &&
+                                EntityManager.TryGetComponent(connected[i].m_Edge, out Game.Net.Edge ed))
+                            {
+                                float3 end = ed.m_Start == node ? c.m_Bezier.a : c.m_Bezier.d;
+                                maxGap = math.max(maxGap, math.length(end - np.m_Position));
+                            }
+                        }
+                    }
+
+                    text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                        "      cvor e{0}: krakova={1} trake={2} voznih={3} najveci rascep={4:F2}m{5}{6}",
+                        node.Index, arms, total, cars, maxGap,
+                        broken ? "   <<< POKIDANA RASKRSNICA (dva kraka, nijedna vozna traka)" : string.Empty,
+                        maxGap > 5f ? "   <<< PUT SE RAZDVOJIO" : string.Empty));
+                }
+
+                System.IO.File.AppendAllText(ProbePath, text.ToString());
+            }
+            catch (System.Exception)
+            {
+            }
+        }
+
+        private readonly List<Entity> m_FollowEdges = new List<Entity>();
+        private readonly StringBuilder m_FollowLine = new StringBuilder();
+        private int m_FollowFrames;
+
+        // Po frejmu posle poteza: koliko traka pogodjenih ivica nosi Updated
+        // odnosno PathfindUpdated. Nula kroz sve frejmove = pathfinding nije
+        // ni saznao da se nesto promenilo.
+        private void SelfTestFollowUp()
+        {
+            if (m_FollowFrames <= 0)
+            {
+                return;
+            }
+
+            m_FollowFrames--;
+
+            int updated = 0;
+            int pathfind = 0;
+            int total = 0;
+            foreach (Entity edge in m_FollowEdges)
+            {
+                if (!EntityManager.TryGetBuffer(edge, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < lanes.Length; i++)
+                {
+                    total++;
+                    if (EntityManager.HasComponent<Updated>(lanes[i].m_SubLane)) { updated++; }
+                    if (EntityManager.HasComponent<Game.Common.PathfindUpdated>(lanes[i].m_SubLane)) { pathfind++; }
+                }
+            }
+
+            // POUZDANA provera (ne zavisi od trenutka uzorkovanja): da li traka
+            // jos uvek lezi na SVOJOJ deonici. Ako je deonica pomerena a traka
+            // ostala na starom mestu, znaci da je LaneSystem nikad nije dirao —
+            // vozila tada voze po geometriji koje vise nema.
+            int stale = 0;
+            float worst = 0f;
+            foreach (Entity edge in m_FollowEdges)
+            {
+                if (!EntityManager.TryGetComponent(edge, out Game.Net.Curve edgeCurve) ||
+                    !EntityManager.TryGetBuffer(edge, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < lanes.Length; i++)
+                {
+                    if (!EntityManager.TryGetComponent(lanes[i].m_SubLane, out Game.Net.Curve laneCurve))
+                    {
+                        continue;
+                    }
+
+                    float d = math.min(
+                        MathUtils.Distance(edgeCurve.m_Bezier.xz, laneCurve.m_Bezier.a.xz, out float _),
+                        MathUtils.Distance(edgeCurve.m_Bezier.xz, laneCurve.m_Bezier.d.xz, out float _));
+                    worst = math.max(worst, d);
+                    if (d > 3f)
+                    {
+                        stale++;
+                    }
+                }
+            }
+
+            m_FollowLine.Append(string.Format(CultureInfo.InvariantCulture,
+                " [{0}:{1}u/{2}p van={3} max={4:F1}m]", 6 - m_FollowFrames, updated, pathfind, stale, worst));
+
+            if (m_FollowFrames == 0)
+            {
+                try
+                {
+                    string line = "    trake posle poteza (frejm:Updated/PathfindUpdated od " +
+                        total + " ukupno):" + m_FollowLine + System.Environment.NewLine;
+                    System.IO.File.AppendAllText(ProbePath, line);
+                }
+                catch (System.Exception)
+                {
+                }
+            }
+        }
+
+        private void SelfTestProbeSelection()
+        {
+            SelfTestProbeSelection("rucni snimak (Ctrl+Shift+F10)");
+        }
+
+        private void SelfTestProbeSelection(string reason)
+        {
+            try
+            {
+                StringBuilder text = new StringBuilder();
+                m_ProbeCounter++;
+                text.AppendLine();
+                text.AppendLine("======== SNIMAK #" + m_ProbeCounter + " — " + reason + " ========");
+                text.AppendLine("vreme: " + System.DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+                text.AppendLine("selektovano: " + m_SelectedNetEdges.Count + " deonica, " + m_SelectedNodes.Count + " cvorova");
+
+                foreach (Entity node in m_SelectedNodes)
+                {
+                    ProbeNode(text, node);
+                }
+
+                foreach (Entity edge in m_SelectedNetEdges)
+                {
+                    ProbeEdge(text, edge);
+                }
+
+                if (m_SelectedNetEdges.Count == 0 && m_SelectedNodes.Count == 0)
+                {
+                    text.AppendLine("  (nista nije selektovano — selektuj deonicu ili cvor pa pritisni ponovo)");
+                }
+
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ProbePath));
+                System.IO.File.AppendAllText(ProbePath, text.ToString());
+                Mod.Log.Info("Copaste probe: snimak #" + m_ProbeCounter + " upisan u " + ProbePath);
+            }
+            catch (System.Exception e)
+            {
+                Mod.Log.Warn("Copaste probe failed: " + e.Message);
+            }
+        }
+
+        private void ProbeNode(StringBuilder text, Entity node)
+        {
+            text.AppendLine("  --- CVOR e" + node.Index + " ---");
+            if (EntityManager.TryGetComponent(node, out Game.Net.Node nodeData))
+            {
+                text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "    pozicija: {0:F2} {1:F2} {2:F2}", nodeData.m_Position.x, nodeData.m_Position.y, nodeData.m_Position.z));
+            }
+
+            if (EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.ConnectedEdge> connected))
+            {
+                text.AppendLine("    krakova (ConnectedEdge): " + connected.Length);
+                EntityManager.TryGetComponent(node, out Game.Net.Node nodePos);
+                for (int i = 0; i < connected.Length; i++)
+                {
+                    Entity e = connected[i].m_Edge;
+                    string mark = EntityManager.HasComponent<Deleted>(e) ? " DELETED" :
+                        (EntityManager.HasComponent<Game.Tools.Temp>(e) ? " TEMP" : string.Empty);
+
+                    // RASCEP: koliko je kraj krive te ivice udaljen od cvora.
+                    // Kod autoputa mali ofset je normalan (poravnanje traka),
+                    // ali metri znace da se put vizuelno pocepao.
+                    string gap = string.Empty;
+                    if (EntityManager.TryGetComponent(e, out Game.Net.Curve c) &&
+                        EntityManager.TryGetComponent(e, out Game.Net.Edge ed))
+                    {
+                        float3 end = ed.m_Start == node ? c.m_Bezier.a : c.m_Bezier.d;
+                        float3 d = end - nodePos.m_Position;
+                        gap = string.Format(CultureInfo.InvariantCulture,
+                            "  rascep={0:F2}m (xz={1:F2} visina={2:F2})",
+                            math.length(d), math.length(d.xz), d.y);
+                    }
+
+                    text.AppendLine("      e" + e.Index + mark + gap);
+                }
+            }
+            else
+            {
+                text.AppendLine("    NEMA ConnectedEdge bafer");
+            }
+
+            ProbeLanes(text, node, "cvor");
+            ProbeNodeLaneDrift(text, node);
+            ProbeFlags(text, node);
+
+            // Rascep se ne mora videti na cvoru koji je pomeren nego na
+            // SUPROTNOM kraju njegovih deonica — zato se i oni snimaju.
+            if (EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.ConnectedEdge> arms))
+            {
+                for (int i = 0; i < arms.Length; i++)
+                {
+                    if (!EntityManager.TryGetComponent(arms[i].m_Edge, out Game.Net.Edge armEdge))
+                    {
+                        continue;
+                    }
+
+                    Entity far = armEdge.m_Start == node ? armEdge.m_End : armEdge.m_Start;
+                    if (!EntityManager.Exists(far) || !EntityManager.TryGetComponent(far, out Game.Net.Node farData))
+                    {
+                        continue;
+                    }
+
+                    int farArms = EntityManager.TryGetBuffer(far, true, out DynamicBuffer<Game.Net.ConnectedEdge> fc) ? fc.Length : -1;
+                    float farGap = 0f;
+                    if (farArms > 0)
+                    {
+                        for (int k = 0; k < fc.Length; k++)
+                        {
+                            if (EntityManager.TryGetComponent(fc[k].m_Edge, out Game.Net.Curve fcv) &&
+                                EntityManager.TryGetComponent(fc[k].m_Edge, out Game.Net.Edge fed))
+                            {
+                                float3 fend = fed.m_Start == far ? fcv.m_Bezier.a : fcv.m_Bezier.d;
+                                farGap = math.max(farGap, math.length(fend - farData.m_Position));
+                            }
+                        }
+                    }
+
+                    int farCars = 0;
+                    int farTotal = 0;
+                    if (EntityManager.TryGetBuffer(far, true, out DynamicBuffer<Game.Net.SubLane> fl))
+                    {
+                        farTotal = fl.Length;
+                        for (int k = 0; k < fl.Length; k++)
+                        {
+                            if (EntityManager.HasComponent<Game.Net.CarLane>(fl[k].m_SubLane))
+                            {
+                                farCars++;
+                            }
+                        }
+                    }
+
+                    text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                        "    DALJI cvor e{0} (preko e{1}): krakova={2} trake={3} voznih={4} rascep={5:F2}m{6}{7}",
+                        far.Index, arms[i].m_Edge.Index, farArms, farTotal, farCars, farGap,
+                        (farArms >= 2 && farCars == 0) ? "   <<< POKIDANA RASKRSNICA" : string.Empty,
+                        farGap > 3f ? "   <<< PUT SE RAZDVOJIO" : string.Empty));
+                }
+            }
+        }
+
+        // Da li trake CVORA prate cvor. Ako cvor pomerimo a trake ostanu na
+        // starom mestu, ovo raste sa svakim pomeranjem — to je otisak toga da
+        // ih igra nikad nije preracunala.
+        private void ProbeNodeLaneDrift(StringBuilder text, Entity node)
+        {
+            if (!EntityManager.TryGetComponent(node, out Game.Net.Node nodeData) ||
+                !EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+            {
+                return;
+            }
+
+            float worst = 0f;
+            for (int i = 0; i < lanes.Length; i++)
+            {
+                if (!EntityManager.TryGetComponent(lanes[i].m_SubLane, out Game.Net.Curve laneCurve))
+                {
+                    continue;
+                }
+
+                float d = math.min(
+                    math.length(laneCurve.m_Bezier.a - nodeData.m_Position),
+                    math.length(laneCurve.m_Bezier.d - nodeData.m_Position));
+                worst = math.max(worst, d);
+            }
+
+            text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "    trake cvora najdalje od cvora: {0:F2}m{1}", worst,
+                worst > 8f ? "   <<< TRAKE NISU PRATILE CVOR" : string.Empty));
+        }
+
+        private void ProbeEdge(StringBuilder text, Entity edge)
+        {
+            text.AppendLine("  --- DEONICA e" + edge.Index + " ---");
+            if (EntityManager.TryGetComponent(edge, out Game.Net.Edge edgeData))
+            {
+                text.AppendLine("    krajevi: start=e" + edgeData.m_Start.Index + " end=e" + edgeData.m_End.Index);
+            }
+
+            if (EntityManager.TryGetComponent(edge, out Game.Net.Curve curve))
+            {
+                text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "    duzina: {0:F2}", curve.m_Length));
+            }
+
+            if (EntityManager.TryGetComponent(edge, out Game.Net.Elevation elevation))
+            {
+                text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "    elevacija: {0:F2} / {1:F2}", elevation.m_Elevation.x, elevation.m_Elevation.y));
+            }
+            else
+            {
+                text.AppendLine("    elevacija: nema komponente (prizemno)");
+            }
+
+            if (EntityManager.TryGetComponent(edge, out Game.Net.Aggregated aggregated))
+            {
+                text.AppendLine("    agregat (ime ulice): e" + aggregated.m_Aggregate.Index +
+                    (EntityManager.Exists(aggregated.m_Aggregate) ? string.Empty : "  << NE POSTOJI"));
+            }
+            else
+            {
+                text.AppendLine("    agregat: NEMA  << deonica nije deo ulice");
+            }
+
+            // Zgrade zakacene na deonicu — bez njih nema ni vozila iz njih.
+            if (EntityManager.TryGetBuffer(edge, true, out DynamicBuffer<Game.Buildings.ConnectedBuilding> buildings))
+            {
+                text.AppendLine("    zakacenih zgrada: " + buildings.Length);
+            }
+
+            // Vozila koja su trenutno na trakama ove deonice.
+            ProbeLanes(text, edge, "deonica");
+            ProbeFlags(text, edge);
+        }
+
+        private void ProbeLanes(StringBuilder text, Entity owner, string what)
+        {
+            if (!EntityManager.TryGetBuffer(owner, true, out DynamicBuffer<Game.Net.SubLane> lanes))
+            {
+                text.AppendLine("    NEMA SubLane bafer");
+                return;
+            }
+
+            int cars = 0;
+            int unsafeLanes = 0;
+            int forbidden = 0;
+            int laneObjects = 0;
+            for (int i = 0; i < lanes.Length; i++)
+            {
+                Entity lane = lanes[i].m_SubLane;
+                if (EntityManager.TryGetComponent(lane, out Game.Net.CarLane carLane))
+                {
+                    cars++;
+                    if ((carLane.m_Flags & Game.Net.CarLaneFlags.Unsafe) != 0) { unsafeLanes++; }
+                    if ((carLane.m_Flags & Game.Net.CarLaneFlags.Forbidden) != 0) { forbidden++; }
+                }
+
+                if (EntityManager.TryGetBuffer(lane, true, out DynamicBuffer<Game.Net.LaneObject> objects))
+                {
+                    laneObjects += objects.Length;
+                }
+            }
+
+            text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "    trake: {0} ukupno, {1} voznih, {2} unsafe, {3} forbidden, {4} vozila na njima",
+                lanes.Length, cars, unsafeLanes, forbidden, laneObjects));
+
+            // Prve tri vozne trake sa vezama — da se vidi da li pokazuju na zivo.
+            int shown = 0;
+            for (int i = 0; i < lanes.Length && shown < 3; i++)
+            {
+                Entity lane = lanes[i].m_SubLane;
+                if (!EntityManager.HasComponent<Game.Net.CarLane>(lane) ||
+                    !EntityManager.TryGetComponent(lane, out Game.Net.Lane laneData))
+                {
+                    continue;
+                }
+
+                shown++;
+                text.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "      vozna e{0}: start=e{1}#{2} end=e{3}#{4}",
+                    lane.Index,
+                    laneData.m_StartNode.GetOwnerIndex(), laneData.m_StartNode.GetLaneIndex(),
+                    laneData.m_EndNode.GetOwnerIndex(), laneData.m_EndNode.GetLaneIndex()));
+            }
+        }
+
+        private void ProbeFlags(StringBuilder text, Entity entity)
+        {
+            string flags = string.Empty;
+            if (EntityManager.HasComponent<Updated>(entity)) { flags += " Updated"; }
+            if (EntityManager.HasComponent<Game.Common.PathfindUpdated>(entity)) { flags += " PathfindUpdated"; }
+            if (EntityManager.HasComponent<BatchesUpdated>(entity)) { flags += " BatchesUpdated"; }
+            if (EntityManager.HasComponent<Game.Common.Created>(entity)) { flags += " Created"; }
+            if (EntityManager.HasComponent<Deleted>(entity)) { flags += " Deleted"; }
+            if (EntityManager.HasComponent<Game.Tools.Temp>(entity)) { flags += " Temp"; }
+            if (EntityManager.HasComponent<Game.Net.Roundabout>(entity)) { flags += " Roundabout"; }
+            if (EntityManager.HasComponent<Game.Net.TrafficLights>(entity)) { flags += " TrafficLights"; }
+            text.AppendLine("    komponente:" + (flags.Length == 0 ? " (nijedna markerska)" : flags));
         }
 
         private void SelfTestPhaseCleanup()
@@ -449,7 +1254,7 @@ namespace Copaste
                 DeleteNetEdgeWithNodes(edge);
             }
 
-            m_SelfTestPhase = 9;
+            m_SelfTestPhase = 16;
             m_SelfTestWait = 8;
         }
 

@@ -87,48 +87,12 @@ A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNe
  <Screenshot Value="Properties/Screenshots/s10.jpg" />
  <Tag Value="Code Mod" />
  <ForumLink Value="https://forum.paradoxplaza.com/forum/threads/copaste-1-1-0-copy-paste-for-props-and-now-buildings.1938698/" />
- <ModVersion Value="1.2.0" />
+ <ModVersion Value="1.2.1" />
  <GameVersion Value="1.6.*" />
- <ChangeLog>Fences &amp; Networks update. Hand-tested in game before publishing - that's the routine for every Copaste release.
+ <ChangeLog>Fixes for the Fences &amp; Networks update. Hand-tested in game before publishing.
 
-Networks
-- New Networks filter: road, path and track nodes and segments can be selected and moved, rotated and nudged. Junctions keep their smooth curves, connected roads stretch to follow, pillars travel along, and the game reconnects buildings and traffic on its own
-- Roads copy and paste with their upgrades (tree rows, wide sidewalks...). Pasted pieces weld back into one network - intersections stay intersections - and form junctions with existing roads
-- Junction state travels with the copy: roundabouts, manual traffic lights and stop signs are captured with the roads and rebuilt on the paste
-- Delete works on networks the way the bulldozer would, and undo rebuilds the piece welded together, upgrades included. Redo re-applies an undone paste or deletion
-- Tap Alt to straighten a selected middle node onto the line between its neighbors; hold Alt while dragging one to slide it along that line
-- Underground mode (U): the view switches to the game's underground look and selection reaches only what is below ground, so a box over a metro tunnel cannot grab the trees above it
-- Blueprints store road segments alongside everything else
-
-Fences
-- New Fences filter: standalone fences and hedges can be selected, copied, pasted, moved, rotated and deleted. Chained fences stay connected - moving one link stretches its neighbor to keep the joint
-- PgUp/PgDn raise and lower them, End drops them back onto the terrain
-- Blueprints store fences too
-
-Curve bending
-- Select one fence or one road segment and handles appear: two on its ends and two control points off to the side. Drag an end to move it while the rest keeps its shape, or a control point to reshape that half
-- Grab the segment anywhere along its curve and pull - it bends under your hand
-- A click selects a handle first and only a press on the already-selected handle starts dragging, so an ordinary click can never bend a road by accident
-- Lane alignment: a triangle next to each joint cycles it through center, left and right. On a lane transition the through lanes line up exactly - the classic highway exit look in one click
-
-Options and panel
-- Mod language, panel theme (a Vanilla option draws the panel in the game's own chrome), panel size and text size
-- The three safety limits are sliders now: selection size, selection outlines and the Selected props list
-- The panel is translated in German, French and Serbian
-
-Performance
-- Selecting large groups is far cheaper: with over a hundred road segments selected the cost per frame dropped from about 6.6 ms with spikes past 21 ms to roughly 3 ms with spikes around 4.5 ms
-- Opening the tool with nothing selected costs about half of what it did
-- While the tool is off it does not run at all
-
-Fixes
-- Loading another city clears the undo history, which used to carry over and could remove one of the new city's own buildings
-- Renaming a blueprint and clicking elsewhere no longer leaves the tool deaf to input
-- Undo of a paste no longer removes roads that were already there
-- Relocating a tall building no longer makes it chase its own roof, and road snap now reaches buildings with deep lots
-- Alt+wheel spinning two objects within a second no longer merges into one undo record
-- A blueprint whose asset is missing falls back to the factory lot instead of stripping the building's paths, and one broken line no longer fails the whole file
-- Deleting more than 500 objects at once is refused with the error sound: a removal that large can crash the game itself. Delete in parts</ChangeLog>
+- Moving a node on an elevated road no longer splits it. The height of an elevated road is a property of the road, not of the ground beneath it; dragging a node across a slope used to carry the bridge along with the terrain, which left a step at the joint - and traffic would not cross that step. Ground-level roads still follow the terrain as before
+- A joint at the far end of a moved segment is now rebuilt together with every road meeting it, so a road you did not touch can no longer keep an outdated joint shape</ChangeLog>
  <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
  <ExternalLink Type="discord" Url="https://discord.gg/HTav7ARPs2" />
  <ExternalLink Type="kofi" Url="https://ko-fi.com/viktorsx" />

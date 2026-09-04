@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-09-04
+
+### Fixes
+- **Moving a node on an elevated road no longer splits it.** The height of an elevated road is a property of the road, not of the ground beneath it; dragging a node across a slope used to carry the bridge with the terrain, leaving a step at the joint and, at that step, a junction traffic would not cross. Ground-level roads still follow the terrain as before
+- A joint at the far end of a moved segment is now rebuilt together with every road meeting it, so a road that was not touched can no longer keep an outdated joint shape
+
 ## [1.2.0] - 2026-09-03
 
 Fences & Networks update.

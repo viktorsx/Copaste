@@ -808,10 +808,16 @@ namespace Copaste
 
                 float3 oldPosition = nodeData.m_Position;
                 m_NetOldNodePos[node] = oldPosition;
-                float3 newPosition = TransformLanePoint(ref heightData, oldPosition, rotation, pivot, delta);
+                float3 newPosition = TransformNetNodePoint(ref heightData, node, oldPosition, rotation, pivot, delta);
                 nodeData.m_Position = newPosition;
                 nodeData.m_Rotation = math.normalize(math.mul(rotation, nodeData.m_Rotation));
                 EntityManager.SetComponentData(node, nodeData);
+
+                // Elevacija se osvežava uz poziciju: ona je ulaz u izbor
+                // kompozicije, pa nesaglasnost između čvora i deonice daje
+                // prelaz visine i završetak mosta nasred trase. Na prizemnom
+                // putu vrednost je nula i SetNetElevation skine komponentu.
+                SetNetElevation(node, newPosition.y - TerrainUtils.SampleHeight(ref heightData, newPosition));
 
                 // NodeGeometry je izvedena geometrija (igra je regeneriše na
                 // Updated) — pomera se samo da međufrejmovi ne "kasne".
@@ -914,6 +920,12 @@ namespace Copaste
                 // (pogrešna vremena putovanja i razmak traka).
                 curve.m_Length = MathUtils.Length(curve.m_Bezier);
                 EntityManager.SetComponentData(edge, curve);
+
+                // I elevacija deonice prati novu krivu — iz istog razloga kao
+                // kod čvora: nesaglasna visina daje prelazni komad i most se
+                // "preseče" nasred trase.
+                float3 edgeMiddle = LaneMidpoint(curve.m_Bezier);
+                SetNetElevation(edge, edgeMiddle.y - TerrainUtils.SampleHeight(ref heightData, edgeMiddle));
             }
 
             // FAZA 4: strukturne izmene na kraju, kad su svi baferi pušteni.
@@ -942,9 +954,9 @@ namespace Copaste
                     if (EntityManager.TryGetComponent(edge, out Game.Net.Edge edgeData))
                     {
                         Entity farNode = moving.Contains(edgeData.m_Start) ? edgeData.m_End : edgeData.m_Start;
-                        if (!moving.Contains(farNode) && EntityManager.Exists(farNode))
+                        if (!moving.Contains(farNode))
                         {
-                            EntityManager.AddComponent<Updated>(farNode);
+                            MarkFarNodeAndItsEdges(farNode);
                         }
                     }
                 }
@@ -955,6 +967,87 @@ namespace Copaste
         // rot*(endStari − nodeStari). Ako stara pozicija čvora nije zapamćena
         // (defenzivno), pada se na rigidFallback (stari način) kada postoji,
         // inače na sam čvor.
+        // Pomeranje ČVORA puta, po pravilu: uzdignuta mreža drži svoju visinu,
+        // prizemna prati teren.
+        //
+        // Zašto: visina uzdignute deonice je svojstvo puta, ne terena ispod
+        // njega. Kad bi se čuvao razmak do terena, čvor pomeren preko kosine
+        // pomerio bi i sam most za visinsku razliku terena — spoj bi dobio
+        // stepenik, a susedne deonice bi ostale na različitim visinama. Ivice
+        // se pomeraju u svetskim koordinatama, pa čvor mora isto.
+        //
+        // Praćenje terena ostaje za prizemne puteve (i za ograde, koje po
+        // prirodi leže na tlu).
+        private float3 TransformNetNodePoint(ref TerrainHeightData heightData, Entity node, float3 point, quaternion rotation, float3 pivot, float3 delta)
+        {
+            float3 position = pivot + math.mul(rotation, point - pivot) + delta;
+
+            bool elevated = false;
+            if (EntityManager.TryGetComponent(node, out Game.Net.Elevation nodeElevation) &&
+                math.max(math.abs(nodeElevation.m_Elevation.x), math.abs(nodeElevation.m_Elevation.y)) > 0.5f)
+            {
+                elevated = true;
+            }
+            else if (EntityManager.TryGetBuffer(node, true, out DynamicBuffer<Game.Net.ConnectedEdge> connected))
+            {
+                for (int i = 0; i < connected.Length && !elevated; i++)
+                {
+                    if (EntityManager.TryGetComponent(connected[i].m_Edge, out Game.Net.Elevation edgeElevation) &&
+                        math.max(math.abs(edgeElevation.m_Elevation.x), math.abs(edgeElevation.m_Elevation.y)) > 0.5f)
+                    {
+                        elevated = true;
+                    }
+                }
+            }
+
+            if (elevated)
+            {
+                position.y = point.y + delta.y;
+                return position;
+            }
+
+            float heightOffset = point.y - TerrainUtils.SampleHeight(ref heightData, point);
+            position.y = TerrainUtils.SampleHeight(ref heightData, position) + heightOffset;
+            return position;
+        }
+
+        // Dalji čvor ulazi u preračun zajedno sa SVIM svojim deonicama:
+        // geometrija spoja se računa po čvoru, pa deonica koja nije označena
+        // zadrži stari oblik kraja i na spoju se vidi stepenik, iako su krive
+        // neprekidne.
+        private void MarkFarNodeAndItsEdges(Entity farNode)
+        {
+            if (!EntityManager.Exists(farNode) || EntityManager.HasComponent<Deleted>(farNode))
+            {
+                return;
+            }
+
+            EntityManager.AddComponent<Updated>(farNode);
+            EntityManager.AddComponent<BatchesUpdated>(farNode);
+
+            if (!EntityManager.TryGetBuffer(farNode, true, out DynamicBuffer<Game.Net.ConnectedEdge> farEdges))
+            {
+                return;
+            }
+
+            m_FarEdgeScratch.Clear();
+            for (int i = 0; i < farEdges.Length; i++)
+            {
+                m_FarEdgeScratch.Add(farEdges[i].m_Edge);
+            }
+
+            foreach (Entity other in m_FarEdgeScratch)
+            {
+                if (EntityManager.Exists(other) && !EntityManager.HasComponent<Deleted>(other))
+                {
+                    EntityManager.AddComponent<Updated>(other);
+                    EntityManager.AddComponent<BatchesUpdated>(other);
+                }
+            }
+        }
+
+        private readonly List<Entity> m_FarEdgeScratch = new List<Entity>();
+
         private float3 NetEndpointFollowNode(float3 endpoint, Entity node, Game.Net.Node movedNode, quaternion rotation, float3 rigidFallback)
         {
             if (m_NetOldNodePos.TryGetValue(node, out float3 oldNode))
@@ -1054,10 +1147,7 @@ namespace Copaste
                 if (EntityManager.TryGetComponent(edge, out Game.Net.Edge edgeData))
                 {
                     Entity farNode = moving.Contains(edgeData.m_Start) ? edgeData.m_End : edgeData.m_Start;
-                    if (EntityManager.Exists(farNode))
-                    {
-                        EntityManager.AddComponent<Updated>(farNode);
-                    }
+                    MarkFarNodeAndItsEdges(farNode);
                 }
 
                 // Ime ulice prati spojene deonice.
@@ -1067,6 +1157,8 @@ namespace Copaste
                     EntityManager.AddComponent<Updated>(aggregated.m_Aggregate);
                 }
             }
+
+            NetProbe("posle pomeranja mreze (settle)");
         }
 
         // Odloženi settle: jedan re-okidač po čvoru N frejmova posle poteza.
@@ -1680,6 +1772,9 @@ namespace Copaste
         partial void DiagPastedTopologyLog(int edges, int unresolved, int sharedNodes);
 
         partial void DiagWriteReport(List<PastedRecord> records);
+
+        // Automatski snimak stanja mreze posle poteza (razvojni alat).
+        partial void NetProbe(string reason);
 
         private void CaptureNetworkEdges(float3 centroid)
         {
@@ -4190,10 +4285,7 @@ namespace Copaste
                 }
 
                 Entity farNode = startMoving ? edgeData.m_End : edgeData.m_Start;
-                if (EntityManager.Exists(farNode) && !EntityManager.HasComponent<Deleted>(farNode))
-                {
-                    EntityManager.AddComponent<Updated>(farNode);
-                }
+                MarkFarNodeAndItsEdges(farNode);
             }
         }
 

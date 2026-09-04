@@ -688,6 +688,8 @@ namespace Copaste
             m_HandleEntity = Entity.Null;
             m_HandleSnappedStraight = false;
             m_HandleSnappedCenter = false;
+
+            NetProbe("posle vuce rucke");
         }
 
         // PgUp/PgDn nad klikom izabranom ručkom: čist vertikalni pomak te
