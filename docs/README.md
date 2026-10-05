@@ -1,4 +1,4 @@
-# Copaste — Developer Documentation
+# Copaste - Developer Documentation
 
 Copaste is a Cities: Skylines II mod: a copy & paste tool for props, decals, trees,
 painted surfaces, buildings (since 1.1.0) and fences and road networks
@@ -29,23 +29,23 @@ modding surface that shaped the design.
 
 ```
 src/
-  Mod.cs               — mod entry point, logging, settings + localization registration
-  CopasteSettings.cs   — ModSetting subclass: options, key bindings, hidden persisted state
-  CopasteToolSystem.cs — the tool itself (selection, paste, align, undo, blueprints)
-  CopasteToolSystem.Buildings.cs — buildings & painted surfaces partial (sub-tree
+  Mod.cs              - mod entry point, logging, settings + localization registration
+  CopasteSettings.cs  - ModSetting subclass: options, key bindings, hidden persisted state
+  CopasteToolSystem.cs - the tool itself (selection, paste, align, undo, blueprints)
+  CopasteToolSystem.Buildings.cs - buildings & painted surfaces partial (sub-tree
                          moves, relocate, road snap, lot transplant, sweeps)
-  CopasteToolSystem.Fences.cs — standalone fences partial (container anatomy,
+  CopasteToolSystem.Fences.cs - standalone fences partial (container anatomy,
                          chain-preserving moves)
-  CopasteToolSystem.Networks.cs — roads partial (selection, transforms,
+  CopasteToolSystem.Networks.cs - roads partial (selection, transforms,
                          copy/paste welding, junction state, undo/redo)
-  CopasteToolSystem.Bending.cs — curve handles for fences and road segments
-  CopasteToolSystem.LaneAlign.cs — lane-alignment triangles at road joints
-  CopasteUISystem.cs   — UI bridge: value bindings and triggers between C# and the panel
-  Localization.cs      — English, German, French and Serbian dictionaries for the Options screen
+  CopasteToolSystem.Bending.cs - curve handles for fences and road segments
+  CopasteToolSystem.LaneAlign.cs - lane-alignment triangles at road joints
+  CopasteUISystem.cs  - UI bridge: value bindings and triggers between C# and the panel
+  Localization.cs     - English, German, French and Serbian dictionaries for the Options screen
 ui/
-  Copaste.mjs          — the in-game UI module (toolbar button + panel), plain JS, no build step
-  Copaste.css          — panel styles (game "rem" units)
-  *.svg                — icons (all must declare width/height, see ui.md)
+  Copaste.mjs         - the in-game UI module (toolbar button + panel), plain JS, no build step
+  Copaste.css         - panel styles (game "rem" units)
+  *.svg               - icons (all must declare width/height, see ui.md)
 ```
 
 ## Reading order

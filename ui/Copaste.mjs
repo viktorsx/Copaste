@@ -42,6 +42,7 @@ const register = (moduleRegistry) => {
     const panelX$ = bindValue("copaste", "panelX", -1);
     const panelY$ = bindValue("copaste", "panelY", -1);
     const randomVariation$ = bindValue("copaste", "randomVariation", false);
+    const pasteKeepShape$ = bindValue("copaste", "pasteKeepShape", false);
     const roadSnap$ = bindValue("copaste", "roadSnap", true);
     const buildingProps$ = bindValue("copaste", "buildingProps", false);
     const selectionFilters$ = bindValue("copaste", "selectionFilters", 15);
@@ -141,6 +142,7 @@ const register = (moduleRegistry) => {
       const savedX = useValue(panelX$);
       const savedY = useValue(panelY$);
       const randomVariation = useValue(randomVariation$);
+      const pasteKeepShape = useValue(pasteKeepShape$);
       const roadSnap = useValue(roadSnap$);
       const buildingProps = useValue(buildingProps$);
       const selectionFilters = useValue(selectionFilters$);
@@ -541,14 +543,14 @@ const register = (moduleRegistry) => {
           h(
             "div",
             { className: "copasteChipRow" },
-            chip(t("CHIP_NETWORKS", "Networks"), 64, t("CHIP_NETWORKS_TIP", "Road, path and track nodes and segments — move, rotate, copy and delete; power lines and pipes stay untouched"), "network.svg")
+            chip(t("CHIP_NETWORKS", "Networks"), 64, t("CHIP_NETWORKS_TIP", "Road, path and track nodes and segments. Move, rotate, copy and delete; power lines and pipes stay untouched"), "network.svg")
           ),
           h(
             "div",
             { className: "copasteSubTitleRow" },
             h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, t("SEC_BUILDING_ELEMENTS", "Building elements")),
             withTooltip(
-              t("BUILDING_ELEMENTS_TIP", "When on, selection also reaches elements that belong to buildings — their props, trees, decals and lot surfaces, each following its filter above. Deleting a lot decoration surface also removes what it keeps spawning. When off, nothing building-owned can be selected, not even by click"),
+              t("BUILDING_ELEMENTS_TIP", "When on, selection also reaches elements that belong to buildings, their props, trees, decals and lot surfaces, each following its filter above. Deleting a lot decoration surface also removes what it keeps spawning. When off, nothing building-owned can be selected, not even by click"),
               h(
                 "button",
                 {
@@ -634,6 +636,30 @@ const register = (moduleRegistry) => {
               )
             )
           ),
+          h("div", { className: "copasteSectionTitle copasteSubTitle" }, t("SEC_PASTE_HEIGHT", "Paste height")),
+          withTooltip(
+            t("PASTE_HEIGHT_TIP", "Follow terrain: every prop keeps its height above the ground under it, so a group bends with a slope. Keep shape: the group stays rigid, exactly as copied"),
+            h(
+              "div",
+              { className: "copasteToggleTrack" },
+              h(
+                "div",
+                {
+                  className: "copasteToggleOpt" + (!pasteKeepShape ? " copasteToggleOptActive" : ""),
+                  onClick: () => trigger("copaste", "setPasteKeepShape", false),
+                },
+                t("FOLLOW_TERRAIN", "Follow terrain")
+              ),
+              h(
+                "div",
+                {
+                  className: "copasteToggleOpt" + (pasteKeepShape ? " copasteToggleOptActive" : ""),
+                  onClick: () => trigger("copaste", "setPasteKeepShape", true),
+                },
+                t("KEEP_SHAPE", "Keep shape")
+              )
+            )
+          ),
           // Road snap red samo dok je Buildings filter uključen — da ne buni
           // kod čistog prop kopiranja (snap se ionako pali samo uz zgradu).
 
@@ -643,7 +669,7 @@ const register = (moduleRegistry) => {
                 { className: "copasteSubTitleRow" },
                 h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, t("SEC_ROAD_SNAP", "Road snap")),
                 withTooltip(
-                  t("ROAD_SNAP_TIP", "Pasted buildings snap to the nearest road like normal plopping — the whole group rotates to face it. While snapped, rotation follows the road"),
+                  t("ROAD_SNAP_TIP", "Pasted buildings snap to the nearest road like normal plopping, and the whole group rotates to face it. While snapped, rotation follows the road"),
                   h(
                     "button",
                     {
@@ -704,7 +730,7 @@ const register = (moduleRegistry) => {
               t("SEC_ALIGN_GAP", "Align props") + (alignGapLive > 0 ? " · " + alignGapLive.toFixed(1) + " m" : "")
             ),
             withTooltip(
-              t("GAP_TIP", "Gap in meters for the align tools (empty = auto). Adjusts a live align too — same as [ and ] keys"),
+              t("GAP_TIP", "Gap in meters for the align tools (empty = auto). Adjusts a live align too, same as the [ and ] keys"),
               h(
                 "div",
                 { className: "copasteStepper" },

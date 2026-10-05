@@ -32,6 +32,7 @@ namespace Copaste
         private ValueBinding<int> m_PanelX;
         private ValueBinding<int> m_PanelY;
         private ValueBinding<bool> m_RandomVariation;
+        private ValueBinding<bool> m_PasteKeepShape;
         private ValueBinding<bool> m_RoadSnap;
         private ValueBinding<bool> m_BuildingProps;
         private ValueBinding<bool> m_RelocateReady;
@@ -226,6 +227,19 @@ namespace Copaste
                     Mod.Settings.RandomPasteVariation = random;
                     Mod.Settings.ApplyAndSave();
                     m_RandomVariation.Update(random);
+                }
+            }));
+            AddBinding(m_PasteKeepShape = new ValueBinding<bool>("copaste", "pasteKeepShape", Mod.Settings != null && Mod.Settings.PasteKeepShape));
+            AddBinding(new TriggerBinding<bool>("copaste", "setPasteKeepShape", (keep) =>
+            {
+                if (Mod.Settings != null)
+                {
+                    Mod.Settings.PasteKeepShape = keep;
+                    Mod.Settings.ApplyAndSave();
+                    m_PasteKeepShape.Update(keep);
+
+                    // Preview pod kursorom odmah pređe na novi režim visine.
+                    m_CopasteToolSystem.RefreshPastePreview();
                 }
             }));
             // Line = red (pozicije + rotacije); To prop = red po uzor-propu (pick).

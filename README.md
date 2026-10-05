@@ -70,7 +70,7 @@ with every detail is in [docs/features.md](docs/features.md).
 ### 🎛️ Interface & languages
 
 - **Toolbar button + panel** - a top-left toolbar button toggles the tool; the panel (draggable, remembers its position) shows counters, the selected prop's name, a per-prop list for selections up to 50 (hover rings the prop in the world, click isolates it), align controls and your blueprints
-- **Panel your way** - a **Vanilla theme** option renders the panel in the game's own look, **Panel size** (80–125%) scales the whole panel and a separate **Text size** (90–130%) grows just the lettering
+- **Panel your way** - a **Vanilla theme** option renders the panel in the game's own look, **Panel size** (80-125%) scales the whole panel and a separate **Text size** (90-130%) grows just the lettering
 - **Rebindable hotkeys** - all shortcuts can be changed in Options → Copaste → Key bindings
 - **English, German, French and Serbian** localization - and a **Mod language** option that pins the mod to its own language, independent of the game's
 
@@ -132,14 +132,14 @@ Everything in **Options → Copaste**, on two tabs. Defaults are in bold - the m
 | General → Panel | What it does |
 |---|---|
 | **Panel theme** | **Copaste** (the mod's own look) or **Vanilla** - the panel is drawn inside the game's own panel chrome, so it blends in with the rest of the interface |
-| **Panel size** | Scales the whole panel, 80–125% (**100**) - for 4K screens or if you like it compact |
-| **Text size** | Scales only the lettering, 90–130% (**100**), leaving the panel layout as it is |
+| **Panel size** | Scales the whole panel, 80-125% (**100**) - for 4K screens or if you like it compact |
+| **Text size** | Scales only the lettering, 90-130% (**100**), leaving the panel layout as it is |
 
 | General → Limits | What it does |
 |---|---|
-| **Selection limit** | How many objects one selection may hold: 500–5000 (**1000**). Raise it on a strong machine, lower it if huge selections stutter |
-| **Selection outline limit** | How many selection circles are drawn at once: 100–1000 (**400**). Everything selected stays selected - this only limits the drawing |
-| **Selected props list limit** | Up to how many objects the panel lists by name: 10–100 (**50**) |
+| **Selection limit** | How many objects one selection may hold: 500-5000 (**1000**). Raise it on a strong machine, lower it if huge selections stutter |
+| **Selection outline limit** | How many selection circles are drawn at once: 100-1000 (**400**). Everything selected stays selected - this only limits the drawing |
+| **Selected props list limit** | Up to how many objects the panel lists by name: 10-100 (**50**) |
 
 **Key bindings** is the second tab: every shortcut is rebindable, grouped by purpose (Tool, Clipboard, Editing, Nudge, Align).
 
@@ -196,7 +196,7 @@ This mod stands on the shoulders of the CS2 modding community - it was written f
 
 ### 🍵 Special thanks
 
-A very special thank-you to **[Biffa (Biffa Plays Indie Games)](https://www.youtube.com/@BiffaPlaysCitiesSkylines)** and **[ConflictNerd](https://www.youtube.com/@ConflictNerd)** - simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing! 🍵
+A very special thank-you to **[Biffa (Biffa Plays Indie Games)](https://www.youtube.com/@BiffaPlaysCitiesSkylines)** and **[ConflictNerd](https://www.youtube.com/@ConflictNerd)** - simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. And a special thank-you to **[MikeBuilds](https://www.youtube.com/@Mike_Builds)** for featuring Copaste in his videos. Keep the traffic flowing! 🍵
 
 ## 📄 License
 

@@ -245,6 +245,11 @@ namespace Copaste
         private ProxyAction m_AlignGapMinusAction;
         private float m_PasteHeightBoost;
 
+        // Poslednje vrednosti iz CreatePasteDefinitions, za log pri stampu.
+        private float m_LastPasteBaseDelta;
+        private float m_LastPasteAnchorTerrain;
+        private float m_LastPasteMeanLift;
+
         private enum UndoKind
         {
             Transforms,
@@ -524,6 +529,21 @@ namespace Copaste
             return false;
         }
 
+        // Alat podržava podzemni režim, i to kaže igri. Igrin okrugli
+        // Underground prekidač u toolbaru je ugašen (crn) za svaki alat koji
+        // ovo ne prijavi, a mi podzemni režim imamo (taster U i dugme u
+        // panelu). Sa ovim prekidač ostaje živ, pokazuje naše stanje
+        // (requireUnderground) i klik na njega ide u SetUnderground ispod.
+        public override bool allowUnderground => true;
+
+        public override void SetUnderground(bool underground)
+        {
+            if (m_Mode != Mode.Relocate)
+            {
+                UndergroundMode = underground;
+            }
+        }
+
         public override void InitializeRaycast()
         {
             base.InitializeRaycast();
@@ -619,6 +639,11 @@ namespace Copaste
                     ComponentType.ReadOnly<Game.Creatures.Creature>(),
                     ComponentType.ReadOnly<Owner>(),
 
+                    // Stubovi mosta i nadvožnjaka su deo puta: igra ih sama
+                    // pravi i ponovo gradi na svaki update deonice, pa bi
+                    // pomeren ili obrisan stub ostao kao bajat entitet.
+                    ComponentType.ReadOnly<Game.Objects.Pillar>(),
+
                     // Nevidljivi funkcionalni objekti — nikad nisu meta selekcije.
                     // SpawnLocation NIJE ovde: nose je i klupe/stolice (sedanje) —
                     // nevidljive spawn tačke filtrira IsInvisibleSpawnPoint u skenu.
@@ -706,6 +731,7 @@ namespace Copaste
                     ComponentType.ReadOnly<Game.Objects.Moving>(),
                     ComponentType.ReadOnly<Game.Vehicles.Vehicle>(),
                     ComponentType.ReadOnly<Game.Creatures.Creature>(),
+                    ComponentType.ReadOnly<Game.Objects.Pillar>(),
 
                     // Nevidljivi funkcionalni objekti zgrade: pristupni markeri
                     // (Pedestrian Access Location) i komunalni priključci
@@ -2166,9 +2192,13 @@ namespace Copaste
                 return false;
             }
 
+            // allKeys nosi jedan unos po vrednosti Key enuma, a taster koji
+            // trenutni raspored tastature nema je NULL unos. Od patcha
+            // 1.6.2f1 to se dešava i na običnoj tastaturi, pa je Alt-tap
+            // padao na NullReference čim je pritisnut bilo koji taster.
             foreach (KeyControl key in Keyboard.current.allKeys)
             {
-                if (key.wasPressedThisFrame && key.keyCode != Key.LeftAlt && key.keyCode != Key.RightAlt)
+                if (key != null && key.wasPressedThisFrame && key.keyCode != Key.LeftAlt && key.keyCode != Key.RightAlt)
                 {
                     return true;
                 }
@@ -2390,6 +2420,22 @@ namespace Copaste
 
             bool raycastValid = GetRaycastResult(out Entity raycastEntity, out RaycastHit hit);
             Entity hitEntity = raycastValid && IsCopyable(raycastEntity) ? raycastEntity : Entity.Null;
+
+            // Zrak ume da PROMAŠI objekat koji se lepo vidi. Igra ga u tom
+            // frejmu drži "prekrivenim" (prop nalepljen na put je klasičan
+            // slučaj) i raycast ga preskače, pa je klik na njega padao do
+            // okvira: alat je umesto pomeranja otvarao marquee, a i samo
+            // obeležavanje klikom je radilo tek povremeno. Zato se na klik,
+            // kad zrak ne vrati ništa naše, isti taj zrak geometrijski preseca
+            // sa gabaritima objekata u blizini.
+            // Samo kad je zrak prošao do TLA ili PUTA. Ako je pogodio objekat
+            // koji namerno odbijamo (stub mosta, zgrada uz ugašen čip, vozilo),
+            // korisnik je pokazao na njega i ništa iza ne sme da se izabere.
+            if (hitEntity == Entity.Null && raycastValid && ClickedThisFrame() &&
+                (raycastEntity == Entity.Null || !EntityManager.HasComponent<Game.Objects.Object>(raycastEntity)))
+            {
+                hitEntity = PickObjectByCursorRay(hit.m_HitPosition);
+            }
             // Hover za mreže/ograde: beli obris kandidata pod kursorom.
             UpdateNetHover(raycastValid, hitEntity, hit.m_HitPosition);
 
@@ -2556,10 +2602,7 @@ namespace Copaste
                     m_MarqueeEnd = m_MarqueeStart;
 
                     // Okvir se poravnava sa uglom kamere.
-                    UnityEngine.Camera camera = UnityEngine.Camera.main;
-                    float3 forward = camera != null ? (float3)camera.transform.forward : new float3(0f, 0f, 1f);
-                    m_MarqueeForward = math.normalizesafe(forward.xz, new float2(0f, 1f));
-                    m_MarqueeRight = new float2(m_MarqueeForward.y, -m_MarqueeForward.x);
+                    CameraGroundAxes(out m_MarqueeForward, out m_MarqueeRight);
                 }
             }
 
@@ -3056,6 +3099,7 @@ namespace Copaste
                 m_PostPasteFix = new List<PastedRecord>(m_LastPreview);
                 m_PostPasteFixFrames = 10;
                 m_EmittedNodeMarkers.Clear();
+                Mod.Log.Info($"Copaste: stamp {m_LastPreview.Count} records, height={(PasteKeepShape ? "keep-shape" : "follow-terrain")}, anchorTerrain={m_LastPasteAnchorTerrain:F2}, baseDelta={m_LastPasteBaseDelta:F2}, meanLift={m_LastPasteMeanLift:F2}, boost={m_PasteHeightBoost:F2}");
 
                 // U ovom frejmu upiti vide samo pre-postojeće entitete (novi
                 // nastaju tek posle Apply) — popis "dvojnika" za rezoluciju,
@@ -3369,20 +3413,61 @@ namespace Copaste
             OverlayRenderSystem.Buffer overlayBuffer = m_OverlayRenderSystem.GetBuffer(out JobHandle _);
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
             float baseDelta = GetAnchorHeightDelta(anchor, ref heightData);
+            float anchorTerrain = TerrainUtils.SampleHeight(ref heightData, anchor);
+            float meanLift = ClipboardMeanHeightOffset();
 
             foreach (ClipboardItem item in m_Clipboard)
             {
                 float3 position = anchor + item.m_Offset;
-                position.y = TerrainUtils.SampleHeight(ref heightData, position) + item.m_HeightOffset + baseDelta + m_PasteHeightBoost;
+                position.y = PasteHeight(item, position, anchorTerrain, baseDelta, meanLift, ref heightData);
                 overlayBuffer.DrawCircle(kPasteColor, default, 0.25f, 0, new float2(0f, 1f), position, item.m_Diameter);
             }
         }
 
-        // Ako je anchor na putu/stazi (iznad terena), cela grupa se podiže na tu površinu.
+        // Ako je sidro na mostu ili uzdignutom putu, cela grupa se podiže na
+        // tu površinu. Prag od jednog metra: trotoar i kolovoz su ispod njega,
+        // jer visina propa iznad terena već sadrži podlogu na kojoj je stajao,
+        // pa bi trotoar sa izvora i trotoar sa cilja ušli u račun dva puta i
+        // grupa bi ostala da lebdi.
         private float GetAnchorHeightDelta(float3 anchor, ref TerrainHeightData heightData)
         {
             float delta = anchor.y - TerrainUtils.SampleHeight(ref heightData, anchor);
-            return delta < 0.1f ? 0f : delta;
+            return delta < 1f ? 0f : delta;
+        }
+
+        private static bool PasteKeepShape => Mod.Settings != null && Mod.Settings.PasteKeepShape;
+
+        // Visina nalepljenog propa. "Prati teren": svaki prop drži svoju visinu
+        // iznad terena pod sobom, pa grupa na kosini prati tlo. "Drži oblik":
+        // teren se uzorkuje jednom, na sidru, i grupa ostaje kruta kakva je
+        // kopirana. Visina grupe iznad tla je prosek pojedinačnih visina, a
+        // oblik nosi puni 3D ofset od centroida, koji blueprint ionako čuva,
+        // pa format fajla ostaje isti.
+        private float PasteHeight(ClipboardItem item, float3 position, float anchorTerrain, float baseDelta, float meanLift, ref TerrainHeightData heightData)
+        {
+            float lift = baseDelta + m_PasteHeightBoost;
+            if (PasteKeepShape)
+            {
+                return anchorTerrain + meanLift + item.m_Offset.y + lift;
+            }
+
+            return TerrainUtils.SampleHeight(ref heightData, position) + item.m_HeightOffset + lift;
+        }
+
+        private float ClipboardMeanHeightOffset()
+        {
+            if (m_Clipboard.Count == 0)
+            {
+                return 0f;
+            }
+
+            float sum = 0f;
+            foreach (ClipboardItem item in m_Clipboard)
+            {
+                sum += item.m_HeightOffset;
+            }
+
+            return sum / m_Clipboard.Count;
         }
 
         private float GetDiameter(Entity entity)
@@ -3618,6 +3703,11 @@ namespace Copaste
             TerrainHeightData heightData = m_TerrainSystem.GetHeightData();
             Unity.Mathematics.Random random = RandomSeed.Next().GetRandom(0);
             float baseDelta = GetAnchorHeightDelta(anchor, ref heightData);
+            float anchorTerrain = TerrainUtils.SampleHeight(ref heightData, anchor);
+            float meanLift = ClipboardMeanHeightOffset();
+            m_LastPasteBaseDelta = baseDelta;
+            m_LastPasteAnchorTerrain = anchorTerrain;
+            m_LastPasteMeanLift = meanLift;
             m_LastPreview.Clear();
 
             // "Original" izgled: nalepljeni prop preuzima seed (boju/varijaciju) i
@@ -3627,7 +3717,7 @@ namespace Copaste
             foreach (ClipboardItem item in m_Clipboard)
             {
                 float3 position = anchor + item.m_Offset;
-                position.y = TerrainUtils.SampleHeight(ref heightData, position) + item.m_HeightOffset + baseDelta + m_PasteHeightBoost;
+                position.y = PasteHeight(item, position, anchorTerrain, baseDelta, meanLift, ref heightData);
                 m_LastPreview.Add(new PastedRecord
                 {
                     m_Prefab = item.m_Prefab,
@@ -3665,7 +3755,10 @@ namespace Copaste
                 definition.m_PrefabSubIndex = -1;
                 definition.m_Scale = 1f;
                 definition.m_Intensity = 1f;
-                definition.m_Elevation = math.max(0f, item.m_HeightOffset + baseDelta + m_PasteHeightBoost);
+                // Elevacija je uvek prema terenu pod samim propom, u oba režima:
+                // to je vrednost koja prop drži u vazduhu kad igra sledeći put
+                // proveri gde stoji.
+                definition.m_Elevation = math.max(0f, position.y - TerrainUtils.SampleHeight(ref heightData, position));
                 definition.m_Age = 0.5f;
 
                 buffer.AddComponent(definitionEntity, creation);
@@ -3764,6 +3857,97 @@ namespace Copaste
             transforms.Dispose();
         }
 
+        // Presek zraka kamere sa gabaritom objekta — rezerva za slučaj kad
+        // igrin raycast ne vidi objekat koji je na ekranu. Zrak je isti onaj
+        // koji je pogodio tlo: od kamere do tačke pogotka, produžen za dva
+        // metra da uđe i ono što stoji tačno na tlu. Sve iza tačke pogotka
+        // ostaje van dometa, pa se ne bira nešto sakriveno iza brda.
+        private Entity PickObjectByCursorRay(float3 groundHit)
+        {
+            UnityEngine.Camera camera = UnityEngine.Camera.main;
+            if (camera == null || !(SelectProps || SelectTrees || SelectDecals))
+            {
+                return Entity.Null;
+            }
+
+            float3 origin = camera.transform.position;
+            float3 toHit = groundHit - origin;
+            float length = math.length(toHit);
+            if (length < 1f)
+            {
+                return Entity.Null;
+            }
+
+            Line3.Segment segment = default;
+            segment.a = origin;
+            segment.b = origin + ((toHit / length) * (length + 2f));
+
+            Entity best = Entity.Null;
+            float bestT = 2f;
+            ScanCursorRay(m_PropQuery, segment, groundHit, ref best, ref bestT);
+
+            // I propovi u tuđem vlasništvu: ulični mobilijar pripada putu ili
+            // čvoru, a klikom se bira i kad je "Building elements" ugašen —
+            // IsCopyable propušta samo ono što čipovi dozvoljavaju.
+            ScanCursorRay(m_OwnedPropQuery, segment, groundHit, ref best, ref bestT);
+            if (best != Entity.Null)
+            {
+                string pickedName = EntityManager.TryGetComponent(best, out PrefabRef pickedPrefab) &&
+                    m_PrefabSystem.TryGetPrefab(pickedPrefab.m_Prefab, out PrefabBase pickedBase)
+                        ? pickedBase.name
+                        : $"e{best.Index}";
+                Mod.Log.Info($"Copaste: click resolved by bounds ray -> '{pickedName}' (game ray returned nothing selectable)");
+            }
+
+            return best;
+        }
+
+        private void ScanCursorRay(EntityQuery query, Line3.Segment segment, float3 groundHit, ref Entity best, ref float bestT)
+        {
+            NativeArray<Entity> entities = query.ToEntityArray(Allocator.Temp);
+            NativeArray<Game.Objects.Transform> transforms = query.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp);
+            NativeArray<PrefabRef> prefabRefs = query.ToComponentDataArray<PrefabRef>(Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                // Gruba odbrana prvo: upit pokriva SVE objekte na mapi, a
+                // presek i IsCopyable su skupi po entitetu.
+                if (math.distance(transforms[i].m_Position, groundHit) > 40f ||
+                    !EntityManager.TryGetComponent(prefabRefs[i].m_Prefab, out ObjectGeometryData geometry))
+                {
+                    continue;
+                }
+
+                // Drveće i rastinje se ne hvata rezervom: gabarit krošnje je
+                // mnogo veći od lišća, pa bi klik na prazno tlo pored drveta
+                // birao drvo. Igrin zrak njih ionako pogađa, rezerva je za
+                // propove koje on preskače.
+                if (EntityManager.HasComponent<Game.Objects.Tree>(entities[i]) ||
+                    EntityManager.HasComponent<Game.Objects.Plant>(entities[i]))
+                {
+                    continue;
+                }
+
+                // Gabarit je u lokalnom sistemu objekta, pa se zrak prebacuje u njega.
+                quaternion inverse = math.inverse(transforms[i].m_Rotation);
+                Line3.Segment local = default;
+                local.a = math.mul(inverse, segment.a - transforms[i].m_Position);
+                local.b = math.mul(inverse, segment.b - transforms[i].m_Position);
+                if (!MathUtils.Intersect(geometry.m_Bounds, local, out float2 t) ||
+                    t.x >= bestT ||
+                    !IsCopyable(entities[i]))
+                {
+                    continue;
+                }
+
+                best = entities[i];
+                bestT = t.x;
+            }
+
+            entities.Dispose();
+            transforms.Dispose();
+            prefabRefs.Dispose();
+        }
+
         private Entity CyclePick(float3 point, Entity topHit)
         {
             List<Entity> candidates = new List<Entity>();
@@ -3837,6 +4021,7 @@ namespace Copaste
             if (!IsCategoryEnabled(entity)) reasons.Add("category chip off for its type");
             if (EntityManager.HasComponent<Game.Buildings.Extension>(entity)) reasons.Add("Extension");
             if (EntityManager.HasComponent<Game.Vehicles.Vehicle>(entity)) reasons.Add("Vehicle");
+            if (EntityManager.HasComponent<Game.Objects.Pillar>(entity)) reasons.Add("Pillar (structural part of a road)");
             if (EntityManager.HasComponent<Game.Objects.Moving>(entity)) reasons.Add("Moving");
             if (EntityManager.HasComponent<Game.Creatures.Creature>(entity)) reasons.Add("Creature");
             if (!SelectBuildingProps && IsOwnedByBuilding(entity)) reasons.Add("building-owned (Building elements off)");
@@ -3858,6 +4043,8 @@ namespace Copaste
                 IsCategoryEnabled(entity) &&
                 !EntityManager.HasComponent<Game.Buildings.Extension>(entity) &&
                 !EntityManager.HasComponent<Game.Vehicles.Vehicle>(entity) &&
+                // Stub mosta pripada putu koji ga ponovo gradi na svaki update.
+                !EntityManager.HasComponent<Game.Objects.Pillar>(entity) &&
                 !EntityManager.HasComponent<Game.Objects.Moving>(entity) &&
                 // Cim koji STOJI nema Moving — živa bića se nikad ne selektuju.
                 !EntityManager.HasComponent<Game.Creatures.Creature>(entity) &&
@@ -6115,14 +6302,36 @@ namespace Copaste
                 return float3.zero;
             }
 
-            UnityEngine.Camera camera = UnityEngine.Camera.main;
-            float3 cameraForward = camera != null ? (float3)camera.transform.forward : new float3(0f, 0f, 1f);
-            float2 forward = math.normalizesafe(cameraForward.xz, new float2(0f, 1f));
-            float2 right = new float2(forward.y, -forward.x);
+            CameraGroundAxes(out float2 forward, out float2 right);
 
             float speed = 1f * UnityEngine.Time.deltaTime;
             float2 delta = ((right * x) + (forward * z)) * speed;
             return new float3(delta.x, 0f, delta.y);
+        }
+
+        // Ose ekrana projektovane na tlo (napred = ka vrhu ekrana, desno =
+        // ka desnoj ivici). Ne izvode se iz forward-a kamere: kad kamera
+        // gleda skoro pravo nadole, njegova xz projekcija je skoro nula i
+        // pravac joj je šum, pa su okvir i pomeranje strelicama stajali pod
+        // nasumičnim uglom. Desno kamere je uvek vodoravno (kamera nema
+        // valjanje), pa je pouzdano pri svakom nagibu; napred je normala na
+        // njega, sa istim smerom kakav daje i forward kad ga ima.
+        private static void CameraGroundAxes(out float2 forward, out float2 right)
+        {
+            UnityEngine.Camera camera = UnityEngine.Camera.main;
+            float2 cameraRight = camera != null ? ((float3)camera.transform.right).xz : new float2(1f, 0f);
+            if (math.lengthsq(cameraRight) < 1e-4f)
+            {
+                // Rezerva: forward i up kamere leže u istoj vertikalnoj ravni,
+                // pa je njihov zbir u xz uvek bar jedinične dužine.
+                float3 cameraForward = camera != null ? (float3)camera.transform.forward : new float3(0f, 0f, 1f);
+                float3 cameraUp = camera != null ? (float3)camera.transform.up : new float3(0f, 1f, 0f);
+                float2 heading = math.normalizesafe(cameraForward.xz + cameraUp.xz, new float2(0f, 1f));
+                cameraRight = new float2(heading.y, -heading.x);
+            }
+
+            right = math.normalizesafe(cameraRight, new float2(1f, 0f));
+            forward = new float2(-right.y, right.x);
         }
 
         private bool AnyNudgePressedThisFrame()

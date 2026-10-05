@@ -73,7 +73,7 @@ Copaste started as a personal tool and grew into this release. It was written fr
 - The **CS2 modding community** for keeping their mods open source
 
 ### Special thanks
-A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNerd**, simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. Keep the traffic flowing!</LongDescription>
+A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNerd**, simply for being the author's favorite Cities: Skylines YouTubers and the reason this game never gets boring. And a special thank-you to **MikeBuilds** (youtube.com/@Mike_Builds) for featuring Copaste in his videos. Keep the traffic flowing!</LongDescription>
  <Thumbnail Value="Properties/Thumbnail.png" />
  <Screenshot Value="Properties/Screenshots/s1.jpg" />
  <Screenshot Value="Properties/Screenshots/s2.jpg" />
@@ -87,12 +87,18 @@ A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNe
  <Screenshot Value="Properties/Screenshots/s10.jpg" />
  <Tag Value="Code Mod" />
  <ForumLink Value="https://forum.paradoxplaza.com/forum/threads/copaste-1-1-0-copy-paste-for-props-and-now-buildings.1938698/" />
- <ModVersion Value="1.2.1" />
+ <ModVersion Value="1.2.2" />
  <GameVersion Value="1.6.*" />
- <ChangeLog>Fixes for the Fences &amp; Networks update. Hand-tested in game before publishing.
+ <ChangeLog>Fixes after the Autumn Breeze game patch, hand-tested in game before publishing.
 
-- Moving a node on an elevated road no longer splits it. The height of an elevated road is a property of the road, not of the ground beneath it; dragging a node across a slope used to carry the bridge along with the terrain, which left a step at the joint - and traffic would not cross that step. Ground-level roads still follow the terrain as before
-- A joint at the far end of a moved segment is now rebuilt together with every road meeting it, so a road you did not touch can no longer keep an outdated joint shape</ChangeLog>
+- New Paste height switch in the Clipboard card. Follow terrain (default) keeps every prop at its own height above the ground, so a group bends with a slope. Keep shape pastes the group rigid, exactly as copied, which is what a walkway or an overpass built from props needs
+- Props on roads that the game hides from its own cursor ray (a parked-vehicle prop, furniture placed over the asphalt) can now be clicked and dragged reliably
+- Bridge supports and pillars are no longer selectable. They belong to the road, which rebuilds them on every update, so moving or deleting one left a stale entity behind
+- Pasting a group onto a sidewalk no longer lifts it by the sidewalk height on top of the height it already carried
+- Tapping Alt with a road node selected no longer resets the tool on game version 1.6.2
+- The game's own Underground toggle in the toolbar stays available while Copaste is active and switches Copaste's underground mode, the same as the U key and the panel button
+- The selection box and the arrow-key nudge keep their screen alignment when the camera looks straight down
+- A copied suspension bridge comes out as one bridge again. Pasted bridges and elevated roads are divided the way the game's own road tool divides them, and a bridge built from the game's span pattern is copied, and restored by undo, as the single course it was built from. A bridge whose nodes were moved by hand is still divided piece by piece</ChangeLog>
  <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
  <ExternalLink Type="discord" Url="https://discord.gg/HTav7ARPs2" />
  <ExternalLink Type="kofi" Url="https://ko-fi.com/viktorsx" />

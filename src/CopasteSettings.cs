@@ -184,6 +184,11 @@ namespace Copaste
         [SettingsUIHidden]
         public bool RandomPasteVariation { get; set; } = false;
 
+        // Visina paste-a: false = svaki prop prati teren pod sobom,
+        // true = grupa ostaje kruta kakva je kopirana (teren samo na sidru).
+        [SettingsUIHidden]
+        public bool PasteKeepShape { get; set; } = false;
+
         // Zgrade u selekciji (v1.1 "Buildings"): kad je uključeno, klik/marquee/Ctrl+klik
         // biraju i zgrade — copy/paste/blueprint rade, transformacije ih preskaču (faza 2).
         // Selection filteri (panel kartica "Selection"): svaka kategorija se
@@ -240,6 +245,7 @@ namespace Copaste
             PanelX = -1;
             PanelY = -1;
             RandomPasteVariation = false;
+            PasteKeepShape = false;
             SelectProps = true;
             SelectTrees = true;
             SelectDecals = true;

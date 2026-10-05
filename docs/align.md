@@ -10,7 +10,7 @@ undo record (positions *and* rotations) and start a **live align session**.
 1. The line is defined by the two props of the selection that are farthest
    apart (ground-plane distance).
 2. Every prop is projected onto that line and redistributed with **equal
-   gaps** — the stepper value if set, otherwise spread evenly between the two
+   gaps** - the stepper value if set, otherwise spread evenly between the two
    end props.
 3. All props are rotated to the **same orientation, perpendicular to the
    line**, choosing the side most props already face (a row of benches doesn't
@@ -19,7 +19,7 @@ undo record (positions *and* rotations) and start a **live align session**.
 ## To prop (reference pick)
 
 Click the button (it lights up, the hint bar changes), then click a reference
-prop — which may or may not be part of the selection:
+prop - which may or may not be part of the selection:
 
 - the row passes through the reference prop, extending along its **right
   axis** (props line up side by side relative to the way it faces),
@@ -35,7 +35,7 @@ the armed state auto-clears if the selection empties.
 
 Distributes the selection evenly on a circle around the selection centroid,
 preserving the current angular order (props keep their neighbors). The radius
-comes from the average distance to the centroid, or — when a gap is set — from
+comes from the average distance to the centroid, or - when a gap is set - from
 `radius = gap · count / 2π`, i.e. the gap is the **arc distance** between
 props. Requires 3+ props. Circle does not change rotations.
 
@@ -43,7 +43,7 @@ props. Requires 3+ props. Circle does not change rotations.
 
 After Line / To prop / Circle, the session stays active until the selection is
 touched (click, marquee, move, rotate, nudge, delete, filter, undo, paste mode,
-tool off — all end it via `EndAlignSession()`):
+tool off - all end it via `EndAlignSession()`):
 
 - the originating button glows (`alignSessionSource`: 1 = Line, 2 = To prop,
   3 = Circle) and the section header shows the current gap ("Align · 4.5 m"),
@@ -68,7 +68,7 @@ The minimum gap everywhere is 0.1 m (initial) and the adjustment step is
 ## Interaction with per-prop rotation
 
 Alt+mouse-wheel spinning (see [tool-system.md](tool-system.md#rotation)) does
-**not** end the align session — a common flow is: Line → Alt+wheel to angle all
+**not** end the align session - a common flow is: Line → Alt+wheel to angle all
 props → `]` to widen the row.
 
 ## Gotchas

@@ -182,6 +182,11 @@ namespace Copaste
             public bool m_HasUpgrade;
             public CompositionFlags m_Upgrade;
 
+            // Element obrasca prefaba (Game.Net.Fixed): lanac takvih snimaka se
+            // vraća kao jedan kurs, kako je i nastao.
+            public bool m_HasFixed;
+            public int m_FixedIndex;
+
             // Krajnji čvorovi: ako prežive brisanje, rekreirana deonica se
             // KAČI na njih (inače bi nastao dvojnik i saobraćaj ne bi prošao).
             // Njihova elevacija je zasebna od elevacije ivice — ivica nosi
@@ -1661,6 +1666,450 @@ namespace Copaste
             MarkNetEdgesAndFarNodes(moving);
         }
 
+        // Deonice iz OBRASCA prefaba (viseći most: prilaz, raspon, prilaz)
+        // nose Game.Net.Fixed sa indeksom elementa. Igra ih je napravila iz
+        // JEDNOG kursa koji je obrazac isekao na elemente. Kad bi svaki
+        // element išao kao svoj kurs, obrazac bi ga isekao ponovo i kopija
+        // bi dobila pilon na svakom rezu. Zato se lanac takvih deonica
+        // sastavi nazad u roditeljsku krivu i ide kao jedan kurs, pa ga
+        // obrazac iseče isto kao original. Elementi su podkrive jedne kubne
+        // krive (igra ih seče iz nje), pa se roditelj rekonstruiše tačno; ako
+        // provera ostatka padne (lanac nije iz jednog kursa, ili je ručno
+        // savijan), deonice ostaju pojedinačne.
+        private void MergeFixedChains(List<Entity> edges, float3 centroid, float centroidTerrain, Dictionary<Entity, int> nodeIndices, HashSet<Entity> consumed)
+        {
+            List<Entity> fixedEdges = new List<Entity>();
+            foreach (Entity edge in edges)
+            {
+                if (EntityManager.HasComponent<Game.Net.Fixed>(edge) &&
+                    EntityManager.HasComponent<Game.Net.Edge>(edge) &&
+                    EntityManager.HasComponent<Game.Net.Curve>(edge) &&
+                    EntityManager.HasComponent<PrefabRef>(edge))
+                {
+                    fixedEdges.Add(edge);
+                }
+            }
+
+            if (fixedEdges.Count < 2)
+            {
+                return;
+            }
+
+            Dictionary<Entity, List<Entity>> byNode = new Dictionary<Entity, List<Entity>>();
+            foreach (Entity edge in fixedEdges)
+            {
+                Game.Net.Edge edgeData = EntityManager.GetComponentData<Game.Net.Edge>(edge);
+                AddFixedAdjacency(byNode, edgeData.m_Start, edge);
+                AddFixedAdjacency(byNode, edgeData.m_End, edge);
+            }
+
+            HashSet<Entity> visited = new HashSet<Entity>();
+            List<Entity> chainEdges = new List<Entity>();
+            List<Bezier4x3> pieces = new List<Bezier4x3>();
+            List<int> pieceIndices = new List<int>();
+            foreach (Entity seed in fixedEdges)
+            {
+                if (visited.Contains(seed))
+                {
+                    continue;
+                }
+
+                Entity prefab = EntityManager.GetComponentData<PrefabRef>(seed).m_Prefab;
+
+                // Unazad do slobodnog kraja lanca.
+                Entity edge = seed;
+                Entity node = EntityManager.GetComponentData<Game.Net.Edge>(seed).m_Start;
+                for (int guard = 0; guard < 512; guard++)
+                {
+                    Entity previous = FixedNeighbor(byNode, node, edge, prefab);
+                    if (previous == Entity.Null || previous == seed)
+                    {
+                        break;
+                    }
+
+                    node = OtherEdgeEnd(previous, node);
+                    edge = previous;
+                }
+
+                // Unapred, sa orijentacijom svake krive duž lanca.
+                Entity chainStart = node;
+                Entity chainEnd = node;
+                chainEdges.Clear();
+                pieces.Clear();
+                pieceIndices.Clear();
+                for (int guard = 0; guard < 512; guard++)
+                {
+                    Game.Net.Edge edgeData = EntityManager.GetComponentData<Game.Net.Edge>(edge);
+                    Bezier4x3 bezier = EntityManager.GetComponentData<Game.Net.Curve>(edge).m_Bezier;
+                    Entity endNode;
+                    if (edgeData.m_Start == node)
+                    {
+                        endNode = edgeData.m_End;
+                    }
+                    else if (edgeData.m_End == node)
+                    {
+                        endNode = edgeData.m_Start;
+                        bezier = new Bezier4x3(bezier.d, bezier.c, bezier.b, bezier.a);
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    visited.Add(edge);
+                    chainEdges.Add(edge);
+                    pieces.Add(bezier);
+                    pieceIndices.Add(EntityManager.GetComponentData<Game.Net.Fixed>(edge).m_Index);
+                    chainEnd = endNode;
+
+                    Entity next = FixedNeighbor(byNode, endNode, edge, prefab);
+                    if (next == Entity.Null || visited.Contains(next))
+                    {
+                        break;
+                    }
+
+                    node = endNode;
+                    edge = next;
+                }
+
+                if (pieces.Count < 2)
+                {
+                    continue;
+                }
+
+                // Smer obrasca = rastući indeks elementa.
+                if (pieceIndices[0] > pieceIndices[pieceIndices.Count - 1])
+                {
+                    pieces.Reverse();
+                    chainEdges.Reverse();
+                    for (int i = 0; i < pieces.Count; i++)
+                    {
+                        Bezier4x3 piece = pieces[i];
+                        pieces[i] = new Bezier4x3(piece.d, piece.c, piece.b, piece.a);
+                    }
+
+                    Entity swap = chainStart;
+                    chainStart = chainEnd;
+                    chainEnd = swap;
+                }
+
+                // Prvo tačna rekonstrukcija (elementi iz jedne krive). Ako je
+                // most posle gradnje savijan pomeranjem čvorova, elementi više
+                // nisu iz jedne krive, pa se kroz lanac provuče jedna kubna
+                // kriva najmanjih kvadrata sa istim krajevima i tangentama:
+                // piloni tada sedaju gde ih obrazac stavi, ali most ostaje
+                // jedan most, a ne niz kratkih rezova sa pilonom na svakom.
+                string how;
+                if (TryReconstructParentCurve(pieces, out Bezier4x3 parent, out float residual))
+                {
+                    how = "exact";
+                }
+                else if (TryFitChainCurve(pieces, out parent, out residual))
+                {
+                    how = "least-squares fit";
+                }
+                else
+                {
+                    Mod.Log.Info($"Copaste: fixed-pattern chain of {pieces.Count} pieces kept separate (residual {residual:F2} m)");
+                    continue;
+                }
+
+                Mod.Log.Info($"Copaste: fixed-pattern chain of {pieces.Count} pieces merged into one course ({how}, residual {residual:F3} m, length {MathUtils.Length(parent):F1} m)");
+
+                CompositionFlags upgradeFlags = CaptureNetUpgrade(chainEdges[0], out bool hasUpgrade);
+                float2[] offsets = new float2[4];
+                float[] heights = new float[4];
+                for (int k = 0; k < 4; k++)
+                {
+                    float3 point = GetBezierPoint(parent, k);
+                    offsets[k] = point.xz - centroid.xz;
+                    heights[k] = point.y - centroidTerrain;
+                }
+
+                foreach (Entity chainEdge in chainEdges)
+                {
+                    consumed.Add(chainEdge);
+                }
+
+                m_ClipboardNetEdges.Add(new NetEdgeClipboardItem
+                {
+                    m_Prefab = prefab,
+                    m_CurveOffsets = offsets,
+                    m_HeightOffsets = heights,
+                    m_HasUpgrade = hasUpgrade,
+                    m_Upgrade = upgradeFlags,
+                    m_StartNodeIndex = CaptureNetNode(chainStart, centroid, centroidTerrain, nodeIndices),
+                    m_EndNodeIndex = CaptureNetNode(chainEnd, centroid, centroidTerrain, nodeIndices),
+                });
+            }
+        }
+
+        private static void AddFixedAdjacency(Dictionary<Entity, List<Entity>> byNode, Entity node, Entity edge)
+        {
+            if (!byNode.TryGetValue(node, out List<Entity> list))
+            {
+                list = new List<Entity>();
+                byNode[node] = list;
+            }
+
+            list.Add(edge);
+        }
+
+        // Sused u lancu: čvor deli TAČNO dve deonice obrasca istog prefaba.
+        private Entity FixedNeighbor(Dictionary<Entity, List<Entity>> byNode, Entity node, Entity edge, Entity prefab)
+        {
+            if (!byNode.TryGetValue(node, out List<Entity> list) || list.Count != 2)
+            {
+                return Entity.Null;
+            }
+
+            Entity other = list[0] == edge ? list[1] : list[0];
+            if (other == edge || EntityManager.GetComponentData<PrefabRef>(other).m_Prefab != prefab)
+            {
+                return Entity.Null;
+            }
+
+            return other;
+        }
+
+        private Entity OtherEdgeEnd(Entity edge, Entity node)
+        {
+            Game.Net.Edge edgeData = EntityManager.GetComponentData<Game.Net.Edge>(edge);
+            return edgeData.m_Start == node ? edgeData.m_End : edgeData.m_Start;
+        }
+
+        // Elementi su podkrive jedne kubne krive Q: prvi element pokriva
+        // parametar [0, s]. Iz njegovih kontrolnih tačaka se Q izvodi za
+        // svako s (obrnuti de Casteljau), a pravo s je ono za koje Q(1)
+        // padne na kraj lanca. Traži se u ravni xz; visine Q ionako ponovo
+        // uzorkuje igra. Provera: svaki element mora da bude podkriva Q na
+        // svom parametarskom opsegu.
+        private static bool TryReconstructParentCurve(List<Bezier4x3> pieces, out Bezier4x3 parent, out float residual)
+        {
+            Bezier4x3 first = pieces[0];
+            float3 chainEnd = pieces[pieces.Count - 1].d;
+            parent = first;
+            residual = float.MaxValue;
+
+            // Dužina lanca = zbir elemenata. Produžetak prvog elementa na
+            // [0, 1/s] je utoliko duži što je s manje, pa se s bira tako da
+            // dužina produžene krive bude tačno dužina lanca (bisekcija po
+            // monotonoj funkciji). Kraj krive se tek onda proverava: prava
+            // deonica je podkriva SVAKE duže kolinearne krive, pa sama
+            // provera ostatka ne bi razlikovala pravu dužinu od pogrešne.
+            float chainLength = 0f;
+            foreach (Bezier4x3 piece in pieces)
+            {
+                chainLength += MathUtils.Length(piece);
+            }
+
+            if (chainLength < 1f)
+            {
+                return false;
+            }
+
+            float low = 0.02f;
+            float high = 1f;
+            for (int i = 0; i < 80; i++)
+            {
+                float mid = (low + high) * 0.5f;
+                float length = MathUtils.Length(ExtendFirstPiece(first, mid));
+                if (length > chainLength)
+                {
+                    low = mid;
+                }
+                else
+                {
+                    high = mid;
+                }
+            }
+
+            float bestFit = (low + high) * 0.5f;
+            Bezier4x3 candidateParent = ExtendFirstPiece(first, bestFit);
+            float endError = math.distance(candidateParent.d.xz, chainEnd.xz);
+            if (endError > 0.25f)
+            {
+                residual = endError;
+                return false;
+            }
+
+            // Ostatak: kontrolne tačke svakog elementa naspram podkrive Q.
+            float worst = endError;
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                Bezier4x3 piece = pieces[i];
+                MathUtils.Distance(candidateParent, piece.a, out float t0);
+                MathUtils.Distance(candidateParent, piece.d, out float t1);
+                if (t1 <= t0)
+                {
+                    return false;
+                }
+
+                Bezier4x3 sub = MathUtils.Cut(candidateParent, new float2(t0, t1));
+                worst = math.max(worst, math.distance(sub.a.xz, piece.a.xz));
+                worst = math.max(worst, math.distance(sub.b.xz, piece.b.xz));
+                worst = math.max(worst, math.distance(sub.c.xz, piece.c.xz));
+                worst = math.max(worst, math.distance(sub.d.xz, piece.d.xz));
+            }
+
+            residual = worst;
+            if (worst > 0.5f)
+            {
+                return false;
+            }
+
+            // Krajevi sedaju tačno na krajeve lanca (parametarski šum).
+            candidateParent.a = first.a;
+            candidateParent.d = chainEnd;
+            parent = candidateParent;
+            return true;
+        }
+
+        // Jedna kubna kriva kroz ceo lanac: krajevi tačni, smerovi tangenti
+        // iz prvog i poslednjeg elementa, a dužine tangenti iz najmanjih
+        // kvadrata nad uzorcima duž lanca (parametar po dužini tetive, pa
+        // jedno doterivanje parametra projekcijom). Ostatak je najveće
+        // odstupanje spojeva elemenata od krive.
+        private static bool TryFitChainCurve(List<Bezier4x3> pieces, out Bezier4x3 parent, out float residual)
+        {
+            parent = pieces[0];
+            residual = float.MaxValue;
+
+            float3 start = pieces[0].a;
+            float3 end = pieces[pieces.Count - 1].d;
+
+            // Uzorci duž lanca sa kumulativnom dužinom.
+            List<float3> samples = new List<float3>();
+            List<float> lengths = new List<float>();
+            float total = 0f;
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                Bezier4x3 piece = pieces[i];
+                float pieceLength = MathUtils.Length(piece);
+                for (int k = (i == 0 ? 0 : 1); k <= 8; k++)
+                {
+                    float t = k / 8f;
+                    samples.Add(MathUtils.Position(piece, t));
+                    lengths.Add(total + MathUtils.Length(piece, new Bounds1(0f, t)));
+                }
+
+                total += pieceLength;
+            }
+
+            if (total < 1f)
+            {
+                return false;
+            }
+
+            float[] u = new float[samples.Count];
+            for (int i = 0; i < samples.Count; i++)
+            {
+                u[i] = lengths[i] / total;
+            }
+
+            // Najmanji kvadrati po OBE unutrašnje kontrolne tačke (krajevi
+            // fiksni): ista 2x2 matrica za x i z. Smerovi na krajevima su
+            // slobodni, jer se savijen most najčešće izvije u sredini dok mu
+            // krajevi ostanu pravi, a to kriva sa fiksiranim smerovima ne može.
+            for (int pass = 0; pass < 4; pass++)
+            {
+                float c11 = 0f;
+                float c12 = 0f;
+                float c22 = 0f;
+                float2 x1 = float2.zero;
+                float2 x2 = float2.zero;
+                for (int i = 0; i < samples.Count; i++)
+                {
+                    float ui = u[i];
+                    float vi = 1f - ui;
+                    float b0 = vi * vi * vi;
+                    float b1 = 3f * ui * vi * vi;
+                    float b2 = 3f * ui * ui * vi;
+                    float b3 = ui * ui * ui;
+                    float2 rest = samples[i].xz - (start.xz * b0) - (end.xz * b3);
+                    c11 += b1 * b1;
+                    c12 += b1 * b2;
+                    c22 += b2 * b2;
+                    x1 += rest * b1;
+                    x2 += rest * b2;
+                }
+
+                float det = (c11 * c22) - (c12 * c12);
+                if (math.abs(det) <= 1e-6f)
+                {
+                    return false;
+                }
+
+                float2 b = ((x1 * c22) - (x2 * c12)) / det;
+                float2 c = ((x2 * c11) - (x1 * c12)) / det;
+                parent = new Bezier4x3(
+                    start,
+                    new float3(b.x, math.lerp(start.y, end.y, 1f / 3f), b.y),
+                    new float3(c.x, math.lerp(start.y, end.y, 2f / 3f), c.y),
+                    end);
+
+                // Doterivanje parametra: svaki uzorak na svoju najbližu tačku.
+                for (int i = 0; i < samples.Count; i++)
+                {
+                    MathUtils.Distance(parent, samples[i], out float nearest);
+                    u[i] = nearest;
+                }
+            }
+
+            float worst = 0f;
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                worst = math.max(worst, MathUtils.Distance(parent, pieces[i].a, out float _));
+                worst = math.max(worst, MathUtils.Distance(parent, MathUtils.Position(pieces[i], 0.5f), out float _));
+                worst = math.max(worst, MathUtils.Distance(parent, pieces[i].d, out float _));
+            }
+
+            // Prag od 12 m: most sa jednim izbočenim čvorom (~20 m van tetive)
+            // fit promaši u sredini za ~9 m, a to je i dalje jedan most, dok
+            // bi odbijanje dalo pilon na svakom rezu. Preko toga ostaje
+            // deonica po deonici, uz ispis geometrije u log.
+            residual = worst;
+            return worst <= 12f;
+        }
+
+        // Kriva čiji je prvi deo [0, s] jednak datoj podkrivi.
+        private static Bezier4x3 ExtendFirstPiece(Bezier4x3 piece, float s)
+        {
+            float3 q0 = piece.a;
+            float3 q1 = q0 + ((piece.b - q0) / s);
+            float3 q2 = (2f * q1) - q0 + ((piece.c - q0 - (2f * s * (q1 - q0))) / (s * s));
+            float u = 1f - s;
+            float3 q3 = (piece.d - (u * u * u * q0) - (3f * u * u * s * q1) - (3f * u * s * s * q2)) / (s * s * s);
+            return new Bezier4x3(q0, q1, q2, q3);
+        }
+
+        // Nadogradnje izvorne deonice za klipbord i undo snimak, uz jednu
+        // dopunu: ako je izvor UZDIGNUT (kompozicija ivice nosi Elevated),
+        // ta zastavica ide u nadogradnje. Igra odluku "uzdignuto ili ne"
+        // donosi sama, iz krive i terena, i uzdignutim proglašava tek kurs
+        // koji je bar dva praga (m_ElevationLimit) iznad tla. Deonica koja je
+        // posle gradnje spuštena ili stoji tek malo iznad praga tu ne prolazi,
+        // pa bi kopija bila sečena kao prizemni put, na kratke komade sa
+        // stubom na svakom rezu. Zastavica Elevated u nadogradnjama je igrin
+        // sopstveni put za "gradi kao uzdignuto": splitter je poštuje, a
+        // posle gradnje je skine, pa je gotova deonica ne nosi i zato se ovde
+        // izvodi iz kompozicije. Nizvodno je nose klipbord, blueprint (polje
+        // nadogradnji već postoji), undo snimak i rekreacija.
+        private CompositionFlags CaptureNetUpgrade(Entity edge, out bool hasUpgrade)
+        {
+            hasUpgrade = EntityManager.TryGetComponent(edge, out Game.Net.Upgraded upgraded);
+            CompositionFlags flags = hasUpgrade ? upgraded.m_Flags : default;
+            if (EntityManager.TryGetComponent(edge, out Game.Net.Composition composition) &&
+                EntityManager.TryGetComponent(composition.m_Edge, out NetCompositionData compositionData) &&
+                (compositionData.m_Flags.m_General & CompositionFlags.General.Elevated) != 0)
+            {
+                flags.m_General |= CompositionFlags.General.Elevated;
+                hasUpgrade = true;
+            }
+
+            return flags;
+        }
+
         // ---------- Copy/paste puteva ----------
         //
         // Isti definicioni pipeline kojim igra gradi puteve (CreationDefinition
@@ -1801,15 +2250,23 @@ namespace Copaste
             float centroidTerrain = TerrainUtils.SampleHeight(ref heightData, centroid);
             Dictionary<Entity, int> nodeIndices = new Dictionary<Entity, int>();
             HashSet<int3> diagCurveEnds = new HashSet<int3>();
+
+            // Lanci deonica iz obrasca prefaba (viseći most) idu kao JEDAN
+            // kurs, kao što su i nastali; pojedinačne deonice ispod ih
+            // preskaču.
+            HashSet<Entity> mergedEdges = new HashSet<Entity>();
+            MergeFixedChains(m_NetCopyScratch, centroid, centroidTerrain, nodeIndices, mergedEdges);
+
             foreach (Entity edge in m_NetCopyScratch)
             {
-                if (!EntityManager.TryGetComponent(edge, out Game.Net.Curve curve) ||
+                if (mergedEdges.Contains(edge) ||
+                    !EntityManager.TryGetComponent(edge, out Game.Net.Curve curve) ||
                     !EntityManager.TryGetComponent(edge, out PrefabRef prefabRef))
                 {
                     continue;
                 }
 
-                bool hasUpgrade = EntityManager.TryGetComponent(edge, out Game.Net.Upgraded upgraded);
+                CompositionFlags upgradeFlags = CaptureNetUpgrade(edge, out bool hasUpgrade);
                 float2[] offsets = new float2[4];
                 float[] heights = new float[4];
                 for (int k = 0; k < 4; k++)
@@ -1829,7 +2286,7 @@ namespace Copaste
                     m_CurveOffsets = offsets,
                     m_HeightOffsets = heights,
                     m_HasUpgrade = hasUpgrade,
-                    m_Upgrade = hasUpgrade ? upgraded.m_Flags : default,
+                    m_Upgrade = upgradeFlags,
                     m_StartNodeIndex = CaptureNetNode(edgeData.m_Start, centroid, centroidTerrain, nodeIndices),
                     m_EndNodeIndex = CaptureNetNode(edgeData.m_End, centroid, centroidTerrain, nodeIndices),
                 });
@@ -2235,6 +2692,13 @@ namespace Copaste
                 creation.m_Prefab = item.m_Prefab;
                 creation.m_RandomSeed = random.NextInt();
 
+                // SubElevation nosi svaka deonica koju povuče igrin alat za
+                // puteve. Bez nje igra uzdignut kurs seče kao prizemni, na
+                // kratke komade po m_EdgeLengthRange, pa most dobije stub na
+                // svakih petnaest metara umesto na razmaku pilona
+                // (m_ElevatedLength). Elevacija u kursu se čita samo uz nju.
+                creation.m_Flags |= CreationFlags.SubElevation;
+
                 NetCourse course = default;
                 course.m_Curve = bezier;
                 course.m_Length = MathUtils.Length(bezier);
@@ -2304,6 +2768,7 @@ namespace Copaste
                 CreationDefinition nodeCreation = default;
                 nodeCreation.m_Prefab = m_ClipboardNetNodePrefabs[n];
                 nodeCreation.m_RandomSeed = random.NextInt();
+                nodeCreation.m_Flags |= CreationFlags.SubElevation;
 
                 NetCourse nodeCourse = default;
                 nodeCourse.m_Curve = new Bezier4x3(nodePoint, nodePoint, nodePoint, nodePoint);
@@ -3015,6 +3480,207 @@ namespace Copaste
         // Rekreacija ivica iz snimaka (redo paste-a i undo brisanja): ponovo
         // kroz definicije, ovaj put Permanent (bez Temp faze). Bez remapa —
         // naredni undo/redo ih nalazi pozicionim fallback-om.
+        // Isto što MergeFixedChains radi pri kopiranju, ali nad snimcima za
+        // undo/redo: lanac elemenata obrasca (isti prefab, spojeni čvorovima)
+        // postaje jedan sintetički snimak sa roditeljskom krivom i spoljnim
+        // čvorovima lanca; članovi idu u `members` radi remapa istorije.
+        private List<NetEdgeSnapshot> MergeSnapshotChains(List<NetEdgeSnapshot> snapshots, List<NetEdgeSnapshot> members)
+        {
+            List<NetEdgeSnapshot> result = new List<NetEdgeSnapshot>(snapshots.Count);
+            Dictionary<Entity, List<int>> byNode = new Dictionary<Entity, List<int>>();
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                NetEdgeSnapshot snapshot = snapshots[i];
+                if (!snapshot.m_HasFixed || snapshot.m_StartNode == Entity.Null || snapshot.m_EndNode == Entity.Null)
+                {
+                    continue;
+                }
+
+                AddSnapshotAdjacency(byNode, snapshot.m_StartNode, i);
+                AddSnapshotAdjacency(byNode, snapshot.m_EndNode, i);
+            }
+
+            bool[] consumed = new bool[snapshots.Count];
+            List<int> chain = new List<int>();
+            List<bool> reversed = new List<bool>();
+            List<Bezier4x3> pieces = new List<Bezier4x3>();
+            for (int seed = 0; seed < snapshots.Count; seed++)
+            {
+                NetEdgeSnapshot seedSnapshot = snapshots[seed];
+                if (consumed[seed] || !seedSnapshot.m_HasFixed || seedSnapshot.m_StartNode == Entity.Null || seedSnapshot.m_EndNode == Entity.Null)
+                {
+                    continue;
+                }
+
+                // Unazad do slobodnog kraja.
+                int index = seed;
+                Entity node = seedSnapshot.m_StartNode;
+                for (int guard = 0; guard < 512; guard++)
+                {
+                    int previous = SnapshotNeighbor(snapshots, byNode, node, index);
+                    if (previous < 0 || previous == seed)
+                    {
+                        break;
+                    }
+
+                    node = snapshots[previous].m_StartNode == node ? snapshots[previous].m_EndNode : snapshots[previous].m_StartNode;
+                    index = previous;
+                }
+
+                // Unapred, sa orijentacijom.
+                chain.Clear();
+                reversed.Clear();
+                pieces.Clear();
+                Entity chainStartNode = node;
+                Entity chainEndNode = node;
+                HashSet<int> inChain = new HashSet<int>();
+                for (int guard = 0; guard < 512; guard++)
+                {
+                    NetEdgeSnapshot current = snapshots[index];
+                    bool isReversed;
+                    Entity endNode;
+                    if (current.m_StartNode == node)
+                    {
+                        isReversed = false;
+                        endNode = current.m_EndNode;
+                    }
+                    else if (current.m_EndNode == node)
+                    {
+                        isReversed = true;
+                        endNode = current.m_StartNode;
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    inChain.Add(index);
+                    chain.Add(index);
+                    reversed.Add(isReversed);
+                    Bezier4x3 bezier = current.m_Curve;
+                    pieces.Add(isReversed ? new Bezier4x3(bezier.d, bezier.c, bezier.b, bezier.a) : bezier);
+                    chainEndNode = endNode;
+
+                    int next = SnapshotNeighbor(snapshots, byNode, endNode, index);
+                    if (next < 0 || inChain.Contains(next) || consumed[next])
+                    {
+                        break;
+                    }
+
+                    node = endNode;
+                    index = next;
+                }
+
+                if (chain.Count < 2)
+                {
+                    continue;
+                }
+
+                if (snapshots[chain[0]].m_FixedIndex > snapshots[chain[chain.Count - 1]].m_FixedIndex)
+                {
+                    chain.Reverse();
+                    reversed.Reverse();
+                    pieces.Reverse();
+                    for (int i = 0; i < pieces.Count; i++)
+                    {
+                        Bezier4x3 piece = pieces[i];
+                        pieces[i] = new Bezier4x3(piece.d, piece.c, piece.b, piece.a);
+                        reversed[i] = !reversed[i];
+                    }
+
+                    Entity swap = chainStartNode;
+                    chainStartNode = chainEndNode;
+                    chainEndNode = swap;
+                }
+
+                string how;
+                if (TryReconstructParentCurve(pieces, out Bezier4x3 parent, out float residual))
+                {
+                    how = "exact";
+                }
+                else if (TryFitChainCurve(pieces, out parent, out residual))
+                {
+                    how = "least-squares fit";
+                }
+                else
+                {
+                    Mod.Log.Info($"Copaste: recreate keeps {chain.Count} fixed-pattern pieces separate (residual {residual:F2} m)");
+                    continue;
+                }
+
+                Mod.Log.Info($"Copaste: recreate merges {chain.Count} fixed-pattern pieces into one course ({how}, residual {residual:F3} m)");
+
+                NetEdgeSnapshot first = snapshots[chain[0]];
+                NetEdgeSnapshot last = snapshots[chain[chain.Count - 1]];
+                bool firstReversed = reversed[0];
+                bool lastReversed = reversed[reversed.Count - 1];
+                NetEdgeSnapshot merged = new NetEdgeSnapshot
+                {
+                    m_Entity = Entity.Null,
+                    m_Curve = parent,
+                    m_Prefab = first.m_Prefab,
+                    m_HasUpgrade = first.m_HasUpgrade,
+                    m_Upgrade = first.m_Upgrade,
+                    m_HadElevation = first.m_HadElevation,
+                    m_Elevation = first.m_Elevation,
+                    m_StartNode = chainStartNode,
+                    m_EndNode = chainEndNode,
+                    m_HasNodePositions = first.m_HasNodePositions && last.m_HasNodePositions,
+                    m_StartNodePos = firstReversed ? first.m_EndNodePos : first.m_StartNodePos,
+                    m_EndNodePos = lastReversed ? last.m_StartNodePos : last.m_EndNodePos,
+                    m_HadStartElevation = firstReversed ? first.m_HadEndElevation : first.m_HadStartElevation,
+                    m_StartElevation = firstReversed ? first.m_EndElevation : first.m_StartElevation,
+                    m_HadEndElevation = lastReversed ? last.m_HadStartElevation : last.m_HadEndElevation,
+                    m_EndElevation = lastReversed ? last.m_StartElevation : last.m_EndElevation,
+                };
+
+                foreach (int member in chain)
+                {
+                    consumed[member] = true;
+                    members.Add(snapshots[member]);
+                }
+
+                result.Add(merged);
+            }
+
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                if (!consumed[i])
+                {
+                    result.Add(snapshots[i]);
+                }
+            }
+
+            return result;
+        }
+
+        private static void AddSnapshotAdjacency(Dictionary<Entity, List<int>> byNode, Entity node, int index)
+        {
+            if (!byNode.TryGetValue(node, out List<int> list))
+            {
+                list = new List<int>();
+                byNode[node] = list;
+            }
+
+            list.Add(index);
+        }
+
+        private static int SnapshotNeighbor(List<NetEdgeSnapshot> snapshots, Dictionary<Entity, List<int>> byNode, Entity node, int index)
+        {
+            if (!byNode.TryGetValue(node, out List<int> list) || list.Count != 2)
+            {
+                return -1;
+            }
+
+            int other = list[0] == index ? list[1] : list[0];
+            if (other == index || snapshots[other].m_Prefab != snapshots[index].m_Prefab)
+            {
+                return -1;
+            }
+
+            return other;
+        }
+
         private void RecreateNetEdges(List<NetEdgeSnapshot> snapshots)
         {
             if (snapshots == null || snapshots.Count == 0)
@@ -3041,7 +3707,13 @@ namespace Copaste
                 RegisterWeldNode(snapshot.m_EndNode);
             }
 
-            foreach (NetEdgeSnapshot snapshot in snapshots)
+            // Lanci obrasca (most) se vraćaju kao JEDAN kurs, kako su i nastali;
+            // članovi lanca dobijaju svoj remap po sopstvenoj krivoj, jer ih
+            // obrazac ponovo iseče na istim mestima.
+            List<NetEdgeSnapshot> chainMembers = new List<NetEdgeSnapshot>();
+            List<NetEdgeSnapshot> emitList = MergeSnapshotChains(snapshots, chainMembers);
+
+            foreach (NetEdgeSnapshot snapshot in emitList)
             {
                 if (snapshot.m_Prefab == Entity.Null || !EntityManager.Exists(snapshot.m_Prefab))
                 {
@@ -3053,7 +3725,10 @@ namespace Copaste
                 CreationDefinition creation = default;
                 creation.m_Prefab = snapshot.m_Prefab;
                 creation.m_RandomSeed = random.NextInt();
-                creation.m_Flags |= CreationFlags.Permanent;
+
+                // Isto pravilo kao pri lepljenju: uzdignuta deonica se deli
+                // po razmaku pilona, ne kao prizemna.
+                creation.m_Flags |= CreationFlags.Permanent | CreationFlags.SubElevation;
 
                 NetCourse course = default;
                 course.m_Curve = snapshot.m_Curve;
@@ -3121,6 +3796,21 @@ namespace Copaste
                         m_OldEndNode = snapshot.m_EndNode,
                         m_Prefab = snapshot.m_Prefab,
                         m_Curve = course.m_Curve,
+                    });
+                }
+            }
+
+            foreach (NetEdgeSnapshot member in chainMembers)
+            {
+                if (member.m_Entity != Entity.Null)
+                {
+                    m_PendingNetRemaps.Add(new PendingNetRemap
+                    {
+                        m_OldEdge = member.m_Entity,
+                        m_OldStartNode = member.m_StartNode,
+                        m_OldEndNode = member.m_EndNode,
+                        m_Prefab = member.m_Prefab,
+                        m_Curve = member.m_Curve,
                     });
                 }
             }
@@ -3225,6 +3915,7 @@ namespace Copaste
                 }
 
                 bool hadElevation = EntityManager.TryGetComponent(record.m_Resolved, out Game.Net.Elevation elevation);
+                bool resolvedFixed = EntityManager.TryGetComponent(record.m_Resolved, out Game.Net.Fixed resolvedFixedData);
                 CaptureNetEdgeEnds(record.m_Resolved, out Entity startNode, out Entity endNode,
                     out bool hadStart, out float2 startElevation, out bool hadEnd, out float2 endElevation,
                     out bool hasNodePositions, out float3 startNodePos, out float3 endNodePos,
@@ -3234,6 +3925,8 @@ namespace Copaste
                 snapshots.Add(new NetEdgeSnapshot
                 {
                     m_Entity = record.m_Resolved,
+                    m_HasFixed = resolvedFixed,
+                    m_FixedIndex = resolvedFixed ? resolvedFixedData.m_Index : -1,
                     m_Curve = curve.m_Bezier,
                     m_Prefab = prefabRef.m_Prefab,
                     m_HasUpgrade = record.m_HasUpgrade,
@@ -3672,7 +4365,8 @@ namespace Copaste
                     continue;
                 }
 
-                bool hasUpgrade = EntityManager.TryGetComponent(edge, out Game.Net.Upgraded upgraded);
+                CompositionFlags upgradeFlags = CaptureNetUpgrade(edge, out bool hasUpgrade);
+                bool hasFixed = EntityManager.TryGetComponent(edge, out Game.Net.Fixed fixedData);
                 bool hadElevation = EntityManager.TryGetComponent(edge, out Game.Net.Elevation elevation);
                 CaptureNetEdgeEnds(edge, out Entity startNode, out Entity endNode,
                     out bool hadStart, out float2 startElevation, out bool hadEnd, out float2 endElevation,
@@ -3686,7 +4380,9 @@ namespace Copaste
                     m_Curve = curve.m_Bezier,
                     m_Prefab = prefabRef.m_Prefab,
                     m_HasUpgrade = hasUpgrade,
-                    m_Upgrade = hasUpgrade ? upgraded.m_Flags : default,
+                    m_Upgrade = upgradeFlags,
+                    m_HasFixed = hasFixed,
+                    m_FixedIndex = hasFixed ? fixedData.m_Index : -1,
                     m_HadElevation = hadElevation,
                     m_Elevation = hadElevation ? elevation.m_Elevation : default,
                     m_StartNode = startNode,
@@ -4449,7 +5145,7 @@ namespace Copaste
                 CreationDefinition nodeCreation = default;
                 nodeCreation.m_Prefab = roadPrefab;
                 nodeCreation.m_RandomSeed = random.NextInt();
-                nodeCreation.m_Flags |= CreationFlags.Permanent;
+                nodeCreation.m_Flags |= CreationFlags.Permanent | CreationFlags.SubElevation;
 
                 NetCourse nodeCourse = default;
                 nodeCourse.m_Curve = new Bezier4x3(nodePoint, nodePoint, nodePoint, nodePoint);

@@ -656,6 +656,10 @@ namespace Copaste
                 return;
             }
 
+            // "Drži oblik": teren jednom, na sidru, kao i kod propova.
+            bool keepShape = Mod.Settings != null && Mod.Settings.PasteKeepShape;
+            float anchorTerrain = TerrainUtils.SampleHeight(ref heightData, anchor);
+
             foreach (LaneClipboardItem item in m_ClipboardLanes)
             {
                 if (item.m_CurveOffsets == null || item.m_CurveOffsets.Length != 4 ||
@@ -670,7 +674,8 @@ namespace Copaste
                 {
                     float2 xz = anchor.xz + item.m_CurveOffsets[k];
                     float3 point = new float3(xz.x, 0f, xz.y);
-                    point.y = TerrainUtils.SampleHeight(ref heightData, point) + item.m_HeightOffsets[k] + baseDelta + m_PasteHeightBoost;
+                    float ground = keepShape ? anchorTerrain : TerrainUtils.SampleHeight(ref heightData, point);
+                    point.y = ground + item.m_HeightOffsets[k] + baseDelta + m_PasteHeightBoost;
                     points[k] = point;
                 }
 
@@ -687,8 +692,8 @@ namespace Copaste
                 // Podignuta ograda (PgUp pre kopiranja): elevacija ide u
                 // definiciju, pa pipeline sam upiše Net.Elevation — bez toga bi
                 // igra nalepljenu krivu vremenom vratila na teren.
-                float startElevation = item.m_HeightOffsets[0] + baseDelta + m_PasteHeightBoost;
-                float endElevation = item.m_HeightOffsets[3] + baseDelta + m_PasteHeightBoost;
+                float startElevation = points[0].y - TerrainUtils.SampleHeight(ref heightData, points[0]);
+                float endElevation = points[3].y - TerrainUtils.SampleHeight(ref heightData, points[3]);
 
                 NetCourse course = default;
                 course.m_Curve = bezier;

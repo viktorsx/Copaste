@@ -8,14 +8,14 @@ Options screen is split into two tabs via `SettingsUITabOrder` /
 (`SettingsUIGroupOrder` + `SettingsUIShowGroupName`):
 
 - **General** → Behavior: *Mod language* (Auto / English / German / French /
-  Serbian — Auto follows the game) and *Ignore placement errors when pasting*
+  Serbian - Auto follows the game) and *Ignore placement errors when pasting*
   (default on; paste stamp only, no override protection)
-- **General** → Panel: *Panel theme* (Copaste / Vanilla — Vanilla hosts the
-  panel in the game's own chrome), *Panel size* (80–125%) and *Text size*
-  (90–130%, scales lettering only)
-- **General** → Limits: *Selection limit* (500–5000, default 1000),
-  *Selection outline limit* (100–1000, default 400) and *Selected props list
-  limit* (10–100, default 50). One limit is fixed, not a slider: a single
+- **General** → Panel: *Panel theme* (Copaste / Vanilla - Vanilla hosts the
+  panel in the game's own chrome), *Panel size* (80-125%) and *Text size*
+  (90-130%, scales lettering only)
+- **General** → Limits: *Selection limit* (500-5000, default 1000),
+  *Selection outline limit* (100-1000, default 400) and *Selected props list
+  limit* (10-100, default 50). One limit is fixed, not a slider: a single
   Delete handles at most 500 objects (`kMaxDeleteAtOnce`); larger selections
   are refused with the error sound, because a one-frame removal of that size
   has crashed the game in testing. A batched delete that lifts it is planned
@@ -27,6 +27,7 @@ Hidden persisted state (`[SettingsUIHidden]`, not shown in Options):
 |---|---|
 | `PanelX`, `PanelY` | saved panel position in px; `-1` = "use CSS default" |
 | `RandomPasteVariation` | the Original/Random paste-look toggle |
+| `PasteKeepShape` | the Paste height toggle (off = follow terrain, on = keep shape) |
 | `SelectProps/Trees/Decals/Surfaces` | selection filter chips (default on) |
 | `SelectBuildings` | Buildings filter chip (default **off**) |
 | `SelectFences` | Fences filter chip (default **off**) |
@@ -34,7 +35,7 @@ Hidden persisted state (`[SettingsUIHidden]`, not shown in Options):
 | `RoadSnapPaste` | road snap toggle for paste/relocate (default on) |
 | `SelectBuildingProps` | marquee may grab building-owned props (default off) |
 
-`SetDefaults()` must reset every property — the game calls it for "Reset
+`SetDefaults()` must reset every property - the game calls it for "Reset
 settings".
 
 ## Key bindings
@@ -69,7 +70,7 @@ rotation (45° snap), Alt during a node drag (slide along the neighbor
 line) and U (underground view). Raw reads are always guarded by
 `m_UiTyping` and, for clicks, by tool-raycast validity.
 
-**Tap Alt** (straighten selected network nodes) is raw too — the game's
+**Tap Alt** (straighten selected network nodes) is raw too - the game's
 binding system cannot bind a bare modifier as a key (`BindingKeyboard` has
 no Alt entry). Since Alt is also a modifier for the gestures above, the
 tap is edge-triggered: pressing Alt arms it, any mouse button or wheel
@@ -90,8 +91,8 @@ settings option, tab, group and binding name needs entries via the
 dictionary as an extra source for the *active* game locale and reloads it,
 so the mod can speak its own language while the game keeps another. The
 apply routine is re-entrancy guarded: `AddSource`/`RemoveSource`/
-`ReloadActiveLocale` all fire `onActiveDictionaryChanged` — which is also
-the hook that re-applies the override on a game-language change — and
+`ReloadActiveLocale` all fire `onActiveDictionaryChanged` - which is also
+the hook that re-applies the override on a game-language change - and
 without the guard that recursion crashed the game.
 
 Panel strings (`ui/Copaste.mjs`) go through the game's `cs2/l10n` module:
@@ -100,5 +101,5 @@ every label, tooltip and hint calls `t("KEY", "English fallback")`, and the
 module (or a missing key) the panel silently stays English.
 
 When renaming or removing a feature, grep the localization file for the old
-name — stale descriptions ("Spaced" after the button was renamed) are easy to
+name - stale descriptions ("Spaced" after the button was renamed) are easy to
 miss because nothing breaks at compile time.

@@ -7,6 +7,9 @@ code works, see the rest of [docs/](README.md).
 ## Selection
 
 - **Click** selects a single object (white ring on hover, blue when selected).
+  Props the game hides from its own cursor ray (a parked-vehicle prop on a
+  road) still take the click: the tool tests the ray against object bounds
+  itself when the game's ray returns nothing.
 - **Shift + click** adds or removes objects from the selection.
 - **Marquee**: click on empty ground and drag a camera-aligned box; everything
   inside is selected with live highlight while dragging. Shift adds to the
@@ -22,7 +25,8 @@ code works, see the rest of [docs/](README.md).
 - **Building elements** switch: when on, selection also reaches things owned
   by buildings - their props, trees, decals and lot surfaces, each still
   following its filter chip. When off, nothing building-owned can be selected,
-  not even by click. Vehicles and citizens are never selectable.
+  not even by click. Vehicles, citizens and the structural parts of roads
+  (bridge supports, pylons) are never selectable.
 - **Type filter (T)**: press T on a hovered or selected object to lock the
   marquee to that exact prefab type; clicking another object switches the
   filter to its type, pressing T again clears it. Works for trees and
@@ -45,6 +49,11 @@ code works, see the rest of [docs/](README.md).
   blue bench stays blue. With "Random", the game rolls new variations per
   stamp. For buildings, "Original" also reproduces the source lot exactly
   (see Buildings below).
+- **Paste height**: with "Follow terrain" (default), every pasted prop keeps
+  its own height above the ground under it, so a group bends with a slope.
+  With "Keep shape", the group is pasted rigid, exactly as copied, which is
+  what a walkway or an overpass built from props needs. Fences follow the
+  same switch; roads are always rigid.
 - **Road snap**: with the toggle on, a pasted building glides along the
   nearest road and faces it exactly like hand plopping; the rest of the group
   follows. Turn it off for free placement.
@@ -125,7 +134,7 @@ Available since 1.1.0, behind the Buildings filter chip.
   traffic on its own. Hovering shows a white outline of what a click would
   pick; selected segments outline their real left and right edges.
 - **Copy and paste**: selected segments go to the clipboard with their
-  upgrades (tree rows, wide sidewalks...) and their junction state —
+  upgrades (tree rows, wide sidewalks...) and their junction state - 
   roundabouts, traffic lights and stop signs come along. Paste shows the
   game's ghost preview, pasted pieces weld into a network, form
   intersections with existing roads and get their junction state rebuilt,
@@ -140,20 +149,21 @@ Available since 1.1.0, behind the Buildings filter chip.
   upgrades included.
 - **Tap Alt to straighten**: a selected middle node (or a run of them)
   snaps onto the straight line between its two neighbors and the road
-  through it straightens out — junctions and dead ends stay put. Alt
+  through it straightens out - junctions and dead ends stay put. Alt
   still works as a modifier: only a clean press-and-release triggers it.
 - **Alt + drag a single selected node** slides it along a straight line: a
   middle node snaps onto the line between its two neighbors and rides
-  it, an end node rides the extension of the road's own direction —
+  it, an end node rides the extension of the road's own direction - 
   release Alt mid-drag to move freely again.
 - **Lane alignment triangle**: with exactly one segment selected, a small
   triangle sits next to each qualifying joint. Clicking it cycles the
-  joint through center → left → right alignment — on a lane-count
+  joint through center → left → right alignment - on a lane-count
   transition the through lanes line up exactly (the classic exit look).
   On streets with sidewalks the targets come from the real driving lanes;
   on highway-style roads the roadway edges align.
-- **Underground mode (U or the panel button)**: the view switches to the
-  game's underground look and selection — click and box alike — reaches
+- **Underground mode (U, the panel button or the game's own Underground
+  toggle in the toolbar)**: the view switches to the
+  game's underground look and selection - click and box alike - reaches
   only what is below ground (metro, tunnels), so a box over a tunnel can
   never grab the surface above it, and vice versa. Copy/paste and undo
   work the same in both worlds.
@@ -166,23 +176,23 @@ Available since 1.1.0, behind the Buildings filter chip.
 - Select **exactly one** fence or road segment and grab handles appear:
   white end handles on the curve, and amber control points beside it, each
   tied to its end by a thin line. A click first **selects** a handle (it
-  turns green) — dragging starts only on a handle that is already selected,
+  turns green) - dragging starts only on a handle that is already selected,
   so a plain click can never bend the road. Dragging a control point moves
   it one-to-one and reshapes that half of the curve; dragging an end moves
   the whole curve shape-locked (a fence end also re-links its chained
   neighbor, a road end keeps its junction updated live).
 - **Grab the curve itself**: press anywhere along the selected segment's
-  body (within about six meters of its axis) and pull — the curve bends
+  body (within about six meters of its axis) and pull - the curve bends
   right under the cursor, and the movement is shared between both control
   points in proportion to their influence at that point, so the shape
   follows smoothly instead of whipping. The same two-step rule applies: the
   first click only marks the point (drawn green), the second press drags.
 - While dragging a middle handle, an amber guide on the chord aligns just
   that handle, and a violet circle at the chord's center straightens the
-  whole segment — as a preview: leave the circle without releasing and the
+  whole segment - as a preview: leave the circle without releasing and the
   bent shape comes back.
 - The selected (green) handle answers PgUp/PgDn: they move exactly that
-  point — the way to make a sloped fence or a raised arc. Hand-made arcs
+  point - the way to make a sloped fence or a raised arc. Hand-made arcs
   survive later endpoint moves.
 - Undo restores the whole curve exactly.
 
@@ -239,10 +249,10 @@ rebindable in Options.
   Networks chip is on), Selection filters, Selected props list, Clipboard
   with Paste look and Road snap, Edit (Undo, Redo, Relocate, Delete),
   Align with the gap stepper, and Blueprints. The how-to hint lives in
-  the logo's tooltip — hover the Copaste logo in the header.
+  the logo's tooltip - hover the Copaste logo in the header.
 - The look is configurable in Options: a **Vanilla theme** renders the
   panel inside the game's own panel chrome, **Panel size** scales the
-  whole panel (80–125%), and a separate **Text size** (90–130%) grows
+  whole panel (80-125%), and a separate **Text size** (90-130%) grows
   the lettering without changing the layout.
 
 ## Input and languages

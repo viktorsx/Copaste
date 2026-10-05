@@ -13,7 +13,7 @@ A placed fence is two invisible "container" nodes plus a container edge
 (`Game.Net.Edge` + `Curve` + `Game.Tools.EditorContainer{m_Prefab =
 NetLanePrefab}` + `PseudoRandomSeed`); the visible geometry is generated
 lanes owned by that edge. Moving or bending a fence is a direct rewrite of
-the curve and node positions plus `Updated` — the game regenerates the
+the curve and node positions plus `Updated` - the game regenerates the
 lanes. Chained fences share a container node, so a moved link stretches its
 neighbor's curve end to keep the joint closed.
 
@@ -32,7 +32,7 @@ selected edges) and transforms it as one rigid piece:
   (one node moving, the other anchored) move only the moving end, and
   their control points re-interpolate per-axis so curvature is preserved.
 - **Endpoint offsets survive node moves**: a curve end legitimately does
-  NOT have to sit on its node — the lateral end-to-node offset *is* lane
+  NOT have to sit on its node - the lateral end-to-node offset *is* lane
   alignment. Node transforms therefore re-derive each end as
   `end' = node' + rot*(end − node)` instead of snapping ends onto nodes;
   height-only operations shift the end's y alone.
@@ -43,10 +43,10 @@ selected edges) and transforms it as one rigid piece:
 
 Copying stores, per edge: the prefab, the **untouched** bezier curve
 (centroid-relative, per-point heights above the source centroid terrain),
-`Upgraded` flags, and indices into a **clipboard node table** — one entry
+`Upgraded` flags, and indices into a **clipboard node table** - one entry
 per source junction node (offset + height + node upgrade flags + node
 prefab). Junction sub-object **markers** (roundabouts, manual traffic
-lights, stop signs — prefabs whose `NetObjectData.m_CompositionFlags`
+lights, stop signs - prefabs whose `NetObjectData.m_CompositionFlags`
 intersects `CompositionFlags.nodeMask`) are captured per node too.
 
 Paste emits one `NetCourse` per edge through the game's definition
@@ -56,22 +56,39 @@ pipeline. The rules that make welding work:
    game's node-welding compares positions **bitwise**, so all courses that
    should share a junction must present the exact same point.
 2. That shared point goes ONLY into `CoursePos.m_Position` of the course
-   ends (from the node table) — the curve itself is never bent toward the
+   ends (from the node table) - the curve itself is never bent toward the
    node. Bending it was the historical "lanes re-centered" bug: ends
    often sit beside the node on purpose (lane alignment, trimmed
    roundabout approaches).
-3. Courses carry `DisableMerge` on both ends — welding does not need the
+3. Courses carry `DisableMerge` on both ends - welding does not need the
    merge machinery, and letting courses into the game's overlap handling
    visibly reshaped parallel carriageways.
 4. Node upgrade flags ride **zero-length courses** at the node point
    (start == end skips edge generation; the flags OR into the node), with
-   terrain-relative elevation set — an elevation-less course can win the
+   terrain-relative elevation set - an elevation-less course can win the
    node merge and ground an elevated junction.
 5. Markers re-attach after the paste resolves, via
    `CreationDefinition{m_Attached = node, Permanent|Attach}` +
-   `ObjectDefinition` — the vanilla way junction markers are placed. The
+   `ObjectDefinition` - the vanilla way junction markers are placed. The
    node is settled again a few frames later because markers are born
    after the roads.
+6. Every road course carries `CreationFlags.SubElevation`, like the courses
+   the game's own road tool emits. Only with it does the course splitter read
+   the course elevation and divide an elevated course at pylon spacing
+   instead of like a ground road. The elevated build flag itself is derived
+   from the source edge's composition (`CaptureNetUpgrade`) and rides in the
+   upgrade flags, because the game decides "elevated" from the curve and the
+   terrain on its own and strips that flag from the finished edge.
+7. Edges built from a prefab pattern (a suspension bridge: approach, span,
+   span, approach, each carrying `Game.Net.Fixed`) are copied as the **one
+   course** they were cut from. `MergeFixedChains` walks the chain, rebuilds
+   the parent curve exactly (the pieces are sub-curves of one cubic, and the
+   parameter follows from the chain length), or fits one least-squares cubic
+   when the chain was bent by moving nodes, and stores a single course. The
+   game then divides the copy as it divided the original. Undo and redo do
+   the same over snapshots (`MergeSnapshotChains`). A chain no single curve
+   can follow within 12 m stays piece by piece, and the game divides every
+   piece again.
 
 Heights are **rigid**: one terrain reference at copy (source centroid) and
 one at paste (anchor); bridge/tunnel elevation is recomputed against the
@@ -86,10 +103,10 @@ With exactly one fence or road segment selected, four handles appear: two
 end handles on `a` and `d`, and two control-point handles at `b` and `c`
 off the curve, each tied to its end by a thin line. Interaction is
 **two-step**: the first click
-only selects a handle (sticky, drawn green — PgUp/PgDn act on it), and a
+only selects a handle (sticky, drawn green - PgUp/PgDn act on it), and a
 drag starts only when the press lands on the already-selected handle, so
 click jitter can never bend a road. Picks and drags both project the
-cursor onto the horizontal plane at the handle's height — a raw terrain
+cursor onto the horizontal plane at the handle's height - a raw terrain
 hit lands tens of meters behind an elevated handle (parallax).
 
 Moving an end keeps the shape: the control points are carried as
@@ -112,18 +129,18 @@ joint (a node with exactly two real arms). Clicking cycles the joint
 center → left → right:
 
 - Targets come from the **composition's lane layout**
-  (`NetCompositionLane`), not the live lane entities — the live sub-lane
+  (`NetCompositionLane`), not the live lane entities - the live sub-lane
   buffer briefly holds duplicate lane sets after every change and the
   measurements drifted. A live mid-edge measurement is kept only to
   orient the composition's axis sign, and as fallback.
 - Roads **without pedestrian lanes** (highways, rural roads) use half the
-  prefab-width difference instead — no sidewalks means total width IS the
+  prefab-width difference instead - no sidewalks means total width IS the
   roadway, and edge-flush is exact there.
 - The measuring/apply axis is anchored to the **wide** edge (alignment
   never moves it), so repeated clicks are idempotent; the narrow edge's
   travel direction only decides which side is "left".
 - The shift moves the curve end **and its adjacent control point** by the
-  same vector, keeping the joint tangent parallel to the through road —
+  same vector, keeping the joint tangent parallel to the through road - 
   moving the end alone kinked the lane line right at the node.
 - Equal lane layouts fall back to a quarter-roadway side-step preset.
 
@@ -132,22 +149,25 @@ center → left → right:
 - **Tap Alt** puts every selected middle node (chains supported) onto the
   straight 3D line between its two anchors (first junction/dead end on
   each side), preserving spacing along the polyline, and flattens every
-  chain edge — anchor edges included — into straight lines. Alt is also a
+  chain edge - anchor edges included - into straight lines. Alt is also a
   modifier for other gestures, so the tap is edge-triggered: press arms,
   any click/wheel/other key disarms, clean release fires.
 - **Alt during a node drag** slides the node along a line instead of
   following the cursor: a two-arm node projects onto the segment between
   its neighbors (clamped 1.5 m off each), an end node onto the extension
-  of the line through the next two nodes — dragging the end of a crooked
+  of the line through the next two nodes - dragging the end of a crooked
   road straightens its last segment into the road's continuation.
 
 ## Underground mode
 
 `UndergroundMode` (U key or the panel button) sets the tool's
 `requireUnderground`, which flips the game into the underground view (the
-bulldozer's mechanism). Picking and marquee then require
+bulldozer's mechanism). The tool also reports `allowUnderground`, so the
+game's own toolbar toggle stays enabled while Copaste is active, shows the
+mode, and drives it through `SetUnderground`; without that report the game
+draws its toggle disabled. Picking and marquee then require
 `MatchesUndergroundMode`: the candidate's position must be below terrain
-(−1.5 m) exactly when the mode is on — for networks, props, buildings,
+(−1.5 m) exactly when the mode is on - for networks, props, buildings,
 fences and surfaces alike. Copy/paste/undo are mode-agnostic.
 
 ## Gotchas
@@ -166,5 +186,5 @@ fences and surfaces alike. Copy/paste/undo are mode-agnostic.
   tool's own per-frame `Clear` kills them before the game consumes them;
   every kept frame must also freeze paste preview/clicks.
 - Deleting network pieces by geometry must compare **height** as well as
-  xz — tunnels and bridges of the same prefab stack directly under/over
+  xz - tunnels and bridges of the same prefab stack directly under/over
   surface roads.

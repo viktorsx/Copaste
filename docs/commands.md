@@ -41,21 +41,21 @@ For what the features do in depth, see [features.md](features.md).
 | **T** | Type filter | Locks the marquee to the prefab type of the hovered or selected object; press again to clear |
 | **Ctrl + arrow keys** | Nudge | Fine-positions the selection in small steps, relative to the camera |
 | **[ and ]** | Align gap | While an align button is lit, shrinks or grows the gap of the last align live |
-| **U** | Underground view | Switches to the game's underground look; selection reaches only what is below ground. Copy/paste and undo work the same in both worlds |
+| **U** | Underground view | Switches to the game's underground look; selection reaches only what is below ground. Copy/paste and undo work the same in both worlds. The game's own Underground toggle in the toolbar does the same while Copaste is active |
 | **Alt (tap)** | Straighten | A clean Alt press-and-release snaps selected middle road nodes onto the straight line between their neighbors and straightens the segments through them |
 
 ## Panel
 
 | **Control** | What it does |
 |---|---|
-| **Selection chips (Props, Trees, Decals, Surfaces, Buildings, Fences, Networks)** | Decide what selection grabs; any mix works. Right-click a chip to solo it; right-click the solo chip again to restore what was on before the solo (or the default set — Props, Trees, Decals, Surfaces — if nothing was remembered). Buildings, Fences and Networks never turn on as a side effect. Turning a chip off also drops already-selected items of that kind from the selection, so Delete can never touch what the panel says is not selectable |
+| **Selection chips (Props, Trees, Decals, Surfaces, Buildings, Fences, Networks)** | Decide what selection grabs; any mix works. Right-click a chip to solo it; right-click the solo chip again to restore what was on before the solo (or the default set - Props, Trees, Decals, Surfaces - if nothing was remembered). Buildings, Fences and Networks never turn on as a side effect. Turning a chip off also drops already-selected items of that kind from the selection, so Delete can never touch what the panel says is not selectable |
 | **Building elements switch** | When on, selection also reaches things owned by buildings (their props, trees, decals and lot surfaces), each still following its chip. When off, nothing building-owned can be selected |
 | **Selected props list** | Selections up to 50 objects listed by name; hovering a row rings that object in the world, clicking a row keeps only it selected |
 | **Copy / Paste / Save** | Same as Ctrl+C / Ctrl+V; Save stores the selection as a blueprint |
 | **Paste look (Original / Random)** | Original keeps the copied colors and, for buildings, reproduces the source lot exactly; Random lets the game roll new variations |
 | **Road snap switch** | Pasted and relocated buildings glide along the nearest road and face it; off = free placement (visible while the Buildings chip is on) |
 | **Clear** | Empties the clipboard |
-| **Underground button** (next to the counters, Networks chip on) | Toggles underground view — same as U; filled while active |
+| **Underground button** (next to the counters, Networks chip on) | Toggles underground view - same as U; filled while active |
 | **Logo (hover)** | The how-to hint: what click, box select and Ctrl+click do in the current mode |
 | **Undo / Redo** | Same as Ctrl+Z / Ctrl+Y |
 | **Relocate** | Same as Tab; lit while relocating, clicking it again cancels |

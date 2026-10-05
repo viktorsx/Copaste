@@ -1,4 +1,4 @@
-# Tool System — Select Mode
+# Tool System - Select Mode
 
 Everything in this document lives in `src/CopasteToolSystem.cs` and runs from
 `UpdateSelectMode()`.
@@ -8,31 +8,46 @@ Everything in this document lives in `src/CopasteToolSystem.cs` and runs from
 The tool relies on the game's `ToolRaycastSystem`, configured per frame in
 `InitializeRaycast()`:
 
-- **Select mode:** `TypeMask.StaticObjects | Terrain` — the ray can hit props
-  and the ground (the ground is needed so a marquee can start on empty terrain).
+- **Select mode:** `TypeMask.StaticObjects | Terrain` - the ray can hit props
+  and the ground (the ground is needed so a marquee can start on empty terrain),
+  plus `Net` while the Fences or Networks chip is on (otherwise the ray passes
+  beside a bridge deck and hits the terrain far behind it).
 - **Paste mode, move drag, and while the marquee is held:**
-  `TypeMask.Terrain | Net` with road/pathway layers — the ray deliberately
+  `TypeMask.Terrain | Net` with road/pathway layers - the ray deliberately
   ignores objects so the dragged/pasted group doesn't "climb" onto props and
   buildings the cursor crosses, but can still land on road surfaces.
 
-`GetRaycastResult(out entity, out hit)` returns **one** hit — the nearest
+`GetRaycastResult(out entity, out hit)` returns **one** hit - the nearest
 surface. The hit entity is filtered through `IsCopyable` (see below); anything
 that fails it yields `hitEntity == Entity.Null` even though the raw
 `raycastEntity` may be something else (a vehicle, a lot decoration…).
+
+**Bounds-ray fallback.** The game's raycast skips any object currently
+flagged `Overridden`, which a prop placed on a road is between the game
+flagging it and a mod clearing the flag. Such a prop is visible but the ray
+passes through it, so a click fell through to the ground and started a
+marquee. On a click frame where the ray reached terrain or a road and
+nothing selectable, `PickObjectByCursorRay` intersects the same ray (camera to
+hit point, extended 2 m) with `ObjectGeometryData.m_Bounds` of objects within
+40 m and takes the nearest copyable one. It never runs when the ray hit an
+object the tool deliberately rejects (a pillar, a building with its chip off):
+the user pointed at that object, so nothing behind it may be picked. Trees and
+plants are excluded, since a canopy's bounds are far larger than its leaves.
 
 ### IsCopyable
 
 An entity can be selected iff it has `Object` + `Transform` + `PrefabRef` and
 passes every gate: not an invisible spawn point (`SpawnLocation` with an empty
-prefab `SubMesh` buffer — benches/chairs carry `SpawnLocation` too and stay
+prefab `SubMesh` buffer - benches/chairs carry `SpawnLocation` too and stay
 selectable), no `Marker`/`UtilityObject`/`Placeholder`, not a regenerating
-deep-owned sub-element, its category chip is on (`IsCategoryEnabled` — this is
+deep-owned sub-element, its category chip is on (`IsCategoryEnabled` - this is
 also how buildings are admitted behind the Buildings chip), no
-`Extension`/`Vehicle`/`Moving`/`Creature`, building-owned only while
+`Extension`/`Vehicle`/`Moving`/`Creature`/`Pillar` (bridge supports and pylons
+belong to the road, which rebuilds them on every update), building-owned only while
 **Building elements** is on, and no `Temp`/`Deleted`. Marquee scans and cycle
-picking draw from three queries — `m_PropQuery` (free-standing),
+picking draw from three queries - `m_PropQuery` (free-standing),
 `m_OwnedPropQuery` (behind Building elements) and `m_BuildingQuery` (behind
-the Buildings chip) — with the per-entity gates applied in the scan; see
+the Buildings chip) - with the per-entity gates applied in the scan; see
 [buildings-and-surfaces.md](buildings-and-surfaces.md).
 
 ## The click chain
@@ -42,7 +57,7 @@ is load-bearing:
 
 1. **"To prop" pick armed** → clicked prop becomes the align reference.
 2. **Match H pick armed** → clicked prop donates its height.
-3. **Ctrl+click cycle picking** (see below) — only when the ray actually hit an
+3. **Ctrl+click cycle picking** (see below) - only when the ray actually hit an
    *object* (prop or building) and a candidate exists; otherwise the click falls
    through.
 4. **Press on a prop** → remember it (`m_LeftPressEntity`); on release it's a
@@ -73,30 +88,33 @@ a bigger object (or in a building) can never be click-selected.
 `CyclePick(point, topHit)`:
 1. Scan `m_PropQuery` for copyable props whose **3D** distance to the hit point
    is within `max(2.5 m, diameter/2 + 0.5 m)` (a cheap 30 m rejection runs
-   before the per-entity diameter lookup — the query spans the whole map).
+   before the per-entity diameter lookup - the query spans the whole map).
 2. Sort candidates by distance.
 3. If the click is within 1 m of the previous Ctrl+click, advance an index and
    return the next candidate (wrapping); otherwise return the nearest.
 
 Repeated Ctrl+clicks on the same spot therefore cycle through everything piled
 up there. Shift+Ctrl+click adds the pick to the selection. A Ctrl+click on bare
-terrain finds no candidates and falls through to normal handling — important
+terrain finds no candidates and falls through to normal handling - important
 because users hold Ctrl for nudging and still expect click-to-deselect and
 marquee to work.
 
 ## Marquee selection
 
-The box is **camera-aligned**: at drag start the camera's forward is projected
-onto the ground plane and stored as `m_MarqueeForward`/`m_MarqueeRight`, and
-membership tests are dot products in that basis. The box activates after 1 m of
+The box is **camera-aligned**: at drag start the camera's **right** vector is
+projected onto the ground plane (`CameraGroundAxes`) and stored as
+`m_MarqueeRight`, with `m_MarqueeForward` as its normal, and membership tests
+are dot products in that basis. The right vector is used because it is
+horizontal at every pitch; the forward vector's ground projection shrinks to
+noise when the camera looks straight down, and the box came out rotated. The box activates after 1 m of
 drag (so a sloppy click doesn't open a 5 cm box) and re-scans candidates only
-when the corner has moved > 0.25 m — scanning all objects each frame is the
+when the corner has moved > 0.25 m - scanning all objects each frame is the
 expensive part.
 
 Membership uses each prop's **footprint radius** (from the prefab's geometry
 data, cached per prefab), not just its center, so props visually inside the box
 don't get skipped when only their center is outside. Selection is capped at
-1000 by default — the *Selection limit* slider in Options.
+1000 by default - the *Selection limit* slider in Options.
 
 Marquee-built selections are marked `m_SelectionFromMarquee = true`; the panel
 uses this to suppress the single-prop name row.
@@ -107,7 +125,7 @@ Same release-time geometric pick as fences, through the net quad tree
 (`TryPickNetAt`): the nearest selectable **node** wins inside its own
 radius (from `NodeGeometry` bounds, min 6 m), otherwise the nearest edge
 curve within 2.5 m. Only Road/Pathway/PublicTransportRoad/Train/Tram/
-Subway layers are selectable (`NetData.m_RequiredLayers`) — utility nets
+Subway layers are selectable (`NetData.m_RequiredLayers`) - utility nets
 never. Everything lives in `src/CopasteToolSystem.Networks.cs`.
 
 ## Fence selection
@@ -131,16 +149,16 @@ Two subtleties:
   prop's height projected along the view ray, which used to cause a visible jerk
   at drag start. Therefore `BeginMoveDrag` only flags the drag as pending and
   the per-prop offsets are computed in `InitMoveOffsets` from the **first
-  terrain hit** — the same kind of anchor every later frame uses.
+  terrain hit** - the same kind of anchor every later frame uses.
 - **Undo is pushed in `InitMoveOffsets`,** not at drag start, so a drag that
   aborts before actually moving anything doesn't leave a no-op undo record.
 
 **Alt+drag** moves only the grabbed prop (if it belongs to the selection)
-instead of the whole selection — used for touch-ups after align operations.
+instead of the whole selection - used for touch-ups after align operations.
 
 **Grabbing without a prop:** pressing on an already-selected net node (its
 radius), segment or fence curve (proximity), or painted surface (inside the
-polygon) starts the same move drag with `m_LeftPressEntity = Entity.Null` —
+polygon) starts the same move drag with `m_LeftPressEntity = Entity.Null` - 
 networks-, fence- and surface-only selections drag directly.
 Shift is excluded (it edits the selection).
 
@@ -173,7 +191,7 @@ destination.
 ## Nudge
 
 Ctrl+Arrow keys move the selection continuously at 1 m/s, camera-relative
-(the same basis logic as the marquee). The first press in a burst pushes one
+(the same `CameraGroundAxes` basis as the marquee). The first press in a burst pushes one
 undo record.
 
 ## Type filter ("Select same", T)
@@ -204,11 +222,11 @@ same cached footprint data as the marquee test.
 ## Gotchas
 
 - The raycast returns a single hit. Anything "under" another surface needs the
-  cycle-pick path — do not try to special-case the raycast masks per prop.
+  cycle-pick path - do not try to special-case the raycast masks per prop.
 - Branch order in the click chain matters; new gestures must slot in *below*
   the armed pick modes and must not swallow empty-ground clicks (Ctrl is held
   for nudging).
-- Never compute drag offsets from a mixed-mask hit (prop surface vs terrain) —
+- Never compute drag offsets from a mixed-mask hit (prop surface vs terrain) - 
   that's the parallax jerk.
 - Raw `Keyboard.current` / `Mouse.current` reads happen even when the cursor is
   over the panel; state-changing reactions to raw clicks must be guarded by

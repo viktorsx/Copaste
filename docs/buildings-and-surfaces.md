@@ -11,20 +11,20 @@ filter off the tool behaves exactly like the props-only versions.
   stays excluded always.
 - A separate `m_BuildingQuery` (Building + Transform + PrefabRef, no
   Extension/Owner/Temp/Deleted) feeds the marquee scan, Ctrl+click cycle
-  picking and post-paste resolution — props scans stay building-free when the
+  picking and post-paste resolution - props scans stay building-free when the
   filter is off.
 - **Painted surfaces** (`Game.Areas.Surface`, no `Owner`) are selected by the
   marquee when any polygon node falls inside the box, or, for surfaces bigger
   than the box, when the polygon centroid does. Selected surfaces are drawn as
   a polygon outline in the selection color and tracked in
-  `m_SelectedSurfaces` — WYSIWYG: what is outlined is what copies.
+  `m_SelectedSurfaces` - WYSIWYG: what is outlined is what copies.
 - **Building-owned surfaces** (lot grass/decoration areas) join selection only
   behind the **Building elements** toggle + Surfaces chip, and only when the
-  owner chain leads to a building (`GetOwnerRootBuilding` — road-owned areas
+  owner chain leads to a building (`GetOwnerRootBuilding` - road-owned areas
   never). They can be **selected and deleted (with undo)** but never
   transformed individually: `TransformSurface` refuses any area with `Owner`
   (the building sub-tree move is what moves them). Deleting one also deletes
-  its `SubObject` children and thereby its decoration spawner — see the
+  its `SubObject` children and thereby its decoration spawner - see the
   regeneration section below. Delete-undo restores the `Owner` link and the
   owner's `SubArea` buffer entry (same pattern as `RecreateProp`).
 
@@ -32,11 +32,11 @@ filter off the tool behaves exactly like the props-only versions.
 
 Copy, paste, blueprints, undo of a paste, **transforms** (move drag,
 right-drag group rotation, nudge, Alt+wheel spin, undo/redo), **Relocate**,
-**road snap**, **height** (PgUp/PgDn, End, Match H — the whole lot moves
+**road snap**, **height** (PgUp/PgDn, End, Match H - the whole lot moves
 through the sub-tree primitive) and **delete with undo**. Align tools skip
 buildings (the UI disables them when nothing in the selection can take
 them). Buildings under construction (`Game.Objects.UnderConstruction`) are
-never transformed — the construction flow would race our sub-tree writes —
+never transformed - the construction flow would race our sub-tree writes - 
 but they CAN be deleted, and delete-undo snapshots them too.
 
 ## Selection filters
@@ -44,7 +44,7 @@ but they CAN be deleted, and delete-undo snapshots them too.
 Seven independent hidden settings (`SelectProps/Trees/Decals/Surfaces/
 Buildings`) drive the panel's Selection card (bitmask binding
 `selectionFilters`, triggers `toggleSelectionFilter` and
-`soloSelectionFilter` — the latter is right-click solo). Category detection
+`soloSelectionFilter` - the latter is right-click solo). Category detection
 is runtime-component based: `Building`; `Tree`/`Plant` = vegetation; an
 object without `Game.Objects.Surface` (no collision surface) is a decal;
 everything else is a prop. `IsCategoryEnabled`
@@ -54,7 +54,7 @@ gates `IsCopyable`, so click, marquee and Ctrl+click all honor the filters.
 
 > **Overlap warning.** Relocate moves the real building, so dropping it into
 > another building creates a genuine overlap. The game's own override rules
-> then decide the conflict and may silently remove one of the buildings —
+> then decide the conflict and may silently remove one of the buildings - 
 > this happens inside the game, outside the mod's undo. The "Ignore placement
 > errors when pasting" option does not apply here (it only affects the paste
 > stamp). The Anarchy mod's protection is what keeps overlapped buildings
@@ -65,13 +65,13 @@ gates `IsCopyable`, so click, marquee and Ctrl+click all honor the filters.
 of 30 m plus the building's lot half-depth (a deep lot keeps its correctly
 snapped center far from the road, so a fixed radius rejected exactly the
 buildings that need snapping most). The result is cached until the cursor
-moves 0.5 m; a cached edge that died — the game splits/rejoins road edges
-around building changes — resets the cache.
+moves 0.5 m; a cached edge that died - the game splits/rejoins road edges
+around building changes - resets the cache.
 
 While relocating, the cursor ray can hit the building being carried (tall
 buildings especially). `RelocateRayHitSelf` walks the hit entity's owner
 chain, and when it lands on the relocated building the pointer is projected
-onto the terrain plane at the building's height instead — otherwise the
+onto the terrain plane at the building's height instead - otherwise the
 building chased its own roof, jumping tens of meters per frame, and road
 snap searched in the wrong place.
 `TryComputeRoadSnap` picks the closest point on the edge's bezier, offsets
@@ -84,12 +84,12 @@ facing the road (building local +z toward it).
   ignored while snapped. Toggle: hidden `RoadSnapPaste` setting, panel
   switch visible only while the Buildings filter is on.
 - **Relocate** (`Mode.Relocate`): the selected building follows the cursor
-  with full updates every frame (single building — no throttle; a 250 ms
+  with full updates every frame (single building - no throttle; a 250 ms
   tick was tried and felt awful), snapping when a road is near. Click
   settles and places; RMB/ESC restores the original transform and pops the
-  undo record pushed on entry **by reference** (never blindly the top —
+  undo record pushed on entry **by reference** (never blindly the top - 
   another record may have landed meanwhile). Rotation is deliberately
-  unavailable in this mode — snap owns the facing. Per-frame updates churn
+  unavailable in this mode - snap owns the facing. Per-frame updates churn
   out orphaned sub-elements, so placement and cancel both run the orphan
   sweep (below) around the departure position.
 
@@ -99,14 +99,14 @@ Delete adds vanilla `Deleted` (what the bulldozer does). Undo recreates the
 building from the prefab archetype (`RecreateProp`) plus the
 `UnderConstruction` kick so sidewalks and driveways regenerate, and a
 delayed settle re-runs the road connection. Limitation, by design: the
-restored building is a fresh instance — households and workers are gone,
+restored building is a fresh instance - households and workers are gone,
 because simulation state cannot be faithfully restored.
 
 ## Stuck "No car access" and the delayed settle
 
 The settle after an operation raises `Updated` in the same frame as the
 final writes, so `RoadConnectionSystem` can evaluate against search trees
-that do not yet contain the moved sub-nets — the check misses and the
+that do not yet contain the moved sub-nets - the check misses and the
 warning icon survives. `RunDelayedSettles` re-marks the building and its
 `Building.m_RoadEdge` once more ~4 frames later, when the trees are fresh.
 
@@ -124,7 +124,7 @@ saves stay clean.
 - `CollectBuildingParts` walks `Game.Net.SubNet`, `Game.Net.SubLane`,
   `Game.Areas.SubArea`, recursing into `Game.Buildings.InstalledUpgrade` and
   `Pillar` sub-objects (depth ≤ 3, visited-set dedup). `ConnectionLane`
-  children are skipped — the game re-links them to the public road.
+  children are skipped - the game re-links them to the public road.
 - `TransformBuildingPart` writes by geometry type: `Game.Objects.Transform`
   for objects, `Game.Net.Node` position/rotation for net nodes (plus `Updated`
   on every `ConnectedEdge`, which is what re-snaps driveways to the road),
@@ -156,25 +156,25 @@ Marking the whole tree `Updated` every frame during a drag makes the game
 fight the mouse: terrain leveling, road reconnection and prefab sub-object
 re-layout all run 60×/s. So drags write positions + `BatchesUpdated` every
 frame, but raise full `Updated` only on a 250 ms tick (`BuildingTick`) and
-once cleanly at the end (`SettleBuilding` — which also `Updated`s the old
+once cleanly at the end (`SettleBuilding` - which also `Updated`s the old
 `Building.m_RoadEdge` so the stale road connection and its warning icon get
 released, and refreshes all sub-objects for spawn-point reconnection).
 
 The game re-lays a building's sub-objects from the PREFAB layout on every
-`Updated` — wiping player customization. Countermeasures, both driven from
+`Updated` - wiping player customization. Countermeasures, both driven from
 the relative layout captured at operation start (`CaptureSubPropLayout` in
 `PushTransformUndo`, reset per operation via `ResetSubPropTracking`; the
 walk covers the full tree including sub-net/sub-area-owned objects):
 - `ScheduleSubPropRestore` + `RunSubPropFix` re-assert the captured relative
   transforms for ~10 frames after the operation (moved benches stay moved).
-  A building that was never captured is refused (`m_SubPropCaptured` set) —
+  A building that was never captured is refused (`m_SubPropCaptured` set) - 
   restoring with an empty layout would classify the whole yard as
   "regenerated" and prune it.
 - `PruneRegeneratedSubProps` deletes sub-objects that appear during that
   window but were not in the capture, or that match the deleted-sub-prop
   registry (below). Guard: `IsPrunableSubProp`, a filter-independent
   predicate (never buildings, extensions, vehicles, spawn points, markers,
-  utility objects, placeholders) — deliberately NOT `IsCopyable`, which
+  utility objects, placeholders) - deliberately NOT `IsCopyable`, which
   follows the live filter chips and would make pruning depend on UI state.
 
 ### Building elements toggle
@@ -184,18 +184,18 @@ building-owned things: with it off, neither the marquee nor a plain click can
 select them (`IsCopyable` checks `SelectBuildingProps || !IsOwnedByBuilding`).
 With it on, owned props/trees/decals follow their filter chips, and owned
 surfaces join behind the Surfaces chip. Road-owned elements are outside this
-rule — their owner chain does not lead to a building.
+rule - their owner chain does not lead to a building.
 
 ### Deleted sub-props: the session registry
 
 Direct building sub-props (trash cans, benches, yard trees) are selectable
 via the **Building elements** toggle and deletable with undo. To keep them
-deleted across later moves/relocates — the prefab re-layout would respawn
-them — every delete records a signature `(prefab, local position)` in
+deleted across later moves/relocates - the prefab re-layout would respawn
+them - every delete records a signature `(prefab, local position)` in
 `m_DeletedSubProps`, keyed by root building. Matching is within 1 m local
 distance; capture skips matches, prune and `SweepBuildingSubElements`
 re-delete them. Undo of the delete calls `ForgetDeletedSubProp`, so the
-prop stays restored. **RAM only, never serialized** — the registry (capped
+prop stays restored. **RAM only, never serialized** - the registry (capped
 at 256 buildings) lasts one game session; saves stay vanilla-clean.
 
 `SweepBuildingSubElements` deletes registry-signature matches ONLY. It had
@@ -206,7 +206,7 @@ per operation) fighting the game's legitimate rebuilds, and are gone.
 
 Decorations owned by the building's sub-areas/sub-nets (lot clotheslines,
 driveway decals) are re-generated **with randomized placement** on every lot
-update — including updates the simulation triggers by itself (tenant
+update - including updates the simulation triggers by itself (tenant
 turnover re-decorates the lot). A position signature cannot pin them down,
 so `IsRegeneratingSubElement` (deep-ownership test: owner chain leads to a
 building but the direct owner is neither the building nor an extension)
@@ -217,40 +217,40 @@ into saves, so per-instance deletion stays out of scope.
 
 **The supported path instead: delete the spawner.** The decorations are
 spawned by a decoration *surface* (sub-area) of the lot. With Building
-elements + Surfaces on, that surface is selectable and deletable — plain
+elements + Surfaces on, that surface is selectable and deletable - plain
 vanilla `Deleted` on the area (and its `SubObject` children), nothing in the
 save, and the game does not rebuild sub-areas until the building itself is
 rebuilt (level-up for growables, or delete+undo). Gone spawner, gone
-clotheslines — permanently, across save/load. The same applies to any
+clotheslines - permanently, across save/load. The same applies to any
 other deep-owned decoration excluded from per-instance selection. (Yard
-benches and chairs are NOT this type — they are direct sub-props,
+benches and chairs are NOT this type - they are direct sub-props,
 selectable and deletable individually, kept deleted by the session
 registry.)
 
 ### Lot transplant ("Paste look: Original" for lots)
 
 Rebuilding a building through construction (paste, delete-undo, paste-redo)
-produces a fresh RANDOMIZED factory lot — different path pieces, missing
+produces a fresh RANDOMIZED factory lot - different path pieces, missing
 front-walkway surface, re-rolled decorations. That clashes with the
-"Original" paste-look promise, so every building capture — `ClipboardItem`,
-`PastedRecord`, `TransformSnapshot` — records `SurfaceSig`s: prefab + the
+"Original" paste-look promise, so every building capture - `ClipboardItem`,
+`PastedRecord`, `TransformSnapshot` - records `SurfaceSig`s: prefab + the
 FULL polygon of each lot surface in building-local frame (`null` = not a
 building or still under construction; empty list = the player deleted them
 all). After the rebuilt building finishes construction,
 `SyncBuildingLotSurfaces` (scheduled via `m_PendingSurfacePrune`; the
-countdown RESETS while `UnderConstruction` is present — a paused sim holds
+countdown RESETS while `UnderConstruction` is present - a paused sim holds
 construction indefinitely; the sync is strictly ONE-SHOT, repeating it
 would duplicate surfaces) deletes ALL factory `Surface` sub-areas (with
 their decoration children) and recreates the captured source surfaces as
-building-owned areas at the new transform — same creation pattern as
+building-owned areas at the new transform - same creation pattern as
 `RecreateSurface`, with terrain-sampled node heights.
 
 Gating: paste applies the transplant only with **Paste look: Original**
-(`RandomPasteVariation` off) — "Random" keeps the construction roll.
+(`RandomPasteVariation` off) - "Random" keeps the construction roll.
 Delete-undo and paste-redo always transplant (undo must be faithful).
 Blueprints carry the capture as `BLOT`/`BSURF` lines (see
 [blueprints.md](blueprints.md)). Pending syncs are never forced on tool
-exit — syncing before the game has created every factory surface would
+exit - syncing before the game has created every factory surface would
 leave permanent duplicates. Entries survive deactivation and the countdown
 resumes on the next activation. Copy also skips building-owned surfaces whose owner is in the
 selection (anti-duplicate, same rule as owned props).
@@ -261,7 +261,7 @@ The game's re-layout during moves can drop sub-elements out of ownership
 buffers (its log says "Owner has no SubObject"), stranding them at the old
 position. `SweepOrphansAround(position, radius)` deletes prunable objects
 whose owner chain is dead (`HasDeadOwnerChain`) around the departure point
-— run at drag release, relocate place/cancel and undo/redo teleports.
+ -  run at drag release, relocate place/cancel and undo/redo teleports.
 
 ## The construction trick (why pasted buildings are complete)
 
@@ -279,14 +279,14 @@ new Game.Objects.UnderConstruction { m_NewPrefab = prefab, m_Progress = 250, m_S
 ```
 
 Construction completes within a tick and the game itself builds the sidewalk,
-driveways and attached props — identical to a hand-placed building. This is
+driveways and attached props - identical to a hand-placed building. This is
 done exactly once, at resolution time (never in the repeated fix-up pass, which
 would loop construction forever).
 
 Notes from testing: grown (zoned) buildings pasted outside zoning persist;
 signature/unique buildings paste when *Ignore placement errors when pasting* is on (the
 placement error for duplicates is ignored). Households and workers are not
-copied — the simulation moves people in, which is the desired behavior.
+copied - the simulation moves people in, which is the desired behavior.
 
 ## Painted surfaces pipeline
 
@@ -304,7 +304,7 @@ offsets in the XZ plane together with the objects.
 
 Post-paste, surfaces are resolved by prefab + polygon centroid (they have no
 `Transform`), which feeds undo. On resolution the `AreaFlags.Complete` flag is
-ensured — without it the game's own surface tool treats the polygon as
+ensured - without it the game's own surface tool treats the polygon as
 unfinished and refuses to edit it.
 
 ## Blueprint format addition
@@ -315,16 +315,16 @@ Older mod versions skip these lines harmlessly.
 
 ## Gotchas
 
-- Never re-add `UnderConstruction` in a repeated pass — one-shot at resolution
+- Never re-add `UnderConstruction` in a repeated pass - one-shot at resolution
   only.
 - Building sub-areas belong to the building (`Owner`); the surface machinery
   must only ever touch standalone painted surfaces or it will fight the
   construction system.
-- Surfaces have no `Transform` — every generic "position of entity" code path
+- Surfaces have no `Transform` - every generic "position of entity" code path
   must either skip them or use the polygon centroid.
 - `AreaFlags.Complete` is load-bearing for editability.
 - **Never delete freshly `Created` entities from a standing system in the
-  same frame** — it corrupts the game's creation pipeline and crashes to
+  same frame** - it corrupts the game's creation pipeline and crashes to
   desktop. If something regenerated must go, defer the deletion until the
   owner has settled (the proven pattern is ~30 quiet frames and a pass
   through a command-buffer barrier).

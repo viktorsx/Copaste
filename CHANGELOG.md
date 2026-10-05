@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.2] - 2026-10-05
+
+### Added
+- **Paste height** switch in the Clipboard card. *Follow terrain* (default) keeps every prop at its own height above the ground, so a group bends with a slope. *Keep shape* pastes the group rigid, exactly as copied, which is what a walkway or an overpass built from props needs
+
+### Fixes
+- Props on roads that the game hides from its own cursor ray (a parked-vehicle prop, furniture placed over the asphalt) can now be clicked and dragged reliably. When the ray returns nothing, the click is resolved against the object's bounds instead
+- Bridge supports and pillars are no longer selectable. They belong to the road and the game rebuilds them on every update, so moving or deleting one left a stale entity behind
+- Pasting a group onto a sidewalk no longer lifts it by the sidewalk height on top of the height it already carried
+- Tapping Alt with a road node selected no longer resets the tool on game version 1.6.2. The keyboard scan that ends the Alt tap now skips keys the current layout does not have
+- The game's own Underground toggle in the toolbar stays available while Copaste is active. The tool now declares underground support to the game, so the toggle shows Copaste's underground mode and switches it, the same as the U key and the panel button
+- The selection box and the arrow-key nudge keep their screen alignment when the camera looks straight down. Both took their direction from the camera's forward vector, which has no ground direction at that angle, so the box came out rotated
+- A copied suspension bridge comes out as one bridge again. Pasted bridges and elevated roads are divided the way the game's own road tool divides them, and a bridge built from the game's span pattern is copied, and restored by undo, as the single course it was built from. It used to be cut like a ground road, every few metres, with a pylon at every cut. A bridge whose nodes were moved by hand is still divided piece by piece
+
 ## [1.2.1] - 2026-09-04
 
 ### Fixes
@@ -13,20 +27,20 @@ Fences & Networks update.
 ### Curve bending
 - Select exactly one fence or one road segment and handles appear: two on its ends, and two control points off to the side, each tied to its end by a thin line. Dragging an end moves it while the rest keeps its shape (a fence end also re-links its chained neighbor, a road end keeps its junction updated); dragging a control point reshapes that half of the curve. Undo restores the whole curve
 - A click **selects** a handle first (it turns green) and only a press on the already-selected handle starts dragging, so an ordinary click can never bend the road by accident. PgUp/PgDn move the selected handle, which is how a sloped fence or a raised arc is made
-- **Grab the segment anywhere and bend it**: press on a selected segment's curve wherever you like and pull — it bends under your hand, and the movement is shared between both control points so the shape follows instead of whipping
+- **Grab the segment anywhere and bend it**: press on a selected segment's curve wherever you like and pull - it bends under your hand, and the movement is shared between both control points so the shape follows instead of whipping
 - The control points follow the mouse one to one. They used to sit on the curve itself and be solved for, which moved them more than twice as far as the cursor and made a smooth result hard to reach
 - Guide snapping is measured on screen rather than in meters, so it helps when zoomed out and gets out of the way when zoomed in for fine work, and it holds once caught instead of flickering at the edge
 - **Alt while dragging a fence joint** slides it along the straight line between its two neighbors, the same as Alt on a road node; the chain's outer end slides along its own link's line instead, which extends or shortens the fence without bending it
-- **Lane alignment**: with one road segment selected, a triangle sits next to each joint between two segments. Clicking it cycles the joint through center, left and right alignment — on a lane transition the through lanes line up exactly, which is the classic highway exit look in one click. On streets with sidewalks the targets come from the real driving lanes; on roads without them the roadway edges align
+- **Lane alignment**: with one road segment selected, a triangle sits next to each joint between two segments. Clicking it cycles the joint through center, left and right alignment - on a lane transition the through lanes line up exactly, which is the classic highway exit look in one click. On streets with sidewalks the targets come from the real driving lanes; on roads without them the roadway edges align
 
 ### Networks
-- New Networks filter in the Selection card: road, path and track nodes and segments can be selected (click or box select) and **moved, rotated and nudged** — junctions keep their smooth curves, connected roads stretch to follow, pillars travel along, and the game reconnects buildings and traffic on its own
-- Box select grabs a segment as soon as the box touches its curve — no need to fit both junctions inside
+- New Networks filter in the Selection card: road, path and track nodes and segments can be selected (click or box select) and **moved, rotated and nudged** - junctions keep their smooth curves, connected roads stretch to follow, pillars travel along, and the game reconnects buildings and traffic on its own
+- Box select grabs a segment as soon as the box touches its curve - no need to fit both junctions inside
 - Undo and redo restore moved networks exactly
-- Grab and drag directly: press a selected node, segment, fence or painted surface and pull — no prop needed in the selection
-- **Roads copy and paste**: selected segments go to the clipboard with their upgrades (tree rows, wide sidewalks...), paste shows the game's own ghost preview, pasted pieces weld back into one network — intersections stay intersections — and form junctions with existing roads; undo removes the stamp cleanly, and blueprints store road segments alongside everything else
+- Grab and drag directly: press a selected node, segment, fence or painted surface and pull - no prop needed in the selection
+- **Roads copy and paste**: selected segments go to the clipboard with their upgrades (tree rows, wide sidewalks...), paste shows the game's own ghost preview, pasted pieces weld back into one network - intersections stay intersections - and form junctions with existing roads; undo removes the stamp cleanly, and blueprints store road segments alongside everything else
 - **Delete works on networks**: selected segments are removed the way the bulldozer would, a selected node takes its connecting roads with it, and undo rebuilds the piece welded together, upgrades included
-- **Tap Alt to straighten**: a selected middle node (or a run of them) snaps onto the straight line between its neighbors and the road through it straightens out — junctions and dead ends stay put
+- **Tap Alt to straighten**: a selected middle node (or a run of them) snaps onto the straight line between its neighbors and the road through it straightens out - junctions and dead ends stay put
 - **Junction state travels with the copy**: roundabouts, manual traffic lights and stop signs are captured with the roads and rebuilt on the paste, saved into blueprints, and undo of a deleted junction brings them back too
 - **Redo** re-applies an undone road paste or deletion, including pieces the game splits at tunnel portals and retaining walls
 - Moving a junction **keeps the lane alignment** of every road meeting it: an exit that was lined up by hand stays lined up instead of snapping back to center
@@ -41,7 +55,7 @@ Fences & Networks update.
 - Delete removes a fence with its endpoints (shared joints of a chain are kept while another link still needs them); undo brings it back and reattaches it to the chain
 - Blueprints store fences alongside props, buildings and surfaces
 - PgUp/PgDn raise and lower fences (they hold the height on their own), End drops them back onto the terrain
-- Pasted fences no longer weld themselves to nearby existing fences — each paste stays its own piece, the same way the game keeps building fences separate
+- Pasted fences no longer weld themselves to nearby existing fences - each paste stays its own piece, the same way the game keeps building fences separate
 - Fences owned by buildings are intentionally not selectable - the building manages those
 
 ### Blueprints
@@ -51,7 +65,7 @@ Fences & Networks update.
 - The three safety limits are now sliders in Options: selection size (default 1000), selection outlines (default 400) and the Selected props list (default 50) - stronger machines can raise them
 - **Mod language**: the mod can speak its own language regardless of the game's, or follow the game as before
 - **Panel theme**: a Vanilla option draws the panel inside the game's own panel chrome so it blends in with the rest of the interface
-- **Panel size** (80–125%) scales the whole panel, and a separate **Text size** (90–130%) grows the lettering without changing the layout
+- **Panel size** (80-125%) scales the whole panel, and a separate **Text size** (90-130%) grows the lettering without changing the layout
 - The Options page is now split into named sections: Behavior, Panel, Limits, and the key bindings tab
 - The old "Anarchy while pasting" option is now called **Ignore placement errors when pasting**, and its description spells out what it does and does not cover - the name promised more than the option ever did
 
@@ -68,7 +82,7 @@ Fences & Networks update.
 - Switching a selection filter no longer stutters: saving the setting was reloading the game's whole localization dictionary every time
 
 ### Fixes
-- **Loading another city clears the history.** Undo and redo used to carry over from the city you just left, where the same steps meant something else entirely — an undo could remove one of the new city's own buildings, or bring back one from the old city. The clipboard is deliberately kept, so copying in one city and pasting in another still works
+- **Loading another city clears the history.** Undo and redo used to carry over from the city you just left, where the same steps meant something else entirely - an undo could remove one of the new city's own buildings, or bring back one from the old city. The clipboard is deliberately kept, so copying in one city and pasting in another still works
 - Renaming a blueprint and then clicking somewhere else no longer leaves the tool deaf: clicks, Delete, undo and every shortcut kept being swallowed until the game was restarted
 - Undo of a paste no longer removes things that were already there. Pasting a road over one you had built could make the game split the old road, and undo then treated the pieces as part of the stamp
 - Deleting a painted surface with its plantings is reliable again; with a certain number of children it could stop partway

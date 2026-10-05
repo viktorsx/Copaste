@@ -5,11 +5,11 @@ of three kinds: `Transforms`, `Delete`, `Paste`. Undoing moves a record (or
 its inverse) onto the redo stack; redoing moves it back. Any NEW action
 clears the redo stack (`PushUndo` → `m_RedoStack.Clear()`). The undo/redo/
 delete hotkeys are ignored while a gesture is active (move drag, RMB
-rotation, marquee) — firing mid-gesture would eat the gesture's own record.
+rotation, marquee) - firing mid-gesture would eat the gesture's own record.
 
 ## Transform records
 
-`UndoKind.Transforms` — pushed before any operation that mutates existing
+`UndoKind.Transforms` - pushed before any operation that mutates existing
 props: move drag (at the moment offsets are initialized, so an aborted drag
 leaves no empty record), rotation bursts, height changes, nudge bursts, align
 operations, and Alt+wheel spin bursts.
@@ -39,12 +39,12 @@ passed since the previous one.
 
 ## Delete records
 
-`UndoKind.Delete` — pushed by Delete with a full `TransformSnapshot` list
-(props, buildings — including under-construction ones — and surfaces).
+`UndoKind.Delete` - pushed by Delete with a full `TransformSnapshot` list
+(props, buildings - including under-construction ones - and surfaces).
 Undo rebuilds every entity (below), redo deletes them again. Order matters:
 the record is placed on the redo stack **before** recreation, so
 `RemapHistoryEntity` can rewrite the old entity ids inside it (and in every
-other record on both stacks) as each entity comes back — without the remap,
+other record on both stacks) as each entity comes back - without the remap,
 a second undo/redo cycle would reference dead entities.
 
 Recreating a deleted building adds the `UnderConstruction` kick (sidewalk +
@@ -72,11 +72,11 @@ Two placement quirks:
 
 ## Paste records
 
-`UndoKind.Paste` — pushed at stamp time. The payload is the same
+`UndoKind.Paste` - pushed at stamp time. The payload is the same
 `PastedRecord` list the post-paste fix resolves (see
 [clipboard-and-paste.md](clipboard-and-paste.md#post-paste-fix-up)); by the
 time the user hits Ctrl+Z the records carry the actual entity ids the paste
-created. Undo deletes exactly those entities — identical pre-existing props on
+created. Undo deletes exactly those entities - identical pre-existing props on
 the same spot are untouched, because resolution claims at most one entity per
 record.
 
@@ -95,7 +95,7 @@ identical existing buildings in the paste bounds, so resolution can never
 Road edges ride the same three record kinds with their own snapshots
 (`NetEdgeSnapshot`): the full bezier curve, prefab, upgrade flags, both
 node positions, per-end elevations, and the junction state of both nodes
-(node upgrade flags plus marker sub-objects — roundabouts, traffic
+(node upgrade flags plus marker sub-objects - roundabouts, traffic
 lights, stop signs).
 
 - **Delete undo** re-emits the pieces through the game's definition
@@ -103,12 +103,12 @@ lights, stop signs).
   Junction upgrades come back as zero-length node courses that carry the
   terrain-relative elevation (a course without it can win the node merge
   and ground an elevated junction); markers re-attach by position once
-  the recreated node physically exists — they get their own frame window,
+  the recreated node physically exists - they get their own frame window,
   because nodes are born a few frames after the edges.
 - The game may **split** a recreated piece (tunnel portals, retaining
   walls), so when a recorded entity id is dead, redo deletes by geometry:
   every same-prefab piece lying wholly on the recorded curve, matched in
-  xz **and height** — a stacked tunnel or bridge of the same road type is
+  xz **and height** - a stacked tunnel or bridge of the same road type is
   never a false match.
 - Transform undo restores node positions and every affected curve;
   endpoint lateral offsets (lane alignment) are part of the curve and
@@ -119,7 +119,7 @@ lights, stop signs).
   click can never stamp an untracked duplicate.
 - Undo/redo snapshots of *unresolved* paste records read the clipboard
   node tables only while the clipboard **generation** still matches the
-  stamp — a later copy rebuilds the tables and stale indices would
+  stamp - a later copy rebuilds the tables and stale indices would
   otherwise pick up a different clipboard's markers.
 
 ## What is *not* undoable
@@ -127,7 +127,7 @@ lights, stop signs).
 Loading another city discards the whole history (`DiscardWorldBoundState`,
 called from `OnGameLoadingComplete`): entity ids and recorded positions mean
 something else in the new city, so an undo there could remove one of its own
-buildings. The clipboard is kept — prefabs survive a load.
+buildings. The clipboard is kept - prefabs survive a load.
 
 Blueprint file operations (save/delete/rename) and settings changes. Undo also
 ends any live align session before applying (the session's geometry would be

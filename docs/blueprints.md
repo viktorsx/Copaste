@@ -15,10 +15,10 @@ Line 1 is the magic header `COPASTE1`. Every following line is one prop,
 
 | # | Field | Notes |
 |---|---|---|
-| 0 | prefab type name | e.g. `StaticObjectPrefab` — used with field 1 as a `PrefabID` |
+| 0 | prefab type name | e.g. `StaticObjectPrefab` - used with field 1 as a `PrefabID` |
 | 1 | prefab name | |
-| 2–4 | offset x/y/z | relative to the group centroid, `R` round-trip floats, invariant culture |
-| 5–8 | rotation quaternion x/y/z/w | |
+| 2-4 | offset x/y/z | relative to the group centroid, `R` round-trip floats, invariant culture |
+| 5-8 | rotation quaternion x/y/z/w | |
 | 9 | height offset | height above terrain at copy time |
 | 10 | diameter | footprint cache for overlays |
 | 11 | had tree flag (`1`/`0`) | since v1.0.4 |
@@ -34,7 +34,7 @@ lacks simply stay at their defaults. The writer always emits the newest
 format. Names containing `|` are skipped at save time.
 
 **Asset hashes (v1.2.0):** the game identifies a prefab by type + name +
-asset hash, and Paradox Mods assets register with a non-empty hash — a
+asset hash, and Paradox Mods assets register with a non-empty hash - a
 name-only lookup misses them. Lines referencing such assets carry the hash
 (field 16 for props; an extra field before the polygon for `AREA`/`BSURF`);
 loading tries the hashed lookup first and falls back to name-only, so old
@@ -44,37 +44,37 @@ at the end of their lot block so the 1.1.0 loader skips only them, not the
 rest of the block.
 
 **Painted surfaces (v1.1.0):** serialized as their own line type,
-`AREA|prefabType|prefabName|x,z;x,z;...` — the polygon as centroid-relative
+`AREA|prefabType|prefabName|x,z;x,z;...` - the polygon as centroid-relative
 XZ pairs (`;`-separated, invariant culture). Loaders older than 1.1.0 skip
 these lines because the field count doesn't match any object format.
 
 **Building lot surfaces (v1.1.0):** a building line may be followed by
-`BLOT|n` and then `n` lines of `BSURF|prefabType|prefabName|x,z;x,z;...` —
+`BLOT|n` and then `n` lines of `BSURF|prefabType|prefabName|x,z;x,z;...` - 
 one per lot surface of the source building, the polygon in building-local
 XZ. They apply to the most recently parsed item. With *Paste look:
 Original*, after paste construction the factory lot surfaces are replaced
 by exact copies of these, so the copy's lot looks like the source's
 (deleted surfaces stay deleted, reshapes carry over). `BLOT|0` with no
-BSURF lines means the source had none left — the copy's factory surfaces
+BSURF lines means the source had none left - the copy's factory surfaces
 are all removed. Old loaders skip both line types (field counts and type
 tags match no known format).
 
 **Fences (v1.2.0):** their own line type,
-`LANE|prefabType|prefabName|hash|seed|x,z,h;x,z,h;x,z,h;x,z,h` — the four
+`LANE|prefabType|prefabName|hash|seed|x,z,h;x,z,h;x,z,h;x,z,h` - the four
 bezier control points as centroid-relative XZ plus each point's height
 above terrain (`-` = no hash, `-1` = no seed). Pasting rebuilds the curve
 on the destination terrain. Old loaders skip the line.
 
-**Roads (v1.2.0):** two line types. `NETNODE|x,z,h|g,l,r` — one per source
+**Roads (v1.2.0):** two line types. `NETNODE|x,z,h|g,l,r` - one per source
 junction node, in order: centroid-relative XZ + height above terrain, then
 the node's upgrade flags (three uints, or `-`). The node table is what lets
 a pasted blueprint weld its segments back together (welding needs a
 bit-identical shared point).
-`ROAD|prefabType|prefabName|hash|upgrades|x,z,h;×4|start,end` — the
+`ROAD|prefabType|prefabName|hash|upgrades|x,z,h;×4|start,end` - the
 four-point curve encoding as fences; `upgrades` is three uints `g,l,r`
 (composition flags general/left/right) or `-`; `start,end` are indices
 into the NETNODE table (`-1` = unknown, falls back to proximity welding).
-`NETMARK|index|prefabType|prefabName|hash` — one line per junction marker
+`NETMARK|index|prefabType|prefabName|hash` - one line per junction marker
 (roundabout, manual traffic light, stop sign), pointing at its NETNODE by
 index. These are sub-objects of the node rather than upgrade flags, so they
 cannot ride in the NETNODE line, and a node can carry several.
@@ -85,7 +85,7 @@ loaders skip all three line types.
 ## Saving
 
 `SaveBlueprint()` snapshots **the current selection** (falling back to the
-clipboard only when nothing is selected — e.g. re-saving a loaded blueprint).
+clipboard only when nothing is selected - e.g. re-saving a loaded blueprint).
 The panel only shows the Save button while something is selected, which
 prevents the classic "saved the previous clipboard by accident" mistake.
 
@@ -102,7 +102,7 @@ refreshes the preview if already pasting).
 
 All names coming from the UI pass through `SanitizeBlueprintName`:
 `Path.GetInvalidFileNameChars` are stripped, `..` is rejected, and the result
-must be non-empty. This runs on load, save, delete and both ends of rename —
+must be non-empty. This runs on load, save, delete and both ends of rename - 
 the panel is cohtml content, so filenames must be treated as untrusted input
 (path traversal).
 

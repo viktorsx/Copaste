@@ -5,3 +5,8 @@ obj/
 assets/
 Library/
 logs/
+
+# Claude Code: lokalna uputstva i skillovi, ne idu u repo
+CLAUDE.md
+CLAUDE.local.md
+.claude/

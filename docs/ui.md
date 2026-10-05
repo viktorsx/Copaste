@@ -1,7 +1,7 @@
 # UI (cohtml / Gameface)
 
 The in-game UI is `ui/Copaste.mjs` + `ui/Copaste.css`, rendered by the game's
-embedded **Coherent Gameface** engine — an HTML/CSS/JS subset, *not* a browser.
+embedded **Coherent Gameface** engine - an HTML/CSS/JS subset, *not* a browser.
 There is no build step: the `.mjs` is plain JavaScript shipped as-is.
 
 ## Module structure
@@ -9,11 +9,11 @@ There is no build step: the `.mjs` is plain JavaScript shipped as-is.
 The game imports the module and calls the default export with a
 `moduleRegistry`:
 
-- `moduleRegistry.append("GameTopLeft", CopasteButton)` — the toolbar button
-- `moduleRegistry.append("Game", CopastePanel)` — the floating panel
+- `moduleRegistry.append("GameTopLeft", CopasteButton)` - the toolbar button
+- `moduleRegistry.append("Game", CopastePanel)` - the floating panel
 - Everything comes from **globals**: `window.React`, `window["cs2/api"]`
   (`bindValue`, `trigger`, `useValue`), `window["cs2/ui"]` (`Tooltip`,
-  `Button`). **Never use `import` in the .mjs** — the game's module loader does
+  `Button`). **Never use `import` in the .mjs** - the game's module loader does
   not resolve bare imports; missing globals are logged and the module bails.
 
 ### Toolbar button
@@ -37,7 +37,7 @@ body inside the game's `Panel` component from `cs2/ui` (game colors and
 header; dragging goes through the game's header). Without `ui.Panel`
 (older game builds) Vanilla falls back to a CSS variant driven by the
 game's `--panelColor*`/`--accentColor*` variables. **Text size** sets a
-`font-size` on the panel root — every inner text size is in `em`, so
+`font-size` on the panel root - every inner text size is in `em`, so
 lettering scales without changing the panel's layout.
 
 The panel is draggable by its header: mouse deltas are applied to `top/left`
@@ -55,17 +55,18 @@ Value bindings (C# → UI), group `copaste`:
 | `toolActive` | bool | panel visibility |
 | `pasteMode` | bool | Paste button glow + hint text |
 | `selectedCount`, `clipboardCount`, `undoCount`, `redoCount` | int | counters / enablement |
-| `copyableCount`, `deletableCount` | int | what Copy and Delete would act on — gate those buttons |
-| `propCount` | int | selected non-building objects — gates align buttons |
-| `heightCount` | int | selected height targets (props + finished buildings) — gates height buttons |
+| `copyableCount`, `deletableCount` | int | what Copy and Delete would act on - gate those buttons |
+| `propCount` | int | selected non-building objects - gates align buttons |
+| `heightCount` | int | selected height targets (props + finished buildings) - gates height buttons |
 | `blueprints` | string | newline-separated names |
 | `sameFilter` | string | active type filter name ("" = off) |
 | `heightPickArmed`, `alignPickArmed` | bool | pick-mode glow + hints |
 | `selectedName` | string | name when exactly one prop/surface is click-selected |
 | `panelX`, `panelY` | int | saved panel position (px; −1 = default) |
 | `randomVariation` | bool | Original/Random paste toggle |
+| `pasteKeepShape` | bool | Paste height toggle: false = follow terrain, true = keep shape |
 | `roadSnap` | bool | Road snap switch (row visible while Buildings filter on) |
-| `buildingProps` | bool | Building elements switch — selection may reach building-owned props/trees/decals/surfaces; off = not even click |
+| `buildingProps` | bool | Building elements switch - selection may reach building-owned props/trees/decals/surfaces; off = not even click |
 | `selectionFilters` | int | bitmask: 1 Props, 2 Trees, 4 Decals, 8 Surfaces, 16 Buildings, 32 Fences, 64 Networks |
 | `uiTheme` | int | 0 Copaste theme, 1 Vanilla (native game panel) |
 | `underground` | bool | underground view state (the stats-row button) |
@@ -73,7 +74,7 @@ Value bindings (C# → UI), group `copaste`:
 | `relocateReady`, `relocating` | bool | Relocate button enable / lit state + hint |
 | `alignGapLive` | float | current session gap (−1 = no session) |
 | `alignSessionSource` | int | 0 none / 1 Line / 2 To prop / 3 Circle |
-| `selectionList` | string | `idx:ver:name` lines for selections of 2–50 |
+| `selectionList` | string | `idx:ver:name` lines for selections of 2-50 |
 
 Triggers (UI → C#): `toggleTool`, `actionCopy`, `actionPaste`, `actionDelete`,
 `actionUndo`, `actionRedo`, `actionRelocate`, `clearClipboard`,
@@ -101,21 +102,21 @@ trigger hotkeys.
 
 ## Gameface constraints (learned in production)
 
-These are the ones that actually bit us — treat them as law:
+These are the ones that actually bit us - treat them as law:
 
 1. **SVG needs explicit dimensions.** Every SVG must carry
    `width="100%" height="100%"` (plus `viewBox`); without them Gameface renders
    the image tiny regardless of CSS on the `<img>`.
-2. **No styled scrollbars.** `::-webkit-scrollbar` rules are ignored — an
+2. **No styled scrollbars.** `::-webkit-scrollbar` rules are ignored - an
    `overflow-y: auto` area scrolls invisibly. That's why both panel lists use
    explicit **pagination** instead of scrollbars.
 3. **Scroll containers clip block children, not bare `<button>`s.** Rows inside
    a max-height container must be wrapped in `<div>`s or the container just
    grows.
-4. **Flexbox yes, grid no.** Avoid flex `gap` too — negative-margin +
+4. **Flexbox yes, grid no.** Avoid flex `gap` too - negative-margin +
    per-child margin is the reliable spacing pattern (`.copasteBtns` /
    `.copasteBtn`).
-5. **`rem` is the game's scale unit** — roughly 1 px at 1080p, scaling with
+5. **`rem` is the game's scale unit** - roughly 1 px at 1080p, scaling with
    resolution/UI scale. Panel position, however, is stored in *pixels* because
    it comes from mouse coordinates.
 6. Linear gradients, border-radius, opacity, transitions, `backdrop-filter`
@@ -131,7 +132,7 @@ These are the ones that actually bit us — treat them as law:
 
 All classes are prefixed `copaste`. Cards (`copasteCard`) hold sections;
 buttons share `copasteBtn` with modifier classes
-(`copasteBtnPrimary` — green solid, `copasteBtnDanger` — red tint,
-`copasteBtnActive` — green glow toggle, `copasteBtnDisabled`). Icons inside
+(`copasteBtnPrimary` - green solid, `copasteBtnDanger` - red tint,
+`copasteBtnActive` - green glow toggle, `copasteBtnDisabled`). Icons inside
 text buttons use `copasteBtnIcon` (11 rem). The stepper
 (`copasteStepper*`) is reused as the shared pager for both lists.

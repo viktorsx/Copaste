@@ -43,7 +43,7 @@ another tool takes over.
 
 `OnUpdate` is wrapped in try/catch: any exception logs the error and calls
 `ResetToolState()` instead of letting the game's tool loop crash. This is a core
-safety rule — a bug in Copaste must degrade to "tool reset", never to a CTD.
+safety rule - a bug in Copaste must degrade to "tool reset", never to a CTD.
 
 The tool has three modes (`Mode.Select` / `Mode.Paste` / `Mode.Relocate`)
 with separate update paths: `UpdateSelectMode()`, `UpdatePasteMode()` and
@@ -86,7 +86,7 @@ Every feature must pass all three:
 2. **Official pipelines only.** Placement goes through the definition pipeline;
    no Harmony patches anywhere in the mod.
 3. **Errors kill the action, never the game.** Try/catch around the update loop,
-   safety limits (1000 selected objects, 400 overlay circles — both sliders in Options), and graceful fallback
+   safety limits (1000 selected objects, 400 overlay circles - both sliders in Options), and graceful fallback
    when optional integrations (Anarchy) are missing.
 
 ## Optional Anarchy integration
@@ -101,5 +101,5 @@ absent everything still works, minus that extra protection.
 
 Everything runs on the main thread inside `OnUpdate`. The heavy queries
 (`m_PropQuery.ToEntityArray` etc.) are synchronous snapshots taken only when
-needed (marquee scan steps, click picking, post-paste frames) — the mod
+needed (marquee scan steps, click picking, post-paste frames) - the mod
 schedules no jobs of its own.

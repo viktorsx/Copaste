@@ -2,7 +2,7 @@
 
 Copaste is measured, not estimated. During development an instrumented
 build times the mod's two update loops, bucketed by what the user is doing,
-and the individual sections inside them — the raycast, the hover pick,
+and the individual sections inside them - the raycast, the hover pick,
 overlay drawing, deferred work, the box-select scan. Rounds are repeated
 across many build, play and measure cycles until the numbers stop moving.
 The instrumentation is not part of the released mod.
@@ -32,7 +32,7 @@ and they are gone.
 ## What was optimized
 
 - **The panel** walked the entire selection every frame to refresh two
-  counters and the name list — several thousand entity lookups per frame with
+  counters and the name list - several thousand entity lookups per frame with
   a large selection. Those values are now recomputed only when the selection
   actually changes, behind a check that reads nothing from the game.
 - **The raycast**, the single most expensive thing the tool does while it is
