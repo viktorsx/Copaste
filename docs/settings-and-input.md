@@ -8,7 +8,8 @@ Options screen is split into two tabs via `SettingsUITabOrder` /
 (`SettingsUIGroupOrder` + `SettingsUIShowGroupName`):
 
 - **General** → Behavior: *Mod language* (Auto / English / German / French /
-  Serbian - Auto follows the game) and *Ignore placement errors when pasting*
+  Serbian / Simplified Chinese / Japanese / Russian - Auto follows the game)
+  and *Ignore placement errors when pasting*
   (default on; paste stamp only, no override protection)
 - **General** → Panel: *Panel theme* (Copaste / Vanilla - Vanilla hosts the
   panel in the game's own chrome), *Panel size* (80-125%) and *Text size*
@@ -53,6 +54,8 @@ the tool is active:
 | Relocate building | Tab (starts relocate when exactly one finished building is selected; cancels while relocating) |
 | Delete selection | Delete |
 | Raise / Lower | PgUp / PgDn |
+| Rotate left / right | , / . (held, 60°/s) |
+| Rotate left / right (fine) | Shift+, / Shift+. (held, 10°/s) |
 | Select same (filter) | T |
 | Snap to ground / Match height | End / Home |
 | Nudge away/towards/left/right | Ctrl+Arrows |
@@ -79,9 +82,11 @@ movement while held disarms it, and releasing Alt clean fires it.
 ## Localization
 
 `Localization.cs` builds one dictionary per locale (English `en-US`, German
-`de-DE`, French `fr-FR`, Serbian `sr-SP`) and `Mod.OnLoad` registers them as
+`de-DE`, French `fr-FR`, Serbian `sr-SP`, Simplified Chinese `zh-HANS`,
+Japanese `ja-JP`, Russian `ru-RU`) and `Mod.OnLoad` registers them as
 localization sources (non-English ones only when the game/I18N mod reports
-the locale as supported). Every
+the locale as supported; the match is by locale prefix, so `zh-HANS` does
+not catch `zh-HANT`). Every
 settings option, tab, group and binding name needs entries via the
 `ModSetting` locale-id helpers (`GetOptionLabelLocaleID`,
 `GetOptionDescLocaleID`, `GetOptionTabLocaleID`, `GetOptionGroupLocaleID`,

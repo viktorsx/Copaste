@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0] - 2026-10-27
+
+### Added
+- Rotate with the keyboard: **,** and **.** turn the selection (or the paste preview) steadily while held, **Shift + ,** and **Shift + .** turn slowly for fine placement. Both pairs can be rebound in Options
+- **Rotate by** field in the Align card: the rotate buttons now turn by the angle typed there (45 degrees when empty), so any exact angle can be applied
+- **?** button in the panel header: swaps the panel for a list of every gesture and key the tool understands, grouped by Selection, Paste, Edit, Roads & fences and Panel
+- Simplified Chinese, Japanese and Russian translations of the panel and the Options screen, with matching Mod language choices
+
+### Fixes
+- PgUp and PgDn raise and lower again instead of switching to underground view. The game's round Underground toggle in the toolbar is dark while Copaste is active, as it was in 1.2.1; the U key and the panel button switch the view as before
+- Custom assets built on a pillar, such as piers, bridge pieces and some industrial props, can be selected again. Since 1.2.2 every object with a pillar component was skipped; now only the supports a road builds for itself are
+
 ## [1.2.2] - 2026-10-05
 
 ### Added

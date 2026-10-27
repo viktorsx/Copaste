@@ -202,6 +202,18 @@ namespace Copaste
         private ProxyAction m_DeleteAction;
         private ProxyAction m_RaiseAction;
         private ProxyAction m_LowerAction;
+        private ProxyAction m_RotateLeftAction;
+        private ProxyAction m_RotateRightAction;
+        private ProxyAction m_RotateLeftFineAction;
+        private ProxyAction m_RotateRightFineAction;
+
+        // Rotacija tasterima je jedan potez od prvog pritiska do otpuštanja:
+        // jedan undo zapis na početku, settle na kraju, kao RMB prevlačenje.
+        private bool m_KeyRotateActive;
+
+        // 60°/s dok se drži, 10°/s u finoj varijanti.
+        private const float kKeyRotateSpeed = 1.0471976f;
+        private const float kKeyRotateFineSpeed = 0.17453292f;
         private ProxyAction m_UndoAction;
         private ProxyAction m_RedoAction;
         private ProxyAction m_RelocateAction;
@@ -529,20 +541,12 @@ namespace Copaste
             return false;
         }
 
-        // Alat podržava podzemni režim, i to kaže igri. Igrin okrugli
-        // Underground prekidač u toolbaru je ugašen (crn) za svaki alat koji
-        // ovo ne prijavi, a mi podzemni režim imamo (taster U i dugme u
-        // panelu). Sa ovim prekidač ostaje živ, pokazuje naše stanje
-        // (requireUnderground) i klik na njega ide u SetUnderground ispod.
-        public override bool allowUnderground => true;
-
-        public override void SetUnderground(bool underground)
-        {
-            if (m_Mode != Mode.Relocate)
-            {
-                UndergroundMode = underground;
-            }
-        }
+        // Podzemni režim imamo (taster U i dugme u panelu), ali ga igri NE
+        // prijavljujemo (allowUnderground ostaje false). Alat koji ga prijavi
+        // dobija od igre i njene prečice "Enter/Exit Underground Mode", a to
+        // su PageDown/PageUp, isti tasteri kao naši Raise/Lower. Cena je što
+        // je igrin okrugli Underground prekidač u toolbaru taman dok je alat
+        // aktivan, kao i za MoveIt.
 
         public override void InitializeRaycast()
         {
@@ -638,11 +642,6 @@ namespace Copaste
                     // hodaju — cim koji stoji nema Moving pa bi prošao.
                     ComponentType.ReadOnly<Game.Creatures.Creature>(),
                     ComponentType.ReadOnly<Owner>(),
-
-                    // Stubovi mosta i nadvožnjaka su deo puta: igra ih sama
-                    // pravi i ponovo gradi na svaki update deonice, pa bi
-                    // pomeren ili obrisan stub ostao kao bajat entitet.
-                    ComponentType.ReadOnly<Game.Objects.Pillar>(),
 
                     // Nevidljivi funkcionalni objekti — nikad nisu meta selekcije.
                     // SpawnLocation NIJE ovde: nose je i klupe/stolice (sedanje) —
@@ -770,6 +769,10 @@ namespace Copaste
             m_DeleteAction = Mod.Settings.GetAction(CopasteSettings.kDeleteAction);
             m_RaiseAction = Mod.Settings.GetAction(CopasteSettings.kRaiseAction);
             m_LowerAction = Mod.Settings.GetAction(CopasteSettings.kLowerAction);
+            m_RotateLeftAction = Mod.Settings.GetAction(CopasteSettings.kRotateLeftAction);
+            m_RotateRightAction = Mod.Settings.GetAction(CopasteSettings.kRotateRightAction);
+            m_RotateLeftFineAction = Mod.Settings.GetAction(CopasteSettings.kRotateLeftFineAction);
+            m_RotateRightFineAction = Mod.Settings.GetAction(CopasteSettings.kRotateRightFineAction);
             m_UndoAction = Mod.Settings.GetAction(CopasteSettings.kUndoAction);
             m_RedoAction = Mod.Settings.GetAction(CopasteSettings.kRedoAction);
             m_RelocateAction = Mod.Settings.GetAction(CopasteSettings.kRelocateAction);
@@ -873,6 +876,11 @@ namespace Copaste
             m_DeleteAction.shouldBeEnabled = true;
             m_RaiseAction.shouldBeEnabled = true;
             m_LowerAction.shouldBeEnabled = true;
+            m_RotateLeftAction.shouldBeEnabled = true;
+            m_RotateRightAction.shouldBeEnabled = true;
+            m_RotateLeftFineAction.shouldBeEnabled = true;
+            m_RotateRightFineAction.shouldBeEnabled = true;
+            m_KeyRotateActive = false;
             m_UndoAction.shouldBeEnabled = true;
             m_RedoAction.shouldBeEnabled = true;
             m_RelocateAction.shouldBeEnabled = true;
@@ -904,6 +912,11 @@ namespace Copaste
             m_DeleteAction.shouldBeEnabled = false;
             m_RaiseAction.shouldBeEnabled = false;
             m_LowerAction.shouldBeEnabled = false;
+            m_RotateLeftAction.shouldBeEnabled = false;
+            m_RotateRightAction.shouldBeEnabled = false;
+            m_RotateLeftFineAction.shouldBeEnabled = false;
+            m_RotateRightFineAction.shouldBeEnabled = false;
+            m_KeyRotateActive = false;
             m_UndoAction.shouldBeEnabled = false;
             m_RedoAction.shouldBeEnabled = false;
             m_RelocateAction.shouldBeEnabled = false;
@@ -1579,6 +1592,62 @@ namespace Copaste
         }
 
         // Kontinuirano dizanje/spuštanje dok je taster pritisnut (~4 m/s).
+        // Rotacija tasterima za ovaj frejm (radijani, desno pozitivno).
+        private float GetRotateInputDelta()
+        {
+            if (m_UiTyping)
+            {
+                return 0f;
+            }
+
+            float dt = UnityEngine.Time.deltaTime;
+            float delta = 0f;
+            if (m_RotateLeftAction.IsPressed())
+            {
+                delta -= kKeyRotateSpeed * dt;
+            }
+
+            if (m_RotateRightAction.IsPressed())
+            {
+                delta += kKeyRotateSpeed * dt;
+            }
+
+            if (m_RotateLeftFineAction.IsPressed())
+            {
+                delta -= kKeyRotateFineSpeed * dt;
+            }
+
+            if (m_RotateRightFineAction.IsPressed())
+            {
+                delta += kKeyRotateFineSpeed * dt;
+            }
+
+            return delta;
+        }
+
+        private bool AnyRotateKeyPressed()
+        {
+            return m_RotateLeftAction.IsPressed() || m_RotateRightAction.IsPressed() ||
+                m_RotateLeftFineAction.IsPressed() || m_RotateRightFineAction.IsPressed();
+        }
+
+        // Završni update posle rotacije bez RMB release događaja (dugme,
+        // tasteri): samo gotove zgrade, pa površine, ograde i mreže.
+        private void SettleAfterRotation()
+        {
+            foreach (Entity entity in m_Selected)
+            {
+                if (IsBuilding(entity) && IsMovableBuilding(entity))
+                {
+                    SettleBuilding(entity);
+                }
+            }
+
+            SettleSurfaces();
+            SettleLanes();
+            SettleNetworks();
+        }
+
         private float GetHeightInputDelta()
         {
             float speed = 4f * UnityEngine.Time.deltaTime;
@@ -2418,6 +2487,30 @@ namespace Copaste
                 RotateSelection(rotationDelta);
             }
 
+            // Rotacija tasterima: prvi pritisak otvara potez (centar + undo),
+            // držanje okreće, otpuštanje poslednjeg tastera radi settle.
+            // Svaki drugi gest (prevlačenje, RMB, okvir, ručka) i klik koji
+            // menja selekciju zatvaraju potez; sledeći frejm sa tasterom
+            // otvara nov, sa novim centrom i svojim undo zapisom.
+            float keyRotate = GetRotateInputDelta();
+            bool keyRotateBlocked = m_HandleDragging || m_RightDragging || m_MoveDragging || m_MarqueeActive || ClickedThisFrame();
+            if (keyRotate != 0f && !keyRotateBlocked && SelectionHasTransformTargets())
+            {
+                if (!m_KeyRotateActive)
+                {
+                    m_KeyRotateActive = true;
+                    m_RotationCenter = GetSelectionCenter();
+                    PushTransformUndo();
+                }
+
+                RotateSelection(keyRotate);
+            }
+            else if (m_KeyRotateActive && (keyRotateBlocked || !AnyRotateKeyPressed()))
+            {
+                m_KeyRotateActive = false;
+                SettleAfterRotation();
+            }
+
             bool raycastValid = GetRaycastResult(out Entity raycastEntity, out RaycastHit hit);
             Entity hitEntity = raycastValid && IsCopyable(raycastEntity) ? raycastEntity : Entity.Null;
 
@@ -2809,7 +2902,7 @@ namespace Copaste
             // Tokom aktivnog poteza (drag/rotacija/marquee) delete i undo/redo
             // se ignorišu — undo bi pojeo zapis SOPSTVENOG poteza i teleportovao
             // entitete usred vučenja.
-            bool gestureActive = m_MoveDragging || m_RightDragging || m_MarqueeActive || m_HandleDragging;
+            bool gestureActive = m_MoveDragging || m_RightDragging || m_MarqueeActive || m_HandleDragging || m_KeyRotateActive;
 
             // U: podzemni režim (prikaz + šta klik/okvir biraju; copy/paste/
             // undo rade isto u oba sveta).
@@ -3009,6 +3102,12 @@ namespace Copaste
             if (rotationDelta != 0f && !RoadSnapEngaged)
             {
                 RotateClipboard(rotationDelta);
+            }
+
+            float keyRotate = GetRotateInputDelta();
+            if (keyRotate != 0f && !RoadSnapEngaged)
+            {
+                RotateClipboard(keyRotate);
             }
 
             // Undo radi i u paste modu — poništava poslednji "stamp".
@@ -4021,13 +4120,19 @@ namespace Copaste
             if (!IsCategoryEnabled(entity)) reasons.Add("category chip off for its type");
             if (EntityManager.HasComponent<Game.Buildings.Extension>(entity)) reasons.Add("Extension");
             if (EntityManager.HasComponent<Game.Vehicles.Vehicle>(entity)) reasons.Add("Vehicle");
-            if (EntityManager.HasComponent<Game.Objects.Pillar>(entity)) reasons.Add("Pillar (structural part of a road)");
+            if (IsOwnedPillar(entity)) reasons.Add("Pillar (structural part of a road)");
             if (EntityManager.HasComponent<Game.Objects.Moving>(entity)) reasons.Add("Moving");
             if (EntityManager.HasComponent<Game.Creatures.Creature>(entity)) reasons.Add("Creature");
             if (!SelectBuildingProps && IsOwnedByBuilding(entity)) reasons.Add("building-owned (Building elements off)");
             if (EntityManager.HasComponent<Temp>(entity)) reasons.Add("Temp");
             if (EntityManager.HasComponent<Deleted>(entity)) reasons.Add("Deleted");
             return reasons.Count > 0 ? string.Join(", ", reasons.ToArray()) : "no blocking check?!";
+        }
+
+        private bool IsOwnedPillar(Entity entity)
+        {
+            return EntityManager.HasComponent<Game.Objects.Pillar>(entity) &&
+                EntityManager.HasComponent<Owner>(entity);
         }
 
         private bool IsCopyable(Entity entity)
@@ -4044,7 +4149,10 @@ namespace Copaste
                 !EntityManager.HasComponent<Game.Buildings.Extension>(entity) &&
                 !EntityManager.HasComponent<Game.Vehicles.Vehicle>(entity) &&
                 // Stub mosta pripada putu koji ga ponovo gradi na svaki update.
-                !EntityManager.HasComponent<Game.Objects.Pillar>(entity) &&
+                // Samo stub SA vlasnikom: samostalan objekat sa Pillar
+                // komponentom (piloni, pirsovi i mostovi iz asset editora)
+                // postavio je igrač i on je običan prop.
+                !IsOwnedPillar(entity) &&
                 !EntityManager.HasComponent<Game.Objects.Moving>(entity) &&
                 // Cim koji STOJI nema Moving — živa bića se nikad ne selektuju.
                 !EntityManager.HasComponent<Game.Creatures.Creature>(entity) &&
@@ -4277,7 +4385,7 @@ namespace Copaste
 
         public void TriggerDelete()
         {
-            if (ToolIsActive && m_Mode == Mode.Select && !m_MoveDragging && !m_RightDragging &&
+            if (ToolIsActive && m_Mode == Mode.Select && !m_MoveDragging && !m_RightDragging && !m_KeyRotateActive &&
                 DeletableSelectedCount > 0)
             {
                 DeleteSelection();
@@ -4294,7 +4402,7 @@ namespace Copaste
 
         private void RunPendingHistorySteps()
         {
-            bool gestureActive = m_Mode == Mode.Relocate || m_MoveDragging || m_RightDragging || m_MarqueeActive || m_HandleDragging;
+            bool gestureActive = m_Mode == Mode.Relocate || m_MoveDragging || m_RightDragging || m_MarqueeActive || m_HandleDragging || m_KeyRotateActive;
             if (gestureActive)
             {
                 m_PendingUndoSteps = 0;
@@ -4324,7 +4432,7 @@ namespace Copaste
             // Tokom Relocate-a undo bi pojeo zapis samog premeštanja i teleportovao
             // zgradu — panel akcije su zamrznute dok premeštanje traje. Isto i
             // tokom aktivnog drag-a/rotacije (zapis sopstvenog poteza).
-            if (ToolIsActive && m_Mode != Mode.Relocate && !m_MoveDragging && !m_RightDragging)
+            if (ToolIsActive && m_Mode != Mode.Relocate && !m_MoveDragging && !m_RightDragging && !m_KeyRotateActive)
             {
                 m_PendingUndoSteps++;
             }
@@ -4354,14 +4462,22 @@ namespace Copaste
             }
         }
 
-        public void TriggerRotate(int degrees)
+        // Ugao iz panela: polje "Rotate by" (45° kad je prazno), bilo koji
+        // broj stepeni u oba smera.
+        public void TriggerRotate(float degrees)
         {
-            if (!ToolIsActive)
+            if (!ToolIsActive || float.IsNaN(degrees) || float.IsInfinity(degrees))
             {
                 return;
             }
 
             if (m_Mode == Mode.Relocate)
+            {
+                return;
+            }
+
+            degrees = math.clamp(degrees, -360f, 360f);
+            if (math.abs(degrees) < 0.01f)
             {
                 return;
             }
@@ -4379,18 +4495,7 @@ namespace Copaste
 
                 // Dugme je single-shot — nema release događaja koji bi odradio
                 // settle kao RMB rotacija, pa pun update ide odmah.
-                // Samo gotove zgrade (under-construction nisu ni rotirane).
-                foreach (Entity entity in m_Selected)
-                {
-                    if (IsBuilding(entity) && IsMovableBuilding(entity))
-                    {
-                        SettleBuilding(entity);
-                    }
-                }
-
-                SettleSurfaces();
-                SettleLanes();
-                SettleNetworks();
+                SettleAfterRotation();
             }
         }
 
@@ -5659,7 +5764,7 @@ namespace Copaste
 
         public void TriggerRedo()
         {
-            if (ToolIsActive && m_Mode != Mode.Relocate && !m_MoveDragging && !m_RightDragging)
+            if (ToolIsActive && m_Mode != Mode.Relocate && !m_MoveDragging && !m_RightDragging && !m_KeyRotateActive)
             {
                 m_PendingRedoSteps++;
             }

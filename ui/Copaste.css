@@ -93,6 +93,31 @@
 
 .copasteHint{margin:8rem 4rem 2rem;font-size:0.846em;line-height:1.45;color:rgba(255,255,255,0.35)}
 
+/* Upitnik u zaglavlju i lista gestova koja zameni telo panela. */
+.copasteHelpBtn{width:16rem;height:16rem;margin-left:5rem;border-radius:8rem;border:1rem solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);font-size:0.846em;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;transition:all .12s}
+.copasteHelpBtn:hover{color:#fff;border-color:rgba(111,211,154,0.5)}
+.copasteHelpBtnOn{border-color:rgba(111,211,154,0.6);background:rgba(111,211,154,0.18);color:#8fe6b4;box-shadow:0 0 8rem rgba(111,211,154,0.35)}
+.copasteHelp{margin-top:0}
+.copastePanel.copasteHelpWide{width:690rem}
+.copasteVanillaDock.copasteHelpWide{width:704rem}
+.copasteHelpCols{display:flex;align-items:flex-start}
+.copasteHelpCol{flex:1 1 0;min-width:0;margin-left:6rem}
+.copasteHelpCol:first-child{margin-left:0}
+.copasteHelpCol .copasteHelpGroup:first-child{margin-top:0}
+.copasteHelpGroup{margin-top:6rem;background:rgba(255,255,255,0.04);border:1rem solid rgba(255,255,255,0.06);border-radius:9rem;padding:6rem 6rem 3rem}
+.copasteHelpGroup:first-child{margin-top:0}
+.copasteHelpGroup .copasteSectionTitle{margin-bottom:4rem}
+.copasteHelpRow{display:flex;align-items:flex-start;padding:2.5rem 2rem;border-top:1rem solid rgba(255,255,255,0.05)}
+.copasteHelpRowFirst{border-top:none}
+.copasteHelpKeys{flex:0 0 78rem;display:flex;flex-wrap:wrap;align-items:center;padding-right:4rem}
+.copasteKey{display:inline-block;margin:1rem 2rem 1rem 0;padding:1rem 4rem;border-radius:4rem;border:1rem solid rgba(255,255,255,0.16);border-bottom-width:2rem;background:rgba(255,255,255,0.07);color:#e6e9f0;font-size:0.769em;font-weight:600;line-height:1.3;white-space:nowrap}
+.copasteKeyAccent{border-color:rgba(111,211,154,0.45);background:rgba(111,211,154,0.12);color:#8fe6b4}
+.copasteHelpPlus{color:rgba(255,255,255,0.3);font-size:0.769em;margin:0 2rem 0 0}
+.copasteHelpNote{font-size:0.769em;color:rgba(255,255,255,0.4);margin:0 2rem 0 0}
+.copasteHelpText{flex:1 1 0;font-size:0.846em;line-height:1.3;color:rgba(255,255,255,0.78);padding-top:1rem}
+.copasteHelpEm{color:#8fe6b4}
+.copasteHelpFoot{margin:8rem 2rem 2rem;font-size:0.769em;color:rgba(255,255,255,0.35);text-align:center}
+
 /* ===== VANILA TEMA (Options → Panel theme → Vanilla) =====
    Ista struktura panela, ali boje/pozadine/okviri dolaze iz IGRINIH CSS
    varijabli (isti izvor koji koriste vanila paneli i modovi poput Node
@@ -129,6 +154,18 @@
 .copasteThemeVanilla .copasteHint{color:var(--textColorDim)}
 .copasteThemeVanilla .copasteEmpty{color:var(--textColorDim)}
 .copasteThemeVanilla .copasteNameTip{background-color:var(--panelColorNormal);border-color:var(--menuControlBorder);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteHelpBtn{background:var(--panelColorDark);border-color:var(--menuControlBorder);color:var(--textColorDim);box-shadow:none}
+.copasteThemeVanilla .copasteHelpBtn:hover{color:var(--normalTextColor);border-color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteHelpBtnOn{background:var(--accentColorDark);border-color:var(--accentColorNormal);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteHelpGroup{background:var(--panelColorDark);border-color:transparent;border-radius:var(--panelRadius)}
+.copasteThemeVanilla .copasteHelpRow{border-top-color:var(--menuControlBorder)}
+.copasteThemeVanilla .copasteKey{background:var(--panelColorNormal);border-color:var(--menuControlBorder);color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteKeyAccent{background:var(--accentColorDark);border-color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteHelpPlus{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteHelpNote{color:var(--textColorDim)}
+.copasteThemeVanilla .copasteHelpText{color:var(--normalTextColor)}
+.copasteThemeVanilla .copasteHelpEm{color:var(--accentColorNormal)}
+.copasteThemeVanilla .copasteHelpFoot{color:var(--textColorDim)}
 
 /* Nativna vanila: igrin Panel je okvir — spoljni dock nosi poziciju/drag,
    telo gubi našu pozadinu (Panel donosi svoju), unutrašnji header je skriven

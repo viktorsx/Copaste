@@ -45,6 +45,21 @@ namespace Copaste
                     GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildFrench(Settings)));
                     Log.Info($"French locale registered for {localeId}");
                 }
+                else if (localeId.StartsWith("zh-HANS"))
+                {
+                    GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildChinese(Settings)));
+                    Log.Info($"Chinese locale registered for {localeId}");
+                }
+                else if (localeId.StartsWith("ja"))
+                {
+                    GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildJapanese(Settings)));
+                    Log.Info($"Japanese locale registered for {localeId}");
+                }
+                else if (localeId.StartsWith("ru"))
+                {
+                    GameManager.instance.localizationManager.AddSource(localeId, new MemorySource(Localization.BuildRussian(Settings)));
+                    Log.Info($"Russian locale registered for {localeId}");
+                }
             }
 
             // Jezik moda nezavisno od igre: izabrani rečnik se doda kao
@@ -121,6 +136,9 @@ namespace Copaste
                         ModLanguageOption.German => Localization.BuildGerman(Settings),
                         ModLanguageOption.French => Localization.BuildFrench(Settings),
                         ModLanguageOption.Serbian => Localization.BuildSerbian(Settings),
+                        ModLanguageOption.Chinese => Localization.BuildChinese(Settings),
+                        ModLanguageOption.Japanese => Localization.BuildJapanese(Settings),
+                        ModLanguageOption.Russian => Localization.BuildRussian(Settings),
                         _ => Localization.BuildEnglish(Settings),
                     };
 

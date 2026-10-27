@@ -69,10 +69,10 @@ with every detail is in [docs/features.md](docs/features.md).
 
 ### 🎛️ Interface & languages
 
-- **Toolbar button + panel** - a top-left toolbar button toggles the tool; the panel (draggable, remembers its position) shows counters, the selected prop's name, a per-prop list for selections up to 50 (hover rings the prop in the world, click isolates it), align controls and your blueprints
+- **Toolbar button + panel** - a top-left toolbar button toggles the tool; the panel (draggable, remembers its position) shows counters, the selected prop's name, a per-prop list for selections up to 50 (hover rings the prop in the world, click isolates it), align controls and your blueprints. The **?** in the header lists every gesture and key
 - **Panel your way** - a **Vanilla theme** option renders the panel in the game's own look, **Panel size** (80-125%) scales the whole panel and a separate **Text size** (90-130%) grows just the lettering
 - **Rebindable hotkeys** - all shortcuts can be changed in Options → Copaste → Key bindings
-- **English, German, French and Serbian** localization - and a **Mod language** option that pins the mod to its own language, independent of the game's
+- **English, German, French, Serbian, Simplified Chinese, Japanese and Russian** localization - and a **Mod language** option that pins the mod to its own language, independent of the game's
 
 ## 🎮 Controls (defaults)
 
@@ -92,6 +92,7 @@ included, is in [docs/commands.md](docs/commands.md).
 | Copy selection | **Ctrl+C** |
 | Paste (preview follows mouse) | **Ctrl+V**, then **left click** to place - repeat to stamp multiple copies |
 | Rotate selection / paste preview | **Hold right mouse button + drag** (hold **Alt** to snap to 45°) |
+| Rotate with keys | **, and .** turn steadily while held, **Shift + , / .** slowly for fine placement; the panel buttons rotate by the angle typed in **Rotate by** (45° when empty) |
 | Spin each prop around its own axis | **Alt + mouse wheel** (15° per notch) |
 | Align: tidy row | **Line** panel button - straight line, equal gaps, uniform rotation |
 | Align: row through a reference prop | **To prop** panel button, then click the reference prop (RMB cancels) |
@@ -126,7 +127,7 @@ Everything in **Options → Copaste**, on two tabs. Defaults are in bold - the m
 
 | General → Behavior | What it does |
 |---|---|
-| **Mod language** | Which language the mod itself speaks: **Auto** (follows the game), English, German, French or Serbian. Handy if you play the game in one language but want the mod in another |
+| **Mod language** | Which language the mod itself speaks: **Auto** (follows the game), English, German, French, Serbian, Simplified Chinese, Japanese or Russian. Handy if you play the game in one language but want the mod in another |
 | **Ignore placement errors when pasting** | **On**: the paste stamp ignores placement errors (overlaps, collisions) and goes down anywhere. Off: the game's normal placement rules apply. Pasting only - it does not protect overlapping buildings from the game's override rules; the Anarchy mod does that |
 
 | General → Panel | What it does |

@@ -137,6 +137,30 @@ const register = (moduleRegistry) => {
       const [renaming, setRenaming] = React.useState(null);
       const [renameValue, setRenameValue] = React.useState("");
       const [alignGap, setAlignGap] = React.useState("");
+
+      // Upitnik u zaglavlju: lista gestova zameni telo panela. Zatvara se
+      // sa alatom, da sledeće otvaranje panela uvek krene od alata.
+      const [helpOpen, setHelpOpen] = React.useState(false);
+      React.useEffect(() => {
+        if (!active) {
+          setHelpOpen(false);
+        }
+      }, [active]);
+
+      // "Rotate by": ugao u stepenima za dugmad rotacije; prazno = 45.
+      const [rotAngle, setRotAngle] = React.useState("");
+      const rotAngleValue = () => {
+        const v = Math.abs(parseFloat((rotAngle || "").replace(",", ".")));
+        return isNaN(v) || v < 0.01 ? 45 : Math.min(360, v);
+      };
+      const stepRotAngle = (dir) => {
+        let v = parseFloat((rotAngle || "").replace(",", "."));
+        v = isNaN(v) ? 45 : v;
+        v = Math.round((v + dir * 5) * 10) / 10;
+        if (v < 1) v = 1;
+        if (v > 360) v = 360;
+        setRotAngle(String(v));
+      };
       const version = useValue(version$);
       const selectedName = useValue(selectedName$);
       const savedX = useValue(panelX$);
@@ -435,17 +459,144 @@ const register = (moduleRegistry) => {
       // Veličina TEKSTA (Options → Text size): koren nosi font-size, sve
       // unutrašnje veličine teksta su u em — gabarit panela ostaje isti.
       const textStyle = { fontSize: Math.round(13 * textScale) / 100 + "rem" };
+      // Dugme ? u zaglavlju. mousedown ne sme do zaglavlja (ono vuče panel).
+      const helpBtn = withTooltip(
+        helpOpen ? t("HELP_BACK_TIP", "Back to the tool") : t("HELP_TIP", "Shortcuts and gestures"),
+        h(
+          "div",
+          {
+            className: "copasteHelpBtn" + (helpOpen ? " copasteHelpBtnOn" : ""),
+            onMouseDown: (e) => e.stopPropagation(),
+            onClick: () => setHelpOpen(!helpOpen),
+          },
+          "?"
+        )
+      );
+
+      // Lista gestova. Tasteri: "!X" = akcenat (modifikator), "+" i "/" su
+      // veznici, "~x" je bleda napomena; u tekstu *ovako* je istaknuto.
+      const helpKey = (k, i) => {
+        if (k === "+" || k === "/") {
+          return h("span", { key: i, className: "copasteHelpPlus" }, k);
+        }
+        if (k.charAt(0) === "!") {
+          return h("span", { key: i, className: "copasteKey copasteKeyAccent" }, k.slice(1));
+        }
+        if (k.charAt(0) === "~") {
+          return h("span", { key: i, className: "copasteHelpNote" }, k.slice(1));
+        }
+        return h("span", { key: i, className: "copasteKey" }, k);
+      };
+      const helpText = (text) =>
+        text.split("*").map((p, i) => (i % 2 === 1 ? h("span", { key: i, className: "copasteHelpEm" }, p) : p));
+      const helpRow = (row, i) =>
+        h(
+          "div",
+          { key: i, className: "copasteHelpRow" + (i === 0 ? " copasteHelpRowFirst" : "") },
+          h("div", { className: "copasteHelpKeys" }, row[0].map(helpKey)),
+          h("div", { className: "copasteHelpText" }, helpText(row[1]))
+        );
+      const helpGroup = (title, rows, i) =>
+        h(
+          "div",
+          { key: i, className: "copasteHelpGroup" },
+          h("div", { className: "copasteSectionTitle" }, title),
+          rows.map(helpRow)
+        );
+      const kClick = t("K_CLICK", "Click");
+      const kDrag = t("K_DRAG", "Drag");
+      const kRmb = t("K_RMB", "RMB");
+      const kRmbDrag = t("K_RMB_DRAG", "RMB drag");
+      const helpGroups = [
+        [
+          t("SEC_SELECTION", "Selection"),
+          [
+            [[kClick, "/", kDrag], t("HELP_SEL_CLICK", "Select one object, or everything in a box")],
+            [["!Shift", "+", kClick], t("HELP_SEL_SHIFT", "Add to or remove from the selection, *also with a box*")],
+            [["!Ctrl", "+", kClick], t("HELP_SEL_CTRL", "Pick props buried in other objects, repeat to cycle")],
+            [["T"], t("HELP_SEL_T", "Lock the box to the hovered object's type")],
+            [[kRmb, "~" + t("K_ON_CHIP", "on chip")], t("HELP_SEL_SOLO", "Solo that filter, again to restore all")],
+            [["U"], t("HELP_SEL_U", "Underground view")],
+          ],
+        ],
+        [
+          t("HELP_SEC_PASTE", "Paste"),
+          [
+            [["Ctrl+C", "Ctrl+V"], t("HELP_PASTE_COPY", "Copy, then paste mode with a ghost preview")],
+            [[kClick], t("HELP_PASTE_CLICK", "Stamp a copy, keep clicking to stamp more")],
+            [[kRmbDrag], t("HELP_PASTE_ROTATE", "Rotate, *hold Alt for 45° steps*")],
+            [[",", "."], t("HELP_ROTATE_KEYS", "Rotate steadily, *Shift for slow fine steps*")],
+            [["PgUp", "PgDn", "End"], t("HELP_PASTE_HEIGHT", "Raise or lower the group, End resets")],
+            [[kRmb], t("HELP_PASTE_EXIT", "Quick click leaves paste mode")],
+          ],
+        ],
+        [
+          t("SEC_EDIT", "Edit"),
+          [
+            [[kDrag], t("HELP_EDIT_MOVE", "Move the selection, *Alt+drag moves one*")],
+            [[kRmbDrag], t("HELP_EDIT_ROTATE", "Rotate around the center, Alt snaps to 45°")],
+            [[",", "."], t("HELP_ROTATE_KEYS", "Rotate steadily, *Shift for slow fine steps*")],
+            [["!Alt", "+", t("K_WHEEL", "Wheel")], t("HELP_EDIT_SPIN", "Spin each object in place")],
+            [["PgUp", "PgDn", "End", "Home"], t("HELP_EDIT_HEIGHT", "Height, End to ground, Home to match another object")],
+            [["!Ctrl", "+", t("K_ARROWS", "Arrows")], t("HELP_EDIT_NUDGE", "Nudge")],
+            [["Del", "Ctrl+Z", "Ctrl+Y"], t("HELP_EDIT_UNDO", "Delete, undo, redo")],
+            [["Tab"], t("HELP_EDIT_RELOCATE", "Relocate a building")],
+          ],
+        ],
+        [
+          t("HELP_SEC_ROADS", "Roads & fences"),
+          [
+            [[t("K_HANDLE", "Drag handle")], t("HELP_ROAD_BEND", "Bend the curve, grab the body to bend where you hold")],
+            [["!Alt", "~" + t("K_TAP", "tap")], t("HELP_ROAD_STRAIGHTEN", "Straighten selected nodes between their neighbours")],
+            [[t("K_TRIANGLE", "Triangle")], t("HELP_ROAD_LANES", "At a joint, cycle lane alignment")],
+            [["[", "]"], t("HELP_ROAD_GAP", "Align gap")],
+          ],
+        ],
+        [
+          t("HELP_SEC_PANEL", "Panel"),
+          [
+            [["Ctrl+Shift+C"], t("HELP_PANEL_TOGGLE", "Toggle the tool")],
+            [[t("K_HEADER", "Drag header")], t("HELP_PANEL_MOVE", "Move the panel, it remembers its place")],
+          ],
+        ],
+      ];
+      // Tri kolone jednake visine: Selection+Panel, Paste+Roads, Edit.
+      // Panel se za to vreme širi (copasteHelpWide), pa lista stane u
+      // pravougaonik umesto u dug stub.
+      const helpCols = [[0, 4], [1, 3], [2]];
+      const helpView = h(
+        "div",
+        { className: "copasteHelp" },
+        h(
+          "div",
+          { className: "copasteHelpCols" },
+          helpCols.map((col, ci) =>
+            h(
+              "div",
+              { key: ci, className: "copasteHelpCol" },
+              col.map((gi) => helpGroup(helpGroups[gi][0], helpGroups[gi][1], gi))
+            )
+          )
+        ),
+        h("div", { className: "copasteHelpFoot" }, t("HELP_FOOT", "Keys can be changed in Options. Click ? to go back."))
+      );
+      const wideClass = helpOpen ? " copasteHelpWide" : "";
+
       const content = h(
         "div",
         nativeVanilla
           ? { className: "copastePanel copasteThemeVanilla copasteVanillaBody", style: textStyle }
-          : { className: "copastePanel" + (uiTheme === 1 ? " copasteThemeVanilla" : ""), ref: panelRef, style: Object.assign({}, panelStyle, textStyle) },
+          : { className: "copastePanel" + (uiTheme === 1 ? " copasteThemeVanilla" : "") + wideClass, ref: panelRef, style: Object.assign({}, panelStyle, textStyle) },
         h(
           "div",
           { className: "copasteHeader", onMouseDown: onHeaderMouseDown },
           withTooltip(hintText, h("img", { className: "copasteTitleLogo", src: "coui://copaste/copastelogotext.svg" })),
+          helpBtn,
           version ? h("div", { className: "copasteVersion" }, "v" + version) : null
         ),
+        helpOpen ? helpView : h(
+          React.Fragment,
+          null,
         h(
           "div",
           { className: "copasteCard copasteCardFlush", style: { marginTop: "0" } },
@@ -715,9 +866,44 @@ const register = (moduleRegistry) => {
           ),
           h(
             "div",
+            { className: "copasteSubTitleRow" },
+            h("div", { className: "copasteSectionTitle copasteSubTitleFlat" }, t("SEC_ROTATE_BY", "Rotate by")),
+            withTooltip(
+              t("ROTATE_BY_TIP", "Angle in degrees for the rotate buttons (empty = 45°). The rotate keys from Options turn steadily while held, the fine ones slowly"),
+              h(
+                "div",
+                { className: "copasteStepper" },
+                h(
+                  "button",
+                  { className: "copasteStepperBtn", onClick: () => stepRotAngle(-1) },
+                  h("img", { src: "coui://copaste/chevl.svg" })
+                ),
+                h("input", {
+                  className: "copasteStepperInput",
+                  value: rotAngle,
+                  placeholder: "45°",
+                  onChange: (e) => setRotAngle(e.target.value),
+                  onFocus: () => trigger("copaste", "setTyping", true),
+                  onKeyDown: (e) => {
+                    if (e.key === "Enter" && e.target && e.target.blur) {
+                      e.target.blur();
+                    }
+                  },
+                  onBlur: () => trigger("copaste", "setTyping", false),
+                }),
+                h(
+                  "button",
+                  { className: "copasteStepperBtn", onClick: () => stepRotAngle(1) },
+                  h("img", { src: "coui://copaste/chevr.svg" })
+                )
+              )
+            )
+          ),
+          h(
+            "div",
             { className: "copasteBtns" },
-            actionBtn("rotl.svg", t("ROTL_TIP", "Rotate 45° left"), selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", -45), false),
-            actionBtn("rotr.svg", t("ROTR_TIP", "Rotate 45° right"), selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", 45), false),
+            actionBtn("rotl.svg", t("ROTL_TIP", "Rotate left by the angle above (45° if empty)"), selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", -rotAngleValue()), false),
+            actionBtn("rotr.svg", t("ROTR_TIP", "Rotate right by the angle above (45° if empty)"), selected > 0 || pasteMode, () => trigger("copaste", "actionRotate", rotAngleValue()), false),
             actionBtn("up.svg", t("RAISE_TIP", "Raise 0.5 m (PgUp)"), heightCount > 0 || pasteMode, () => trigger("copaste", "actionHeight", 1), false),
             actionBtn("down.svg", t("LOWER_TIP", "Lower 0.5 m (PgDn)"), heightCount > 0 || pasteMode, () => trigger("copaste", "actionHeight", -1), false)
           ),
@@ -822,12 +1008,13 @@ const register = (moduleRegistry) => {
             ? h("div", { className: "copasteEmpty" }, t("NO_BLUEPRINTS", "No saved blueprints"))
             : h("div", null, bpPageItems.map(bpRow))
         )
+        )
       );
 
       if (nativeVanilla) {
         return h(
           "div",
-          { className: "copasteVanillaDock", ref: panelRef, style: panelStyle },
+          { className: "copasteVanillaDock" + wideClass, ref: panelRef, style: panelStyle },
           h(
             ui.Panel,
             {
@@ -836,6 +1023,7 @@ const register = (moduleRegistry) => {
                 "div",
                 { className: "copasteVanillaHeader", onMouseDown: onHeaderMouseDown },
                 withTooltip(hintText, h("img", { className: "copasteTitleLogo", src: "coui://copaste/copastelogotext.svg" })),
+                helpBtn,
                 version ? h("div", { className: "copasteVersion" }, "v" + version) : null
               ),
             },

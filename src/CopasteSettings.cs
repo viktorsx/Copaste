@@ -18,6 +18,9 @@ namespace Copaste
         German = 2,
         French = 3,
         Serbian = 4,
+        Chinese = 5,
+        Japanese = 6,
+        Russian = 7,
     }
 
     [FileLocation("ModsSettings/Copaste/Copaste")]
@@ -58,6 +61,10 @@ namespace Copaste
         public const string kNudgeRightAction = "CopasteNudgeRight";
         public const string kAlignGapPlusAction = "CopasteAlignGapPlus";
         public const string kAlignGapMinusAction = "CopasteAlignGapMinus";
+        public const string kRotateLeftAction = "CopasteRotateLeft";
+        public const string kRotateRightAction = "CopasteRotateRight";
+        public const string kRotateLeftFineAction = "CopasteRotateLeftFine";
+        public const string kRotateRightFineAction = "CopasteRotateRightFine";
 
         public CopasteSettings(IMod mod)
             : base(mod)
@@ -87,6 +94,26 @@ namespace Copaste
         [SettingsUIKeyboardBinding(BindingKeyboard.PageDown, kLowerAction)]
         [SettingsUISection(kKeybindingsTab, kEditingGroup)]
         public ProxyBinding LowerBinding { get; set; }
+
+        // Rotacija tasterima: držanje okreće ravnomerno, fina varijanta
+        // sporije. Četiri zasebne veze (ne "Shift kao modifikator u kodu"),
+        // da svaka bude vidljiva i promenljiva u Options i da ne zavisi od
+        // toga kako igra tretira držani modifikator uz golu vezu.
+        [SettingsUIKeyboardBinding(BindingKeyboard.Comma, kRotateLeftAction)]
+        [SettingsUISection(kKeybindingsTab, kEditingGroup)]
+        public ProxyBinding RotateLeftBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.Period, kRotateRightAction)]
+        [SettingsUISection(kKeybindingsTab, kEditingGroup)]
+        public ProxyBinding RotateRightBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.Comma, kRotateLeftFineAction, shift: true)]
+        [SettingsUISection(kKeybindingsTab, kEditingGroup)]
+        public ProxyBinding RotateLeftFineBinding { get; set; }
+
+        [SettingsUIKeyboardBinding(BindingKeyboard.Period, kRotateRightFineAction, shift: true)]
+        [SettingsUISection(kKeybindingsTab, kEditingGroup)]
+        public ProxyBinding RotateRightFineBinding { get; set; }
 
         [SettingsUIKeyboardBinding(BindingKeyboard.Z, kUndoAction, ctrl: true)]
         [SettingsUISection(kKeybindingsTab, kEditingGroup)]

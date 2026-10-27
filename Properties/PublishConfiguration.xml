@@ -87,18 +87,19 @@ A very special thank-you to **Biffa** (Biffa Plays Indie Games) and **ConflictNe
  <Screenshot Value="Properties/Screenshots/s10.jpg" />
  <Tag Value="Code Mod" />
  <ForumLink Value="https://forum.paradoxplaza.com/forum/threads/copaste-1-1-0-copy-paste-for-props-and-now-buildings.1938698/" />
- <ModVersion Value="1.2.2" />
+ <ModVersion Value="1.3.0" />
  <GameVersion Value="1.6.*" />
- <ChangeLog>Fixes after the Autumn Breeze game patch, hand-tested in game before publishing.
+ <ChangeLog>Rotation keys, a shortcut list in the panel and three new languages, hand-tested in game before publishing.
 
-- New Paste height switch in the Clipboard card. Follow terrain (default) keeps every prop at its own height above the ground, so a group bends with a slope. Keep shape pastes the group rigid, exactly as copied, which is what a walkway or an overpass built from props needs
-- Props on roads that the game hides from its own cursor ray (a parked-vehicle prop, furniture placed over the asphalt) can now be clicked and dragged reliably
-- Bridge supports and pillars are no longer selectable. They belong to the road, which rebuilds them on every update, so moving or deleting one left a stale entity behind
-- Pasting a group onto a sidewalk no longer lifts it by the sidewalk height on top of the height it already carried
-- Tapping Alt with a road node selected no longer resets the tool on game version 1.6.2
-- The game's own Underground toggle in the toolbar stays available while Copaste is active and switches Copaste's underground mode, the same as the U key and the panel button
-- The selection box and the arrow-key nudge keep their screen alignment when the camera looks straight down
-- A copied suspension bridge comes out as one bridge again. Pasted bridges and elevated roads are divided the way the game's own road tool divides them, and a bridge built from the game's span pattern is copied, and restored by undo, as the single course it was built from. A bridge whose nodes were moved by hand is still divided piece by piece</ChangeLog>
+New
+- Rotate with the keyboard: , and . turn the selection (or the paste preview) steadily while held, Shift + , and Shift + . turn slowly for fine placement. Both pairs can be rebound in Options
+- Rotate by field in the Align card: the rotate buttons now turn by the angle typed there (45 degrees when empty), so any exact angle can be applied
+- ? button in the panel header: swaps the panel for a list of every gesture and key the tool understands, grouped by Selection, Paste, Edit, Roads &amp; fences and Panel
+- Simplified Chinese, Japanese and Russian translations of the panel and the Options screen, with matching Mod language choices
+
+Fixes
+- PgUp and PgDn raise and lower again instead of switching to underground view. The game's round Underground toggle in the toolbar is dark while Copaste is active, as it was in 1.2.1; the U key and the panel button switch the view as before
+- Custom assets built on a pillar, such as piers, bridge pieces and some industrial props, can be selected again. Since 1.2.2 every object with a pillar component was skipped; now only the supports a road builds for itself are</ChangeLog>
  <ExternalLink Type="github" Url="https://github.com/viktorsx/Copaste" />
  <ExternalLink Type="discord" Url="https://discord.gg/HTav7ARPs2" />
  <ExternalLink Type="kofi" Url="https://ko-fi.com/viktorsx" />

@@ -41,7 +41,7 @@ src/
   CopasteToolSystem.Bending.cs - curve handles for fences and road segments
   CopasteToolSystem.LaneAlign.cs - lane-alignment triangles at road joints
   CopasteUISystem.cs  - UI bridge: value bindings and triggers between C# and the panel
-  Localization.cs     - English, German, French and Serbian dictionaries for the Options screen
+  Localization.cs     - English, German, French, Serbian, Chinese, Japanese and Russian dictionaries
 ui/
   Copaste.mjs         - the in-game UI module (toolbar button + panel), plain JS, no build step
   Copaste.css         - panel styles (game "rem" units)
@@ -74,7 +74,7 @@ can do, and [commands.md](commands.md) for every control.
 9. [ui.md](ui.md) - the cohtml panel: bindings, triggers, Gameface engine
    constraints
 10. [settings-and-input.md](settings-and-input.md) - settings, key bindings,
-    localization (four languages)
+    localization (seven languages)
 11. [build-and-deploy.md](build-and-deploy.md) - building from source and
     local deploy
 

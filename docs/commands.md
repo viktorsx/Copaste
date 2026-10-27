@@ -36,12 +36,14 @@ For what the features do in depth, see [features.md](features.md).
 | **Tab** | Relocate | The selected building follows the cursor and snaps to the road; click places it, Tab, right click or Escape puts it back (needs exactly one finished building selected) |
 | **Del** | Delete | Removes the whole selection at once, undo brings everything back. Refused above 500 objects (error sound) - a removal that large in one frame can crash the game; delete in parts |
 | **PgUp / PgDn** | Raise / Lower | Moves the selection (or the paste preview) up and down; hold for continuous movement |
+| **, and .** | Rotate left / right | Turns the selection (or the paste preview) around its center while held, 60 degrees per second. One undo step per press-and-release |
+| **Shift + , / Shift + .** | Rotate left / right (fine) | The same, slowly: 10 degrees per second, for exact placement |
 | **End** | Snap to ground | Drops the selection back onto the terrain; in paste mode it resets the height offset |
 | **Home** | Match height | Arms height picking: the next object you click sets the height for the whole selection |
 | **T** | Type filter | Locks the marquee to the prefab type of the hovered or selected object; press again to clear |
 | **Ctrl + arrow keys** | Nudge | Fine-positions the selection in small steps, relative to the camera |
 | **[ and ]** | Align gap | While an align button is lit, shrinks or grows the gap of the last align live |
-| **U** | Underground view | Switches to the game's underground look; selection reaches only what is below ground. Copy/paste and undo work the same in both worlds. The game's own Underground toggle in the toolbar does the same while Copaste is active |
+| **U** | Underground view | Switches to the game's underground look; selection reaches only what is below ground. Copy/paste and undo work the same in both worlds. The game's own Underground toggle in the toolbar is inactive while Copaste is on; reporting underground support to the game would also hand PgUp/PgDn to the game's underground shortcuts |
 | **Alt (tap)** | Straighten | A clean Alt press-and-release snaps selected middle road nodes onto the straight line between their neighbors and straightens the segments through them |
 
 ## Panel
@@ -57,10 +59,11 @@ For what the features do in depth, see [features.md](features.md).
 | **Clear** | Empties the clipboard |
 | **Underground button** (next to the counters, Networks chip on) | Toggles underground view - same as U; filled while active |
 | **Logo (hover)** | The how-to hint: what click, box select and Ctrl+click do in the current mode |
+| **? (header)** | Swaps the panel body for the list of every gesture and key, grouped into Selection, Paste, Edit, Roads & fences and Panel. Click again to return; the list also closes with the tool |
 | **Undo / Redo** | Same as Ctrl+Z / Ctrl+Y |
 | **Relocate** | Same as Tab; lit while relocating, clicking it again cancels |
 | **Delete** | Same as Del |
 | **Ground / Match H** | Same as End / Home |
-| **Rotate 45 left / right** | Rotates the selection (or the paste preview) in 45 degree steps around its center |
+| **Rotate by + left / right buttons** | Rotates the selection (or the paste preview) around its center by the angle in the field; empty means 45 degrees. The stepper moves the angle in 5 degree steps, or type any angle and press Enter |
 | **Line / To prop / Circle** | Align tools: a straight row with equal gaps, a row through a reference prop you click, or an even circle. The stepper next to them sets the gap in exact meters |
 | **Blueprints list** | Click a name to load it and start pasting; the pencil renames inline, the x deletes the file. Lists are paged, 5 per page |

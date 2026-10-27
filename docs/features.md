@@ -161,8 +161,7 @@ Available since 1.1.0, behind the Buildings filter chip.
   transition the through lanes line up exactly (the classic exit look).
   On streets with sidewalks the targets come from the real driving lanes;
   on highway-style roads the roadway edges align.
-- **Underground mode (U, the panel button or the game's own Underground
-  toggle in the toolbar)**: the view switches to the
+- **Underground mode (U or the panel button)**: the view switches to the
   game's underground look and selection - click and box alike - reaches
   only what is below ground (metro, tunnels), so a box over a tunnel can
   never grab the surface above it, and vice versa. Copy/paste and undo
@@ -202,8 +201,11 @@ Available since 1.1.0, behind the Buildings filter chip.
   mouse, layout and heights preserved.
 - **Group rotation**: hold the right mouse button and drag to rotate the
   selection (or the paste preview) around its center; hold **Alt** while
-  dragging to snap to 45 degree steps. The panel also has 45 degree left and
-  right buttons.
+  dragging to snap to 45 degree steps. The **, and .** keys turn it
+  steadily while held (60 degrees per second), **Shift + , / .** slowly
+  (10 degrees per second) for exact placement. The panel's left and right
+  buttons rotate by the angle typed in the **Rotate by** field (45 degrees
+  when empty), so any angle can be applied exactly.
 - **Alt + drag**: pulls a single object out of the selection and moves only
   it - the rest stays put. Handy for nudging one prop of a group into place.
 - **Alt + mouse wheel**: spins every selected object around its own axis, 15
@@ -250,6 +252,10 @@ rebindable in Options.
   with Paste look and Road snap, Edit (Undo, Redo, Relocate, Delete),
   Align with the gap stepper, and Blueprints. The how-to hint lives in
   the logo's tooltip - hover the Copaste logo in the header.
+- The **?** button in the header swaps the panel body for a list of every
+  gesture and key the tool understands, grouped into Selection, Paste,
+  Edit, Roads & fences and Panel. Click it again to get the tool back; the
+  list also closes when the tool is turned off.
 - The look is configurable in Options: a **Vanilla theme** renders the
   panel inside the game's own panel chrome, **Panel size** scales the
   whole panel (80-125%), and a separate **Text size** (90-130%) grows
@@ -260,9 +266,10 @@ rebindable in Options.
 - **Every hotkey is rebindable** in Options → Copaste → Key bindings,
   grouped by purpose (Tool, Clipboard, Editing, Nudge, Align).
 - Both the Options screen and the in-game panel are localized in **English,
-  German, French and Serbian** - by default the mod follows the game
-  language and falls back to English, and a **Mod language** option pins
-  the mod to a language of its own, independent of the game's.
+  German, French, Serbian, Simplified Chinese, Japanese and Russian** - by
+  default the mod follows the game language and falls back to English, and
+  a **Mod language** option pins the mod to a language of its own,
+  independent of the game's.
 - The three safety limits (selection size, selection outlines, the Selected
   props list) are sliders in Options → General for stronger machines.
 

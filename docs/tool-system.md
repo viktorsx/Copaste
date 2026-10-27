@@ -170,6 +170,18 @@ destination.
 
 - **RMB drag** rotates the whole selection around its center; holding **Alt**
   snaps to 45° steps (`kRotateSnap`).
+- **Comma / Period** (and the Shift variants, four separate bindings so each
+  is visible in Options) rotate while held: `GetRotateInputDelta` sums
+  `kKeyRotateSpeed` (60°/s) and `kKeyRotateFineSpeed` (10°/s) per frame.
+  In select mode the first frame of a press opens the gesture
+  (`m_KeyRotateActive`: selection center + one `PushTransformUndo`), every
+  frame rotates, and the frame after the last key is released runs
+  `SettleAfterRotation` (buildings, surfaces, lanes, networks) - the same
+  shape as an RMB drag. In paste mode the keys rotate the clipboard unless
+  road snap holds the facing. `m_UiTyping` mutes them while a panel field
+  has focus.
+- `TriggerRotate(float degrees)` serves the panel buttons with the
+  **Rotate by** angle (clamped to ±360°, under 0.01° ignored).
 - **Alt + mouse wheel** spins **each prop around its own axis**, 15° per wheel
   notch (`SpinSelection`). One undo record covers a whole burst (records are
   only pushed when > 1 s passed since the last wheel event). Note the game's

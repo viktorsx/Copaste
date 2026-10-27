@@ -25,7 +25,8 @@ mods) fully controls its look. The icon is our SVG.
 ### Panel
 
 A single `CopastePanel` component: header (drag handle; the logo's tooltip
-carries the how-to hint), stats card (Selected/Clipboard counters, an
+carries the how-to hint; a `?` button swaps the body for the shortcuts
+list, local React state that resets when the tool goes inactive), stats card (Selected/Clipboard counters, an
 Underground toggle button while the Networks chip is on, plus conditional
 Prop-name and Filter rows), "Selected props" paged list,
 Clipboard/Edit/Rotate&Align cards and the Blueprints paged list. All state
@@ -79,7 +80,8 @@ Value bindings (C# → UI), group `copaste`:
 Triggers (UI → C#): `toggleTool`, `actionCopy`, `actionPaste`, `actionDelete`,
 `actionUndo`, `actionRedo`, `actionRelocate`, `clearClipboard`,
 `actionSelectSame`, `actionSnapGround`, `actionMatchHeight`,
-`actionRotate(int degrees)`, `actionHeight(int steps)`,
+`actionRotate(float degrees)` (the panel's Rotate-by angle, 45 when the
+field is empty), `actionHeight(int steps)`,
 `actionAlignLine(gap)`, `actionAlignRef(gap)`, `actionAlignCircle(gap)`,
 `adjustAlignGap(int dir)`, `setAlignGapLive(gap)`, `setRandomVariation(bool)`,
 `setRoadSnap(bool)`, `setBuildingProps(bool)`, `toggleSelectionFilter(int bit)`,

@@ -162,10 +162,11 @@ center → left → right:
 
 `UndergroundMode` (U key or the panel button) sets the tool's
 `requireUnderground`, which flips the game into the underground view (the
-bulldozer's mechanism). The tool also reports `allowUnderground`, so the
-game's own toolbar toggle stays enabled while Copaste is active, shows the
-mode, and drives it through `SetUnderground`; without that report the game
-draws its toggle disabled. Picking and marquee then require
+bulldozer's mechanism). The tool deliberately does not report
+`allowUnderground`: a tool that does also receives the game's Enter and
+Exit Underground Mode shortcuts, PageDown and PageUp by default, which are
+the mod's Raise and Lower keys. The game therefore draws its own toolbar
+toggle disabled while Copaste is active. Picking and marquee require
 `MatchesUndergroundMode`: the candidate's position must be below terrain
 (−1.5 m) exactly when the mode is on - for networks, props, buildings,
 fences and surfaces alike. Copy/paste/undo are mode-agnostic.

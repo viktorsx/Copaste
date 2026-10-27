@@ -342,7 +342,7 @@ namespace Copaste
             AddBinding(new TriggerBinding("copaste", "clearClipboard", () => m_CopasteToolSystem.TriggerClearClipboard()));
             AddBinding(new TriggerBinding("copaste", "actionSelectSame", () => m_CopasteToolSystem.TriggerSelectSame()));
             AddBinding(new TriggerBinding("copaste", "actionSnapGround", () => m_CopasteToolSystem.TriggerSnapGround()));
-            AddBinding(new TriggerBinding<int>("copaste", "actionRotate", (degrees) => m_CopasteToolSystem.TriggerRotate(degrees)));
+            AddBinding(new TriggerBinding<float>("copaste", "actionRotate", (degrees) => m_CopasteToolSystem.TriggerRotate(degrees)));
             AddBinding(new TriggerBinding<int>("copaste", "actionHeight", (steps) => m_CopasteToolSystem.TriggerHeight(steps)));
 
             m_ToolSystem.EventToolChanged += (tool) =>
